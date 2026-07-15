@@ -70,15 +70,35 @@ Polices : titres **Playfair Display**, interface **DM Sans**, chiffres **EB Gara
 - Les données sont **liées à l'origine (l'URL)** : changer d'hébergement = stockage vide → **exporter le JSON avant, réimporter après**.
 - Difficulté = **Henle 1–9**. Ressenti/humeur/énergie = **nuances pp–ff**. **Pas de boutique**.
 - Pas d'emoji dans l'UI (sauf rares exceptions déjà en place). Français partout.
+- **Pas de métronome** (refus explicite). Le suivi de tempo = **saisie manuelle du bpm stable**.
+- Déploiement : `git push` → GitHub Pages republie (~1 min). **Incrémenter `CACHE`** sinon l'app
+  installée ne voit pas la mise à jour ; ouvrir l'app 2 fois côté iPhone pour activer la nouvelle version.
 
 ## État & feuille de route
-- **Fait** : v3 complète (séances, fiche morceau unifiée, répertoire trié/filtré/tags, base compositeurs,
+- **Fait (v2)** : séances, fiche morceau unifiée, répertoire trié/filtré/tags, base compositeurs,
   Voyage/Notes/succès/défis, Jardin, cartes, intervalles, plan guidé, simulation concert, rapport hebdo
-  et mensuel, révision, avancement/maturité, filet de sauvegarde JSON) + passe UX (accueil réordonné,
-  Carnet à un écran, Voyage centré sur le rang courant).
-- **À faire (ordre conseillé)** : (1) mettre sous **Git** ; (2) sauvegarde **auto vers NAS Synology** +
-  passage à **IndexedDB** ; (3) synchro **iPhone/iPad** ; (4) finitions (onboarding, frise de maturité
-  visuelle, accessibilité) ; (5) éventuellement **migration React+TS+Vite** ou app **SwiftUI** native.
+  et mensuel, révision, avancement/maturité, filet de sauvegarde JSON, passe UX (accueil réordonné,
+  Carnet à un écran, Voyage centré sur le rang courant). **Sous Git + déployé sur GitHub Pages**
+  (`https://megaxuu.github.io/mypiano/`, PWA installée sur iPhone).
+
+- **Feuille de route V3 (ordre imposé, dépendances techniques)** — étapes 2 et 3 : présenter
+  plan/maquette et faire **valider avant de coder**. Détail dans le prompt Sonnet dédié.
+  1. **Révision adaptative** : intervalle d'entretien par morceau (`p.revInterval`, défaut =
+     `settings.revisionDays`) qui s'allonge sur « toujours maîtrisée » et se resserre sur
+     « à retravailler » ; bouton « Réviser » = séance **entrelacée** de 3 pièces à entretenir.
+  2. **Sections & tempo** (cœur v3) : `p.sections[] = {id,name,todo,status,bpm:[{d,v}]}`
+     **facultatives** ; édition dans `pieceDetail` + mini-courbe SVG du tempo. **Suivi de tempo =
+     saisie manuelle du bpm stable, JAMAIS de métronome** (refus explicite de l'utilisateur).
+  3. **Migration IndexedDB** (socle pour l'audio) : S en mémoire, persistance async, migration
+     one-shot depuis localStorage, export/import JSON conservé. Adapter `test.mjs` (fake-indexeddb).
+  4. **Enregistrement audio** (dépend de 3) : MediaRecorder en séance, blobs en IndexedDB, rattachés
+     à la pièce/section, réécoute + auto-éval pp–ff dans la fiche. Tester le format sur iOS réel.
+  5. **Bilans & insights** : croisements (ressenti × moment, stagnation), rétrospective annuelle
+     sobre ; **push iOS réel** = nécessite serveur VAPID → à valider séparément (sinon rester en
+     notifications locales).
+
+- **Reporté en V4** : **sauvegarde auto vers NAS Synology** (on reste sur GitHub Pages quelques
+  mois) ; synchro multi-appareils ; éventuelle migration React+TS+Vite ou app SwiftUI native.
 
 ## Stratégie de modèles (économie de crédit)
 - **Sonnet 5 par défaut** pour coder au quotidien.
