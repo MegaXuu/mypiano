@@ -78,11 +78,59 @@ function piecePhase(p){if(!p)return null;
   if(p.status==='archived')return{k:'archived',label:'Archivé',col:'var(--t2)'};
   if(p.status==='abandoned')return{k:'abandoned',label:'Abandonné',col:'var(--t2)'};
   if(p.status==='mastered')return needsRevision(p)?{k:'entretien',label:'À entretenir',col:'var(--gold)'}:{k:'mastered',label:'Maîtrisé',col:'var(--acc)'};
-  const pr=p.progress||0;
+  const pr=pieceProgress(p);
   if(pr<30)return{k:'dechiffrage',label:'Déchiffrage',col:'#D2694A'};
   if(pr<70)return{k:'consolidation',label:'Consolidation',col:'#7FC9C4'};
   return{k:'polissage',label:'Polissage',col:'#9FC93C'};}
 function phaseChip(p){const ph=piecePhase(p);if(!ph)return '';return `<span class="tag" style="padding:2px 9px;font-size:11px;color:${ph.col};border-color:${ph.col}44;">${ph.label}</span>`;}
+
+/* ---------- Sections & mesures (V3 étape 2) ---------- */
+const SEC_STATUS=[{k:'new',label:'Déchiffrage',col:'#D2694A'},{k:'wip',label:'Travail',col:'#7FC9C4'},{k:'poli',label:'Polissage',col:'#9FC93C'},{k:'ok',label:'Au point',col:'var(--acc)'}];
+function secStatusInfo(k){return SEC_STATUS.find(s=>s.k===k)||SEC_STATUS[0];}
+function secList(p){return (p&&p.sections)||[];}
+function sortSections(p){if(p.sections)p.sections.sort((a,b)=>(a.from|0)-(b.from|0));}
+function hasDerivedProgress(p){return !!(p&&p.bars&&secList(p).length);}
+// Rang par mesure (1..bars) : le meilleur statut connu si des sections se chevauchent. -1 = non couverte.
+function sectionRankArr(p){
+  const bars=p.bars|0;if(!bars)return[];
+  const arr=new Array(bars).fill(-1);
+  secList(p).forEach(s=>{const r=SEC_STATUS.findIndex(x=>x.k===s.status);
+    const from=Math.max(1,s.from|0||1),to=Math.min(bars,s.to|0||0);
+    for(let i=from;i<=to;i++)if(r>arr[i-1])arr[i-1]=r;});
+  return arr;
+}
+function barsOk(p){return sectionRankArr(p).filter(r=>r===3).length;}
+function pieceProgress(p){return hasDerivedProgress(p)?Math.round(barsOk(p)/p.bars*100):(p.progress||0);}
+function mapSegments(p){
+  const arr=sectionRankArr(p);if(!arr.length)return[];
+  const segs=[];let cur=arr[0],n=0;
+  arr.forEach(r=>{if(r===cur){n++;}else{segs.push({rank:cur,count:n});cur=r;n=1;}});
+  segs.push({rank:cur,count:n});
+  return segs.map(s=>({count:s.count,col:s.rank===-1?null:SEC_STATUS[s.rank].col,gap:s.rank===-1}));
+}
+function coverageGaps(p){
+  const arr=sectionRankArr(p),gaps=[];let start=null;
+  arr.forEach((r,i)=>{const m=i+1;if(r===-1){if(start==null)start=m;}else if(start!=null){gaps.push({from:start,to:m-1});start=null;}});
+  if(start!=null)gaps.push({from:start,to:arr.length});
+  return gaps;
+}
+function recordHist(p){if(!hasDerivedProgress(p))return;const d=dkey(),v=barsOk(p);p.hist=p.hist||[];
+  const last=p.hist[p.hist.length-1];if(last&&last.d===d)last.m=v;else p.hist.push({d,m:v});}
+function secName(p,id){if(!id)return '';const s=secList(p).find(x=>x.id===id);return s?s.name:id;}
+function secLastWorked(p,sec){let last=null;S.sessions.forEach(s=>{(s.entries||[]).forEach(e=>{
+  if(e.piece===p.id&&e.sections&&e.sections.includes(sec.id)&&(!last||s.date>last))last=s.date;});});return last;}
+function pickTodaySection(p){
+  const secs=secList(p).filter(s=>s.status!=='ok');if(!secs.length)return null;
+  const withDate=secs.map(s=>({s,d:secLastWorked(p,s)}));
+  withDate.sort((a,b)=>{const ad=a.d||'',bd=b.d||'';if(ad!==bd)return ad<bd?-1:1;return(a.s.from|0)-(b.s.from|0);});
+  return withDate[0];
+}
+function sectionsReminderLine(p){
+  if(!p||!hasDerivedProgress(p))return '';
+  const names=secList(p).filter(s=>s.status!=='ok').map(s=>s.name);
+  coverageGaps(p).forEach(g=>names.push('mes. '+g.from+'–'+g.to));
+  return names.length?'Pas au point : '+names.join(' · '):'';
+}
 function normStr(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,'');}
 function findDuplicate(title,composer,exceptId){const nt=normStr(title),nc=normStr(composer);if(!nt)return null;
   return S.pieces.find(p=>!p.isEnsemble&&p.id!==exceptId&&normStr(p.title)===nt&&normStr(p.composer)===nc)||null;}
@@ -343,7 +391,9 @@ function paintSession(){
   const td=document.getElementById('ss-todo');
   if(td){
     if(timer.plan){const cb=timer.plan[timer.planIdx];td.innerHTML=`<div class="card" style="padding:12px 14px;border-left:2px solid var(--gold);border-radius:0 12px 12px 0;"><span class="muted" style="font-size:12px;">Plan · étape ${timer.planIdx+1}/${timer.plan.length} · ${esc(cb.focus)}</span><div style="font-size:14px;margin-top:3px;">${esc(cb.consigne)}</div></div>`;}
-    else{const p=cur!==IMPROV?pieceById(cur):null;td.innerHTML=(p&&p.todo)?`<div class="card" style="padding:12px 14px;border-left:2px solid var(--acc);border-radius:0 12px 12px 0;"><span class="muted" style="font-size:12px;">Rappel · à faire</span><div style="font-size:14px;margin-top:3px;">${esc(p.todo)}</div></div>`:'';}
+    else{const p=cur!==IMPROV?pieceById(cur):null;const secLine=p?sectionsReminderLine(p):'';
+      td.innerHTML=(p&&p.todo)?`<div class="card" style="padding:12px 14px;border-left:2px solid var(--acc);border-radius:0 12px 12px 0;"><span class="muted" style="font-size:12px;">Rappel · à faire</span><div style="font-size:14px;margin-top:3px;">${esc(p.todo)}</div>${secLine?`<div class="muted" style="font-size:12px;margin-top:7px;padding-top:7px;border-top:1px solid rgba(255,255,255,.06);">${esc(secLine)}</div>`:''}</div>`
+        :secLine?`<div class="card" style="padding:12px 14px;border-left:2px solid var(--acc);border-radius:0 12px 12px 0;"><span class="muted" style="font-size:12px;">${esc(secLine)}</span></div>`:'';}
   }
   if(timer.plan&&md)md.textContent='Plan guidé';
   const iv=timer.interval;if(iv&&iv.phase==='break'){if(t)t.textContent=big(Math.max(0,iv.brk-iv.phaseSec));if(md)md.textContent='Pause · repose tes mains 🖐';}
@@ -383,6 +433,7 @@ function carnetSheet(total){
         <div class="field" style="margin-bottom:0;"><label>À faire la prochaine fois</label><textarea id="cn-${i}" placeholder="Accélérer, revoir la pédale…">${todo}</textarea></div>
         ${p&&p.status==='mastered'?`<div class="field" style="margin-top:10px;margin-bottom:0;"><label>Cette pièce maîtrisée</label>
           <div class="seg" id="cm-${i}"><button class="on" onclick="pickMastery(${i},'mastered',this)">Toujours maîtrisée</button><button onclick="pickMastery(${i},'active',this)">À retravailler</button></div></div>`:''}
+        ${carnetSecBlock(i,p)}
       </div>`;}).join('')}
     <div class="field"><label>Ressenti global</label><div class="dyn" id="c-f">${FEEL_ORDER.map(f=>`<button data-f="${f}" onclick="pickFeel('${f}',this)">${f}</button>`).join('')}</div>
       <div class="muted" id="c-fl" style="font-size:13px;margin-top:7px;text-align:center;">—</div></div>
@@ -395,6 +446,47 @@ function carnetSheet(total){
     <button class="btn primary" onclick="commitSession(${total})">Enregistrer la séance</button>`);
   _feel='';
 }
+function carnetSecBlock(i,p){
+  if(!p||!hasDerivedProgress(p))return '';
+  return `<div class="field" style="margin:12px 0 0;">
+    <button type="button" class="btn ghost sm" id="csec-btn-${i}" style="width:100%;" onclick="toggleCarnetSec(${i})">Sections travaillées (facultatif) ⌄</button>
+    <div id="csec-body-${i}" style="display:none;margin-top:12px;">
+      <div class="chips" id="csec-chips-${i}" style="margin-bottom:10px;">
+        ${secList(p).map(s=>`<button type="button" class="chip" data-sid="${s.id}" style="padding:7px 12px;font-size:13px;" onclick="toggleCarnetChip(${i},'${p.id}','${s.id}',this)">${esc(s.name)}</button>`).join('')}</div>
+      ${secList(p).map(s=>carnetSecRow(i,p,s,false)).join('')}
+      <div class="muted" style="font-size:11px;margin-top:2px;line-height:1.45;">Le bouton fait passer la section à l'étape suivante. Laisse le tempo vide si tu n'as rien mesuré.</div>
+    </div></div>`;
+}
+function carnetSecRow(i,p,s,visible){
+  const info=secStatusInfo(s.status),order=['new','wip','poli','ok'];
+  const nextK=order[Math.min(order.length-1,order.indexOf(s.status)+1)],nextInfo=secStatusInfo(nextK);
+  const lastBpm=(s.bpm||[])[(s.bpm||[]).length-1];
+  return `<div class="between" id="csec-row-${i}-${s.id}" style="background:var(--surface2);border-radius:11px;padding:11px 12px;margin-bottom:7px;display:${visible?'flex':'none'};">
+    <div style="flex:1;min-width:0;">
+      <div class="between" style="margin-bottom:9px;">
+        <span style="font-size:13px;font-weight:600;">${esc(s.name)}</span>
+        <span class="tag" style="padding:3px 9px;font-size:11px;color:${info.col};background:none;">${info.label}</span></div>
+      <div class="row" style="gap:8px;">
+        ${s.status!=='ok'?`<button type="button" class="btn ghost sm" id="csec-adv-${i}-${s.id}" style="flex:1;font-size:12px;padding:7px 8px;" onclick="advanceCarnetSec(${i},'${p.id}','${s.id}')">${nextK==='ok'?'Au point ✓':nextInfo.label+' →'}</button>`:'<span class="muted" style="flex:1;font-size:12px;">Déjà au point</span>'}
+        <span class="muted num" style="font-size:12px;">${lastBpm?lastBpm.v+' →':''}</span>
+        <input class="num" id="cbpm-${i}-${s.id}" inputmode="numeric" placeholder="bpm" style="width:70px;flex:0 0 auto;padding:7px 8px;text-align:center;">
+      </div></div></div>`;
+}
+function advanceCarnetSec(i,pid,sid){
+  const p=pieceById(pid);const s=p&&secList(p).find(x=>x.id===sid);if(!s)return;
+  const order=['new','wip','poli','ok'];s.status=order[Math.min(order.length-1,order.indexOf(s.status)+1)];
+  recordHist(p);save();
+  const row=document.getElementById('csec-row-'+i+'-'+sid);if(row)row.outerHTML=carnetSecRow(i,p,s,true);
+}
+function toggleCarnetChip(i,pid,sid,el){
+  el.classList.toggle('on');
+  const row=document.getElementById('csec-row-'+i+'-'+sid);if(row)row.style.display=el.classList.contains('on')?'flex':'none';
+}
+function toggleCarnetSec(i){
+  const b=document.getElementById('csec-body-'+i),btn=document.getElementById('csec-btn-'+i);if(!b)return;
+  const open=b.style.display!=='none';b.style.display=open?'none':'block';
+  if(btn)btn.textContent=open?'Sections travaillées (facultatif) ⌄':'Sections travaillées (facultatif) ⌃';
+}
 function toggleMoodEnergy(){const b=document.getElementById('c-mood-body'),btn=document.getElementById('c-mood-btn');if(!b)return;
   const open=b.style.display!=='none';b.style.display=open?'none':'block';if(btn)btn.textContent=open?'Humeur & énergie (facultatif) ⌄':'Humeur & énergie (facultatif) ⌃';}
 function copyTodoToWorked(i){const cn=document.getElementById('cn-'+i),cw=document.getElementById('cw-'+i);if(!cn||!cw)return;cw.value=cw.value?cw.value+'\n'+cn.value:cn.value;}
@@ -406,10 +498,18 @@ function commitSession(total){
   if(!blocks.length)blocks.push({piece:timer.blocks[0].piece,sec:total});
   const before=currentStone();
   const val=id=>{const e=document.getElementById(id);return e?e.value.trim():'';};
-  const entries=_carnetPieces.map((pid,i)=>({piece:pid,worked:val('cw-'+i),next:val('cn-'+i)}));
+  const entries=_carnetPieces.map((pid,i)=>{
+    const p=pid!==IMPROV?pieceById(pid):null;
+    const sections=(p&&hasDerivedProgress(p))?[...document.querySelectorAll('#csec-chips-'+i+' .chip.on')].map(el=>el.dataset.sid):[];
+    return {piece:pid,worked:val('cw-'+i),next:val('cn-'+i),sections};
+  });
   entries.forEach((e,i)=>{if(e.piece===IMPROV)return;const p=pieceById(e.piece);if(!p)return;
-    if(e.worked||e.next){p.notes=p.notes||[];p.notes.push({id:uid(),date:dkey(),section:'',text:(e.worked||'')+(e.next?((e.worked?' · ':'')+'À faire : '+e.next):'')});}
+    (e.sections||[]).forEach(sid=>{const s=secList(p).find(x=>x.id===sid);if(!s)return;
+      const v=parseInt(val('cbpm-'+i+'-'+sid));if(v){s.bpm=s.bpm||[];const d=dkey();const last=s.bpm[s.bpm.length-1];
+        if(last&&last.d===d)last.v=v;else s.bpm.push({d,v});}});
+    if(e.worked||e.next){p.notes=p.notes||[];p.notes.push({id:uid(),date:dkey(),section:e.sections&&e.sections.length===1?e.sections[0]:'',text:(e.worked||'')+(e.next?((e.worked?' · ':'')+'À faire : '+e.next):'')});}
     p.todo=e.next||'';
+    if(hasDerivedProgress(p))recordHist(p);
     if(_mastery[i]==='active'&&p.status==='mastered'){p.status='active';p.masteredAt=null;p.revInterval=S.settings.revisionDays||18;}
     else if(_mastery[i]==='mastered'&&p.status==='mastered'){p.revInterval=Math.min(120,Math.round((p.revInterval||S.settings.revisionDays||18)*1.6));}});
   S.sessions.push({id:uid(),date:dkey(),mode:timer.mode,goal:timer.goal,feeling:_feel,blocks,entries,ts:Date.now()});
@@ -478,12 +578,19 @@ function setJournal(field,v){const k=dkey();S.journal[k]=S.journal[k]||{mood:'',
   const mb=document.getElementById('c-mood-body');
   if(mb){const j=S.journal[k];mb.innerHTML=dynScale('Humeur',j.mood,'mood')+dynScale('Énergie',j.energy,'energy');}
   else renderCarnetBody();}
-function noteSheet(pid){openSheet(`<h3>Nouvelle note</h3>
-  <div class="field"><label>Mesures / section (optionnel)</label><input id="n-s" placeholder="mes. 12–20, lecture, par cœur…"></div>
+let _noteSecId='';
+function noteSheet(pid){_noteSecId='';const p=pieceById(pid),secs=p?secList(p):[];
+  openSheet(`<h3>Nouvelle note</h3>
+  ${secs.length?`<div class="field"><label>Section (optionnel)</label><div class="chips" id="n-secs">${secs.map(s=>`<button type="button" class="chip" onclick="pickNoteSec('${s.id}',this)">${esc(s.name)}</button>`).join('')}</div></div>`
+    :`<div class="field"><label>Mesures / section (optionnel)</label><input id="n-s" placeholder="mes. 12–20, lecture, par cœur…"></div>`}
   <div class="field"><label>Note</label><textarea id="n-t" placeholder="Le legato tient mieux, main droite plus fluide…"></textarea></div>
   <button class="btn primary" onclick="saveNote('${pid}')">Ajouter</button>`);}
+function pickNoteSec(id,el){const was=_noteSecId===id;_noteSecId=was?'':id;
+  document.querySelectorAll('#n-secs .chip').forEach(b=>b.classList.toggle('on',!was&&b===el));}
 function saveNote(pid){const t=document.getElementById('n-t').value.trim();if(!t){toast('Écris une note');return;}
-  const p=pieceById(pid);p.notes=p.notes||[];p.notes.push({id:uid(),date:dkey(),section:document.getElementById('n-s').value.trim(),text:t});save();refreshScreen();pieceDetail(pid);toast('Note ajoutée');}
+  const p=pieceById(pid);p.notes=p.notes||[];
+  const sEl=document.getElementById('n-s'),sec=sEl?sEl.value.trim():_noteSecId;
+  p.notes.push({id:uid(),date:dkey(),section:sec,text:t});save();refreshScreen();pieceDetail(pid);toast('Note ajoutée');}
 function wishSheet(){_worksCache=[];
   const comps=OPUS.ALL.map(c=>`<option value="${c.name}"></option>`).join('');
   openSheet(`<h3>À apprendre un jour</h3>
@@ -659,9 +766,11 @@ function pieceSheet(id,prefill){
         <div class="field"><label>Opus</label><input id="p-o" value="${esc(p.opus)}" placeholder="op. 9 no 2"></div></div>
       <div class="grid2"><div class="field"><label>Genre</label><input id="p-g" value="${esc(p.genre)}" placeholder="Nocturne"></div>
         <div class="field"><label>Tonalité</label><input id="p-k" value="${esc(p.key)}" placeholder="Mi♭ majeur"></div></div>
-      <div class="field"><label>Tempo cible (bpm)</label><input id="p-b" inputmode="numeric" value="${esc(p.bpm)}" placeholder="92"></div>
+      <div class="grid2"><div class="field"><label>Tempo cible (bpm)</label><input id="p-b" inputmode="numeric" value="${esc(p.bpm)}" placeholder="92"></div>
+        <div class="field"><label>Mesures totales</label><input id="p-bars" inputmode="numeric" value="${p.bars||''}" placeholder="57"></div></div>
       <div class="field"><label>Tags (séparés par des virgules)</label><input id="p-tags" value="${esc((p.tags||[]).join(', '))}" placeholder="concert, par cœur, déchiffrage"></div>
-      <div class="field"><label>Avancement · <span id="p-progl">${_pprog}</span> %</label><input id="p-prog" type="range" min="0" max="100" step="5" value="${_pprog}" oninput="document.getElementById('p-progl').textContent=this.value"></div>
+      ${hasDerivedProgress(p)?`<div class="field"><label>Avancement</label><div class="muted" style="font-size:13px;">Calculé automatiquement à partir des sections (${pieceProgress(p)} %). Modifiable depuis la fiche.</div></div>`
+        :`<div class="field"><label>Avancement · <span id="p-progl">${_pprog}</span> %</label><input id="p-prog" type="range" min="0" max="100" step="5" value="${_pprog}" oninput="document.getElementById('p-progl').textContent=this.value"></div>`}
       <div class="field"><label>Statut</label><div class="seg" id="p-st"><button class="${_pstatus==='active'?'on':''}" onclick="setPStatus('active',this)">En cours</button><button class="${_pstatus==='mastered'?'on':''}" onclick="setPStatus('mastered',this)">Maîtrisé</button></div></div>
     </div>
     <button class="btn primary" style="margin-top:6px;" onclick="savePiece('${isNew?'':p.id}')">${isNew?'Ajouter':'Enregistrer'}</button>
@@ -697,8 +806,9 @@ function savePiece(id){const title=document.getElementById('p-t').value.trim();i
   const data={title,composer:document.getElementById('p-c').value.trim(),epoch:document.getElementById('p-e').value.trim(),
     opus:document.getElementById('p-o').value.trim(),genre:document.getElementById('p-g').value.trim(),key:document.getElementById('p-k').value.trim(),
     bpm:document.getElementById('p-b').value.trim(),diff:_pdiff,status:_pstatus,
-    progress:parseInt((document.getElementById('p-prog')||{}).value)||0,
+    bars:parseInt(document.getElementById('p-bars').value)||0,
     tags:(document.getElementById('p-tags').value||'').split(',').map(t=>t.trim()).filter(Boolean)};
+  const progEl=document.getElementById('p-prog');if(progEl)data.progress=parseInt(progEl.value)||0;
   let newlyMastered=false;
   if(id){const p=pieceById(id);const was=p.status==='mastered';Object.assign(p,data);
     if(p.status==='mastered'){if(!p.masteredAt)p.masteredAt=Date.now();if(!was)newlyMastered=true;}}
@@ -716,11 +826,13 @@ function refreshScreen(){const a=document.querySelector('.screen.active');if(!a)
 
 /* ---------- Fiche morceau unifiée ---------- */
 function pieceDetail(id){const p=pieceById(id);if(!p)return;
+  if(_detailPid!==id)_secOpen=null;
+  _detailPid=id;
   const ph=piecePhase(p),played=pieceSeconds(p.id),lp=pieceLastPlayed(p.id),nSess=pieceSessionCount(p.id);
   const meta=[p.composer,p.epoch,p.opus].filter(Boolean).join(' · ');
   const stat=(v,l)=>`<div class="metric" style="padding:12px;"><div class="v" style="font-size:20px;">${v}</div><div class="l">${l}</div></div>`;
   const isWish=p.status==='wishlist',closed=p.status==='archived'||p.status==='abandoned';
-  const notes=(p.notes||[]).length?'<div class="tl" style="margin-top:6px;">'+[...p.notes].reverse().slice(0,12).map(n=>`<div class="n"><div class="between"><span class="muted" style="font-size:12px;">${frShort(n.date)}</span>${n.section?`<span class="tag" style="padding:3px 9px;">${esc(n.section)}</span>`:''}</div><div style="margin-top:5px;line-height:1.5;color:var(--tc);">${esc(n.text)}</div></div>`).join('')+'</div>':'<div class="empty" style="padding:14px;">Aucune note pour l\'instant.</div>';
+  const notes=(p.notes||[]).length?'<div class="tl" style="margin-top:6px;">'+[...p.notes].reverse().slice(0,12).map(n=>`<div class="n"><div class="between"><span class="muted" style="font-size:12px;">${frShort(n.date)}</span>${n.section?`<span class="tag" style="padding:3px 9px;">${esc(secName(p,n.section))}</span>`:''}</div><div style="margin-top:5px;line-height:1.5;color:var(--tc);">${esc(n.text)}</div></div>`).join('')+'</div>':'<div class="empty" style="padding:14px;">Aucune note pour l\'instant.</div>';
   openSheet(`<div class="between" style="align-items:flex-start;">
       <div style="min-width:0;"><h3 style="margin:0;">${esc(p.title)}</h3>${meta?`<div class="muted" style="font-size:13px;margin-top:3px;">${esc(meta)}</div>`:''}</div>
       ${phaseChip(p)}</div>
@@ -728,30 +840,196 @@ function pieceDetail(id){const p=pieceById(id);if(!p)return;
       ${p.diff?`<span class="tag">Henle ${p.diff}</span>`:''}
       ${p.key?`<span class="tag">${esc(p.key)}</span>`:''}
       ${p.genre?`<span class="tag">${esc(p.genre)}</span>`:''}
+      ${p.bars?`<span class="tag">${p.bars} mesures</span>`:''}
       ${(p.tags||[]).map(t=>`<span class="tag" style="padding:2px 8px;">${esc(t)}</span>`).join('')}</div>
     <div class="grid2" style="gap:8px;margin-bottom:6px;">${stat(played?dur(played):'—','temps joué')}${stat(nSess||'—','séances')}</div>
     <div class="metric" style="padding:12px;margin-bottom:12px;"><div class="v" style="font-size:16px;">${lp?frShort(lp):'jamais'}</div><div class="l">dernière fois</div></div>
-    ${!isWish&&!closed?`<div class="card" style="padding:12px 14px;margin-bottom:12px;">
-      <div class="between"><span class="muted" style="font-size:13px;">Avancement</span><span style="font-weight:600;">${p.progress||0} %</span></div>
-      <div class="row" style="gap:8px;margin-top:10px;">
-        <button class="btn ghost sm" style="flex:1;" onclick="nudgeProgress('${p.id}',-10)">– 10</button>
-        <button class="btn ghost sm" style="flex:1;" onclick="nudgeProgress('${p.id}',10)">+ 10</button>
-        ${p.status!=='mastered'?`<button class="btn primary sm" style="flex:1;" onclick="markMastered('${p.id}')">Maîtrisé ✓</button>`:''}</div>
-      ${estimateText(p)?`<div style="font-size:12px;margin-top:8px;color:var(--acc);">${estimateText(p)}</div>`:''}</div>`:''}
+    ${!isWish&&!closed?renderProgressCard(p):''}
     ${p.todo&&p.todo.trim()?`<div class="card" style="padding:12px 14px;margin-bottom:12px;border-left:2px solid var(--acc);border-radius:0 12px 12px 0;"><span class="muted" style="font-size:12px;">À faire</span><div style="font-size:14px;margin-top:3px;">${esc(p.todo)}</div></div>`:''}
     ${isWish?`<button class="btn primary" onclick="startLearning('${p.id}')">Commencer à apprendre</button>
       <div class="grid2" style="margin-top:10px;"><button class="btn ghost sm" onclick="editPiece('${p.id}')">Modifier</button><button class="btn ghost sm" style="color:#F0857A;border-color:#5a2f2b;" onclick="deleteWish('${p.id}')">Retirer</button></div>`
     :closed?`<button class="btn primary" onclick="reopenPiece('${p.id}')">Réactiver (en cours)</button>
       <button class="btn ghost sm" style="width:100%;margin-top:10px;" onclick="editPiece('${p.id}')">Modifier</button>`
     :`<div class="grid2"><button class="btn primary" onclick="detailPlay('${p.id}')">${playSvg()} Jouer</button><button class="btn ghost" onclick="noteSheet('${p.id}')">+ Note</button></div>
-      <div class="grid2" style="margin-top:10px;"><button class="btn ghost sm" onclick="editPiece('${p.id}')">Modifier</button><button class="btn ghost sm" onclick="setPieceStatus('${p.id}','archived')">Archiver</button></div>`}
+      <div class="grid2" style="margin-top:10px;"><button class="btn ghost sm" onclick="editPiece('${p.id}')">Modifier</button><button class="btn ghost sm" onclick="setPieceStatus('${p.id}','archived')">Archiver</button></div>
+      <div class="between" style="margin:20px 0 10px;"><h2 style="margin:0;">Sections</h2>${secList(p).length?`<button class="btn ghost sm" onclick="addSection('${p.id}')">+ Ajouter</button>`:''}</div>
+      ${renderSections(p)}`}
     <h2 style="margin-top:18px;">Notes</h2>${notes}`);
 }
 function detailPlay(id){closeSheet();quickStart(id);}
 function editPiece(id){pieceSheet(id);}
+function renderProgressCard(p){
+  const pr=pieceProgress(p),derived=hasDerivedProgress(p);
+  return `<div class="card" style="padding:14px;margin-bottom:12px;">
+      <div class="between" style="margin-bottom:${derived?'4px':'0'};"><span class="muted" style="font-size:13px;">Avancement</span><span style="font-weight:600;${derived?'font-size:17px;':''}">${pr} %</span></div>
+      ${derived?`<div class="muted" style="font-size:12px;margin-bottom:11px;">${barsOk(p)} mesures sur ${p.bars} au point${secList(p).some(s=>s.status==='poli')?' · '+secList(p).filter(s=>s.status==='poli').reduce((a,s)=>a+Math.max(0,s.to-s.from+1),0)+' en polissage':''}</div>
+        ${renderMap(p)}${mapLegend()}${renderHistCurve(p)}`
+      :`<div class="row" style="gap:8px;margin-top:10px;">
+        <button class="btn ghost sm" style="flex:1;" onclick="nudgeProgress('${p.id}',-10)">– 10</button>
+        <button class="btn ghost sm" style="flex:1;" onclick="nudgeProgress('${p.id}',10)">+ 10</button>
+        ${p.status!=='mastered'?`<button class="btn primary sm" style="flex:1;" onclick="markMastered('${p.id}')">Maîtrisé ✓</button>`:''}</div>`}
+      ${p.status!=='mastered'&&derived&&pr>=100?`<button class="btn primary sm" style="width:100%;margin-top:12px;" onclick="markMastered('${p.id}')">Maîtrisé ✓</button>`:''}
+      ${estimateText(p)?`<div style="font-size:12px;margin-top:8px;color:var(--acc);">${estimateText(p)}</div>`:''}</div>`;
+}
+function renderMap(p){
+  const segs=mapSegments(p);if(!segs.length)return '';
+  return `<div class="map">${segs.map(s=>`<i class="${s.gap?'map-gap':''}" style="flex:${s.count};${s.gap?'':'background:'+s.col+';'}"></i>`).join('')}</div>
+    <div class="sub" style="margin-top:6px;font-size:10px;"><span class="num">mes. 1</span><span class="num">${p.bars}</span></div>`;
+}
+function mapLegend(){
+  return `<div class="row" style="gap:12px;flex-wrap:wrap;margin-top:10px;font-size:11px;color:var(--t2);">
+    ${SEC_STATUS.map(s=>`<span class="row" style="gap:5px;"><i style="width:8px;height:8px;border-radius:2px;background:${s.col};display:inline-block;"></i>${s.label.toLowerCase()}</span>`).join('')}
+    <span class="row" style="gap:5px;"><i class="map-gap" style="width:8px;height:8px;border-radius:2px;display:inline-block;"></i>non couvert</span></div>`;
+}
+function renderHistCurve(p){
+  const h=(p.hist||[]).slice(-24);if(h.length<3)return '';
+  const w=300,ht=96,padL=30,padR=6,padT=18,padB=14,innerW=w-padL-padR,innerH=ht-padT-padB;
+  const x=i=>padL+(h.length===1?0:i/(h.length-1)*innerW);
+  const y=v=>padT+innerH-(v/p.bars*innerH);
+  const linePts=h.map((pt,i)=>`${x(i).toFixed(1)},${y(pt.m).toFixed(1)}`);
+  const baseY=(padT+innerH).toFixed(1);
+  const areaD='M'+x(0).toFixed(1)+','+baseY+' L'+linePts.join(' L')+' L'+x(h.length-1).toFixed(1)+','+baseY+' Z';
+  const first=h[0],last=h[h.length-1],delta=last.m-first.m;
+  const circles=h.map((pt,i)=>`<circle cx="${x(i).toFixed(1)}" cy="${y(pt.m).toFixed(1)}" r="${i===h.length-1?3.6:1.8}" fill="var(--acc)" ${i===h.length-1?'stroke="#242833" stroke-width="2"':''}/>`).join('');
+  return `<div class="mini">
+    <div class="between" style="padding:0 2px 4px;"><span class="muted" style="font-size:11px;">Mesures au point</span></div>
+    <svg viewBox="0 0 ${w} ${ht}" width="100%" style="display:block;overflow:visible;">
+      <line x1="${padL}" y1="${padT}" x2="${w-padR}" y2="${padT}" stroke="var(--gold)" stroke-width="1" stroke-dasharray="3 4" opacity=".7"/>
+      <text x="${w-padR}" y="13" fill="var(--gold)" font-size="8" font-family="DM Sans" text-anchor="end" opacity=".9">${p.bars} · le morceau entier</text>
+      <text x="${padL-4}" y="${padT+3}" fill="#9B97A8" font-size="8" font-family="EB Garamond" text-anchor="end">${p.bars}</text>
+      <text x="${padL-4}" y="${padT+innerH}" fill="#9B97A8" font-size="8" font-family="EB Garamond" text-anchor="end">0</text>
+      <path d="${areaD}" fill="rgba(158,147,242,.13)"/>
+      <polyline points="${linePts.join(' ')}" fill="none" stroke="var(--acc)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      ${circles}
+      <text x="${padL}" y="${ht-2}" fill="#9B97A8" font-size="8" font-family="DM Sans">${frShort(first.d)}</text>
+      <text x="${w-padR}" y="${ht-2}" fill="#9B97A8" font-size="8" font-family="DM Sans" text-anchor="end">${frShort(last.d)}</text>
+    </svg>
+    <div class="sub" style="margin-top:8px;padding:0 2px;"><span>${h.length} relevés</span><span style="color:var(--acc);">${delta>=0?'+ ':'− '}${Math.abs(delta)} mesures</span></div>
+  </div>`;
+}
+function renderTodaySec(p){
+  const pick=pickTodaySection(p);if(!pick)return '';
+  const days=pick.d?Math.floor((Date.now()-new Date(pick.d+'T00:00'))/86400000):null;
+  const sub=pick.d?(days<=0?"travaillée aujourd'hui":`pas ouverte depuis ${days} j`):'jamais travaillée';
+  return `<div class="card" style="padding:11px 14px;margin-bottom:10px;border-left:2px solid var(--gold);border-radius:0 12px 12px 0;background:rgba(228,197,138,.06);">
+    <div class="between"><div style="min-width:0;">
+        <span class="muted" style="font-size:11px;">À travailler aujourd'hui</span>
+        <div style="font-size:14px;margin-top:2px;font-weight:600;">${esc(pick.s.name)} · mes. ${pick.s.from}–${pick.s.to}</div>
+        <div class="muted" style="font-size:11px;margin-top:2px;">${sub}</div></div>
+      <button class="btn ghost sm" style="flex:0 0 auto;" onclick="toggleSec('${p.id}','${pick.s.id}')">Ouvrir</button></div></div>`;
+}
+function renderSections(p){
+  if(!secList(p).length)return `<div class="card" style="padding:14px 16px;margin-bottom:10px;">
+    <p class="muted" style="font-size:13px;margin:0 0 12px;line-height:1.5;">Découper un morceau en sections est facultatif. Utile pour organiser le travail passage par passage et voir précisément ce qui est acquis.</p>
+    <button class="btn ghost sm" style="width:100%;" onclick="cutSheet('${p.id}')">Découper en sections</button></div>`;
+  sortSections(p);
+  let html=renderTodaySec(p)+secList(p).map(s=>renderSecRow(p,s)).join('');
+  coverageGaps(p).forEach(g=>{html+=`<div class="row" style="gap:10px;padding:11px 14px;border:1px dashed var(--border);border-radius:13px;margin-bottom:8px;">
+    <span class="muted" style="font-size:13px;flex:1;">mes. ${g.from}–${g.to} · pas encore couvertes</span>
+    <button class="btn ghost sm" style="flex:0 0 auto;" onclick="addSection('${p.id}',${g.from},${g.to})">+ Section</button></div>`;});
+  if(!p.bars)html='<div class="card" style="padding:12px 14px;margin-bottom:10px;"><p class="muted" style="font-size:13px;margin:0;">Indique le nombre de mesures (dans « Modifier ») pour calculer ton avancement.</p></div>'+html;
+  return html;
+}
+function renderSecRow(p,s){
+  const open=_secOpen===s.id,info=secStatusInfo(s.status);
+  return `<div class="sec" style="${open?'box-shadow:inset 0 0 0 1px rgba(158,147,242,.35);':''}">
+    <div class="sec-h" style="cursor:${open?'default':'pointer'};" ${open?'':`onclick="toggleSec('${p.id}','${s.id}')"`}>
+      <span class="sec-dot" style="background:${info.col};"></span>
+      ${open?`<input class="sec-n" id="sec-n-${s.id}" value="${esc(s.name)}">`:`<span class="sec-n">${esc(s.name)}</span>`}
+      <span class="sec-r">${s.from}–${s.to}</span>
+      <span class="sec-car" style="cursor:pointer;" onclick="toggleSec('${p.id}','${s.id}')">${open?'⌃':'⌄'}</span>
+    </div>
+    ${!open&&s.todo?`<div class="sec-todo" onclick="toggleSec('${p.id}','${s.id}')" style="cursor:pointer;">${esc(s.todo)}</div>`:''}
+    ${open?renderSecBody(p,s):''}
+  </div>`;
+}
+function renderSecBody(p,s){
+  const bpmDraft=_secBpm[s.id]!=null?_secBpm[s.id]:((s.bpm&&s.bpm.length)?s.bpm[s.bpm.length-1].v:(parseInt(p.bpm)||92));
+  _secBpm[s.id]=bpmDraft;
+  const lastBpm=(s.bpm||[])[(s.bpm||[]).length-1];
+  return `<div class="sec-body">
+    <div class="row" style="gap:8px;margin:12px 0;">
+      <span class="muted" style="font-size:13px;flex:0 0 auto;">Mesures</span>
+      <input class="num" inputmode="numeric" id="sec-from-${s.id}" value="${s.from}" style="width:56px;padding:8px;text-align:center;" onchange="setSecRange('${p.id}','${s.id}')">
+      <span class="muted">→</span>
+      <input class="num" inputmode="numeric" id="sec-to-${s.id}" value="${s.to}" style="width:56px;padding:8px;text-align:center;" onchange="setSecRange('${p.id}','${s.id}')">
+      <span class="muted" style="font-size:12px;">${Math.max(0,s.to-s.from+1)} mes.</span>
+    </div>
+    <div class="field" style="margin:0 0 12px;"><div class="seg">${SEC_STATUS.map(st=>`<button class="${s.status===st.k?'on':''}" onclick="setSecStatus('${p.id}','${s.id}','${st.k}')">${st.label}</button>`).join('')}</div></div>
+    <div class="field" style="margin-bottom:12px;"><label>À faire sur cette section</label>
+      <textarea id="sec-todo-${s.id}" placeholder="Main gauche seule, pédale aux temps faibles…">${esc(s.todo||'')}</textarea></div>
+    <div class="field" style="margin-bottom:0;"><label>Tempo stable du jour</label>
+      <div class="row" style="gap:10px;">
+        <button class="btn ghost" style="width:44px;height:44px;padding:0;border-radius:50%;font-size:20px;flex:0 0 auto;" onclick="secBpmStep('${s.id}',-2)">–</button>
+        <div class="num" id="sec-bpmv-${s.id}" style="flex:1;text-align:center;font-size:28px;font-weight:600;">${bpmDraft}<span style="font-size:13px;color:var(--t2);font-family:var(--sans);font-weight:400;"> bpm</span></div>
+        <button class="btn ghost" style="width:44px;height:44px;padding:0;border-radius:50%;font-size:20px;flex:0 0 auto;" onclick="secBpmStep('${s.id}',2)">+</button>
+        <button class="btn primary sm" style="flex:0 0 auto;" onclick="noteSecBpm('${p.id}','${s.id}')">Noter</button></div>
+      <div class="sub" style="margin-top:9px;"><span style="font-size:11px;">Le plus rapide joué proprement${p.bpm?' · cible '+esc(p.bpm):''}</span>
+        ${lastBpm?`<span style="font-size:11px;color:var(--acc);">dernier ${lastBpm.v} le ${frShort(lastBpm.d)}</span>`:''}</div></div>
+    <button class="btn ghost sm" style="width:100%;margin-top:14px;color:#F0857A;border-color:#5a2f2b;" onclick="deleteSection('${p.id}','${s.id}')">Supprimer la section</button>
+  </div>`;
+}
+let _secOpen=null,_secBpm={},_detailPid=null;
+function commitOpenSec(pid){if(!_secOpen)return;const p=pieceById(pid);const s=p&&secList(p).find(x=>x.id===_secOpen);if(!s)return;
+  const n=document.getElementById('sec-n-'+s.id),t=document.getElementById('sec-todo-'+s.id);
+  if(n)s.name=n.value.trim()||s.name;if(t)s.todo=t.value;}
+function toggleSec(pid,sid){commitOpenSec(pid);_secOpen=(_secOpen===sid)?null:sid;save();pieceDetail(pid);}
+function addSection(pid,presetFrom,presetTo){commitOpenSec(pid);const p=pieceById(pid);p.sections=p.sections||[];
+  const from=presetFrom||((p.sections.length?Math.max(...p.sections.map(s=>s.to)):0)+1);
+  const to=presetTo||Math.min(p.bars||from+7,from+7);
+  const s={id:uid(),name:'Nouvelle section',from,to,todo:'',status:'new',bpm:[]};
+  p.sections.push(s);sortSections(p);recordHist(p);_secOpen=s.id;save();pieceDetail(pid);}
+function setSecRange(pid,sid){const p=pieceById(pid);const s=secList(p).find(x=>x.id===sid);if(!s)return;
+  const from=parseInt(document.getElementById('sec-from-'+sid).value)||1,to=parseInt(document.getElementById('sec-to-'+sid).value)||from;
+  s.from=Math.max(1,from);s.to=Math.max(s.from,to);sortSections(p);recordHist(p);save();pieceDetail(pid);}
+function setSecStatus(pid,sid,st){commitOpenSec(pid);const p=pieceById(pid);const s=secList(p).find(x=>x.id===sid);if(!s)return;
+  s.status=st;recordHist(p);save();refreshScreen();pieceDetail(pid);}
+function secBpmStep(sid,d){_secBpm[sid]=Math.max(20,(_secBpm[sid]||92)+d);paintSecBpm(sid);}
+function paintSecBpm(sid){const el=document.getElementById('sec-bpmv-'+sid);if(el)el.innerHTML=_secBpm[sid]+'<span style="font-size:13px;color:var(--t2);font-family:var(--sans);font-weight:400;"> bpm</span>';}
+function noteSecBpm(pid,sid){const p=pieceById(pid);const s=secList(p).find(x=>x.id===sid);if(!s)return;
+  const v=_secBpm[sid];s.bpm=s.bpm||[];const d=dkey();const last=s.bpm[s.bpm.length-1];
+  if(last&&last.d===d)last.v=v;else s.bpm.push({d,v});
+  save();toast('Tempo noté');pieceDetail(pid);}
+function deleteSection(pid,sid){if(!confirm('Supprimer cette section ?'))return;const p=pieceById(pid);
+  p.sections=secList(p).filter(x=>x.id!==sid);if(_secOpen===sid)_secOpen=null;recordHist(p);save();refreshScreen();pieceDetail(pid);}
+let _cutSize=16;
+function cutSheet(pid){const p=pieceById(pid);if(!p)return;_cutSize=16;
+  openSheet(`<h3>Découper en sections</h3>
+    <p class="muted" style="font-size:13px;margin:-6px 0 16px;line-height:1.5;">Travailler un morceau par segments indépendants, c'est la façon la plus sûre d'avancer. L'app en tire ton avancement réel.</p>
+    <div class="field"><label>Combien de mesures compte le morceau ?</label>
+      <input id="cut-bars" class="num" inputmode="numeric" value="${p.bars||''}" placeholder="57" style="text-align:center;font-size:22px;font-weight:600;" oninput="paintCutPreview()"></div>
+    <div class="field"><label>Découpage de départ</label>
+      <div class="seg" id="cut-seg">
+        <button onclick="pickCutSize(8,this)">8 mes.</button>
+        <button class="on" onclick="pickCutSize(16,this)">16 mes.</button>
+        <button onclick="pickCutSize(32,this)">32 mes.</button>
+        <button onclick="pickCutSize('manual',this)">À la main</button></div></div>
+    <div class="card" id="cut-preview" style="padding:12px 14px;background:var(--surface2);"></div>
+    <button class="btn primary" style="margin-top:16px;" onclick="applyCut('${pid}')">Créer les sections</button>`);
+  paintCutPreview();
+}
+function pickCutSize(v,el){_cutSize=v;document.querySelectorAll('#cut-seg button').forEach(b=>b.classList.remove('on'));el.classList.add('on');paintCutPreview();}
+function paintCutPreview(){
+  const bars=parseInt((document.getElementById('cut-bars')||{}).value)||0;
+  const el=document.getElementById('cut-preview');if(!el)return;
+  if(!bars){el.innerHTML='<div class="muted" style="font-size:12px;">Indique le nombre de mesures.</div>';return;}
+  if(_cutSize==='manual'){el.innerHTML=`<div class="muted" style="font-size:12px;">${bars} mesures enregistrées. Ajoute les sections une par une depuis la fiche.</div>`;return;}
+  const step=_cutSize,ranges=[];for(let f=1;f<=bars;f+=step)ranges.push([f,Math.min(bars,f+step-1)]);
+  el.innerHTML=`<div class="muted" style="font-size:11px;margin-bottom:9px;">Aperçu · ${ranges.length} section${ranges.length>1?'s':''}, renommables ensuite</div>
+    <div class="map" style="height:16px;">${ranges.map(r=>`<i style="flex:${r[1]-r[0]+1};background:#D2694A;"></i>`).join('')}</div>
+    <div class="sub" style="margin-top:9px;font-size:12px;"><span>mes. ${ranges.map(r=>r[0]+'–'+r[1]).join(' · ')}</span></div>`;
+}
+function applyCut(pid){
+  const bars=parseInt((document.getElementById('cut-bars')||{}).value)||0;if(bars<1){toast('Indique le nombre de mesures');return;}
+  const p=pieceById(pid);p.bars=bars;p.sections=p.sections||[];
+  if(_cutSize!=='manual'){const step=_cutSize;for(let f=1;f<=bars;f+=step)p.sections.push({id:uid(),name:'Section '+(p.sections.length+1),from:f,to:Math.min(bars,f+step-1),todo:'',status:'new',bpm:[]});}
+  recordHist(p);save();closeSheet();refreshScreen();pieceDetail(pid);
+}
 function nudgeProgress(id,d){const p=pieceById(id);if(!p)return;p.progress=Math.max(0,Math.min(100,(p.progress||0)+d));
   if(p.progress>=100&&p.status!=='mastered'){markMastered(id);return;}save();pieceDetail(id);}
-function markMastered(id){const p=pieceById(id);if(!p)return;const was=p.status==='mastered';p.status='mastered';p.progress=100;if(!p.masteredAt)p.masteredAt=Date.now();
+function markMastered(id){const p=pieceById(id);if(!p)return;const was=p.status==='mastered';p.status='mastered';p.progress=100;
+  if(hasDerivedProgress(p)){secList(p).forEach(s=>s.status='ok');recordHist(p);}
+  if(!p.masteredAt)p.masteredAt=Date.now();
   save();closeSheet();refreshScreen();if(!was)celebrate('Morceau maîtrisé !',p.title);else toast('Maîtrisé');}
 function reopenPiece(id){const p=pieceById(id);if(!p)return;p.status='active';save();pieceDetail(id);toast('Réactivé · en cours');}
 function deleteWish(id){if(!confirm('Retirer ce morceau de « à apprendre » ?'))return;S.pieces=S.pieces.filter(p=>p.id!==id);save();closeSheet();refreshScreen();toast('Retiré');}
@@ -1159,22 +1437,23 @@ function hourHeat(){
 }
 function revisionList(){const now=Date.now();
   return S.pieces.filter(p=>!p.isEnsemble&&p.status==='mastered').map(p=>{const days=p.revInterval||S.settings.revisionDays||18;const lp=pieceLastPlayed(p.id);const d=lp?Math.floor((now-new Date(lp+'T00:00'))/86400000):9999;return {p,d,days};}).filter(x=>x.d>=x.days).sort((a,b)=>b.d-a.d).map(x=>x.p);}
-function estimateText(p){if(S.settings.estimates===false||!p||p.progress==null||p.progress>=100||!p.createdAt)return '';
-  const days=(Date.now()-p.createdAt)/86400000;if(days<3||!p.progress)return '';const rate=p.progress/days;if(rate<=0)return '';
-  const rem=(100-p.progress)/rate;if(rem>3650)return '';return 'Maîtrise estimée dans ~'+(rem<14?Math.round(rem)+' j':Math.round(rem/7)+' sem.');}
+function estimateText(p){if(S.settings.estimates===false||!p||!p.createdAt)return '';
+  const pr=pieceProgress(p);if(pr>=100)return '';
+  const days=(Date.now()-p.createdAt)/86400000;if(days<3||!pr)return '';const rate=pr/days;if(rate<=0)return '';
+  const rem=(100-pr)/rate;if(rem>3650)return '';return 'Maîtrise estimée dans ~'+(rem<14?Math.round(rem)+' j':Math.round(rem/7)+' sem.');}
 
 /* ==========================================================================
    LOT 2 partie 2 — plan guidé (Chang), simulation de concert, rapport hebdo
    ========================================================================== */
 let _plan=null;
-function changConsigne(p){const pr=p.progress||0;if(pr<30)return "Passage le plus difficile d'abord, mains séparées, très lent.";if(pr<70)return "Mains ensemble, monte le tempo par petits paliers.";return "Peaufine les nuances et joue de mémoire.";}
+function changConsigne(p){const pr=pieceProgress(p);if(pr<30)return "Passage le plus difficile d'abord, mains séparées, très lent.";if(pr<70)return "Mains ensemble, monte le tempo par petits paliers.";return "Peaufine les nuances et joue de mémoire.";}
 function generatePlan(){
   const goal=todayGoal();const active=S.pieces.filter(p=>!p.isEnsemble&&p.status==='active');const rev=revisionList();
   const blocks=[];const warm=Math.max(5,Math.round(goal*0.12));
   blocks.push({piece:null,focus:'Échauffement',min:warm,consigne:'Gammes et mouvements lents, mains détendues.'});
   const maint=rev.length?Math.max(5,Math.round(goal*0.15)):0;const play=Math.max(3,Math.round(goal*0.10));
   const workTime=Math.max(5,goal-warm-maint-play);
-  const targets=active.slice().sort((a,b)=>((a.progress||0)-(b.progress||0))||((b.diff||0)-(a.diff||0))).slice(0,3);
+  const targets=active.slice().sort((a,b)=>(pieceProgress(a)-pieceProgress(b))||((b.diff||0)-(a.diff||0))).slice(0,3);
   if(targets.length){const per=Math.max(5,Math.round(workTime/targets.length));targets.forEach(p=>blocks.push({piece:p.id,focus:'Travail',min:per,consigne:changConsigne(p)}));}
   if(maint&&rev[0])blocks.push({piece:rev[0].id,focus:'Entretien',min:maint,consigne:'Filage lent pour réactiver la mémoire.'});
   const last=targets[0]||active[0]||null;blocks.push({piece:last?last.id:null,focus:'Filage',min:play,consigne:"Joue en entier sans t'arrêter, comme en concert."});

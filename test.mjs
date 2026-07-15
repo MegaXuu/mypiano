@@ -24,6 +24,13 @@ const seed = {
     { id: 'a1', title: 'Nocturne op. 9 no 2', composer: 'Chopin', epoch: 'Romantique', diff: 6, status: 'active', progress: 20, tags: ['concert'], notes: [{ id: 'n1', date: '2026-07-10', section: 'mes. 1-8', text: 'Legato' }], createdAt: now - 40 * 864e5 },
     { id: 'a2', title: 'Clair de lune', composer: 'Debussy', diff: 7, status: 'active', progress: 55, notes: [], createdAt: now - 20 * 864e5 },
     { id: 'a3', title: 'Gymnopédie no 1', composer: 'Satie', diff: 3, status: 'mastered', progress: 100, masteredAt: now - 60 * 864e5, notes: [], createdAt: now - 120 * 864e5 },
+    { id: 'a4', title: 'Fantaisie-Impromptu', composer: 'Chopin', diff: 8, status: 'active', progress: 0, bars: 50, notes: [], createdAt: now - 30 * 864e5,
+      sections: [
+        { id: 'sec1', name: 'Ouverture', from: 1, to: 20, todo: '', status: 'wip', bpm: [{ d: '2026-07-01', v: 70 }, { d: '2026-07-08', v: 80 }] },
+        { id: 'sec2', name: 'Coda', from: 21, to: 50, todo: 'Ralentir', status: 'ok', bpm: [] },
+      ],
+      hist: [{ d: '2026-06-20', m: 0 }, { d: '2026-06-27', m: 10 }, { d: '2026-07-04', m: 20 }, { d: '2026-07-11', m: 30 }] },
+    { id: 'a5', title: 'Étude sans section', composer: 'Czerny', diff: 4, status: 'active', progress: 30, notes: [], createdAt: now - 10 * 864e5 },
   ],
   sessions: [{ id: 's1', date: '2026-07-14', mode: 'chrono', blocks: [{ piece: 'a1', sec: 1200 }], entries: [], ts: now }],
   wishlist: [{ id: 'w1', title: 'La Campanella', composer: 'Liszt' }],
@@ -43,6 +50,8 @@ const dom = new JSDOM(html, {
     Object.defineProperty(win.navigator, 'onLine', { get: () => false });
     // jsdom n'implémente pas scrollTo : no-op pour éviter le bruit console.
     win.scrollTo = () => {};
+    // idem pour confirm() (dialogues non implémentés en jsdom) : on approuve toujours.
+    win.confirm = () => true;
     // app.js déclare une fonction globale history() (liste des séances) ;
     // en vrai navigateur elle masque sans souci window.history (vérifié),
     // mais l'objet History de jsdom est non-configurable et bloque le
@@ -83,6 +92,52 @@ call('addPieceSheet', () => win.addPieceSheet());
 call('startSheet', () => win.startSheet());
 call('setVoyage(sous-onglets)', () => ['voyage', 'jardin', 'succes'].forEach(t => win.setVoyage && win.setVoyage(t)));
 call('lastMonthReport', () => win.lastMonthReport());
+
+// 3bis) Sections & mesures (V3 étape 2).
+call('pieceDetail(sections)', () => win.pieceDetail('a4'));
+call('addSection+deleteSection', () => {
+  win.addSection('a4');
+  const p = S.pieces.find(x => x.id === 'a4');
+  const last = p.sections[p.sections.length - 1];
+  win.deleteSection('a4', last.id);
+});
+call('toggleSec+secBpmStep+noteSecBpm', () => {
+  win.pieceDetail('a4');
+  const p = S.pieces.find(x => x.id === 'a4');
+  const sid = p.sections[0].id;
+  win.toggleSec('a4', sid);
+  win.secBpmStep(sid, 2);
+  win.noteSecBpm('a4', sid);
+});
+call('setSecStatus', () => {
+  const p = S.pieces.find(x => x.id === 'a4');
+  win.setSecStatus('a4', p.sections[0].id, 'poli');
+});
+call('cutSheet+applyCut(pièce sans sections)', () => {
+  win.cutSheet('a5');
+  const barsInput = win.document.getElementById('cut-bars');
+  barsInput.value = '40';
+  win.paintCutPreview();
+  const btns = [...win.document.querySelectorAll('#cut-seg button')];
+  if (btns[1]) btns[1].click(); // « 16 mes. »
+  win.applyCut('a5');
+  const p = S.pieces.find(x => x.id === 'a5');
+  if (!p.bars || !p.sections.length) throw new Error('découpage assisté n’a rien créé');
+});
+call('carnetSheet+commitSession(sections)', () => {
+  // Démarre une vraie séance (fixe le `timer` interne, pas accessible depuis window autrement).
+  win.quickStart('a4');
+  win.stopSession(); // total < 5s → confirm() stubbé à true → carnetSheet() s'ouvre quand même.
+  const chip = win.document.querySelector('#csec-chips-0 .chip');
+  if (!chip) throw new Error('chip section introuvable dans le carnet');
+  chip.click();
+  const sid = chip.dataset.sid;
+  const adv = win.document.getElementById('csec-adv-0-' + sid);
+  if (adv) adv.click();
+  const bpmInput = win.document.getElementById('cbpm-0-' + sid);
+  if (bpmInput) bpmInput.value = '96';
+  win.commitSession(0);
+});
 
 // 4) Bilan.
 if (fails.length) {

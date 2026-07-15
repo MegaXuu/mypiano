@@ -40,13 +40,14 @@ carnet de travail, et se motiver par la gamification. Cible : iPhone (PWA instal
   Les notes par morceau vivent dans la fiche unifiée (`pieceDetail`), pas dans le Carnet.
 
 ## Modèle de données (S)
-- `pieces[]` : `{id,title,composer,epoch,opus,genre,key,diff(Henle 1–9),status(wishlist|active|mastered|archived|abandoned),bpm,progress(0–100),tags[],notes[{id,date,section,text}],todo,createdAt,masteredAt,isEnsemble?,parentId?,revInterval?}`
+- `pieces[]` : `{id,title,composer,epoch,opus,genre,key,diff(Henle 1–9),status(wishlist|active|mastered|archived|abandoned),bpm,progress(0–100),tags[],notes[{id,date,section,text}],todo,createdAt,masteredAt,isEnsemble?,parentId?,revInterval?,bars?,sections?[],hist?[]}`
   - `revInterval` (jours, pièces `mastered` seulement) : intervalle d'entretien adaptatif, défaut
     `settings.revisionDays` (18). S'allonge (`×1.6`, plafond 120 j) sur « Toujours maîtrisée » en fin
     de séance, se réinitialise au défaut si repassée `active` (« À retravailler »). `needsRevision`/
     `revisionList` l'utilisent au lieu de l'intervalle fixe. Bouton « Réviser » (accueil) = séance
     entrelacée des 3 pièces les plus en retard (`startRevision`, réutilise `timer.plan/planIdx`).
-  - **Fiche unifiée** `pieceDetail(id)` (feuille) = point d'entrée depuis le répertoire : stats, avancement ±10, notes, transitions de statut. Formulaire `pieceSheet` allégé (champs primaires + dépliant « Détails »). **Phase** dérivée `piecePhase(p)` (À apprendre / Déchiffrage / Consolidation / Polissage / Maîtrisé / À entretenir…). Anti-doublon `findDuplicate` (normalisé).
+  - **Fiche unifiée** `pieceDetail(id)` (feuille) = point d'entrée depuis le répertoire : stats, avancement (dérivé si sections, sinon ±10 manuel), notes, transitions de statut. Formulaire `pieceSheet` allégé (champs primaires + dépliant « Détails »). **Phase** dérivée `piecePhase(p)` (À apprendre / Déchiffrage / Consolidation / Polissage / Maîtrisé / À entretenir…). Anti-doublon `findDuplicate` (normalisé).
+  - **Sections & mesures (V3 étape 2)** : `bars` (nb de mesures, facultatif) + `sections[] = {id,name,from,to,todo,status(new|wip|poli|ok),bpm:[{d,v}]}`, **entièrement facultatif** — une pièce sans section se comporte comme avant (avancement manuel ±10). Dès que `bars` et au moins une section existent, `hasDerivedProgress(p)` devient vrai et `pieceProgress(p)` **remplace** `p.progress` partout (phase, estimation, tri du plan guidé) : seules les mesures des sections `ok` comptent (`barsOk`, union par rang pour éviter les doubles comptages en cas de chevauchement — `sectionRankArr`). `hist[] = {d,m}` journalise les mesures au point (un point par jour joué ou modifié, `recordHist`) → mini-courbe (`renderHistCurve`, pas de courbe de tempo). Carte visuelle de couverture (`renderMap`/`mapSegments`, trous = `coverageGaps`). Tempo = **saisie manuelle uniquement**, stocké par section (`sec.bpm[]`), jamais de métronome. Découpage assisté = `cutSheet`/`applyCut` (mesures régulières ou « à la main »). Suggestion « à travailler aujourd'hui » = section non `ok` la moins récemment travaillée (`pickTodaySection`, dérivé de `sessions[].entries[].sections`). Rappel en séance = ligne « Pas au point : … » (`sectionsReminderLine`). Carnet de fin de séance = bloc replié « Sections travaillées » (chips + avancer d'un cran + bpm optionnel).
 - `sessions[]` : `{id,date,mode(chrono|minuteur|guided|concert),goal,feeling(pp|p|mf|f|ff),blocks[{piece|'__improv__',sec}],entries[{piece,worked,next}],ts,concert?}`
 - `journal{date:{mood,energy}}` — capturé en **fin de séance** (`carnetSheet`, bloc repliable « facultatif » sous le ressenti), pas d'écran dédié. `opusCache{composer:[works]}`.
   (`wishlist[]` **fusionnée** dans `pieces` via `status:'wishlist'` — migration auto dans `migrate()`, tableau conservé vide. Accessible uniquement via le filtre « Apprendre » du Répertoire.)
@@ -91,9 +92,10 @@ Polices : titres **Playfair Display**, interface **DM Sans**, chiffres **EB Gara
   1. ✅ **Révision adaptative** : intervalle d'entretien par morceau (`p.revInterval`, défaut =
      `settings.revisionDays`) qui s'allonge sur « toujours maîtrisée » et se réinitialise sur
      « à retravailler » ; bouton « Réviser » = séance **entrelacée** de 3 pièces à entretenir.
-  2. **Sections & tempo** (cœur v3) : `p.sections[] = {id,name,todo,status,bpm:[{d,v}]}`
-     **facultatives** ; édition dans `pieceDetail` + mini-courbe SVG du tempo. **Suivi de tempo =
-     saisie manuelle du bpm stable, JAMAIS de métronome** (refus explicite de l'utilisateur).
+  2. ✅ **Sections & mesures** (cœur v3) : `p.bars` + `p.sections[]` facultatifs (voir modèle de
+     données ci-dessus), avancement dérivé des mesures « au point », carte de couverture + courbe
+     de progression, découpage assisté, suggestion « à travailler aujourd'hui ». **Suivi de tempo =
+     saisie manuelle du bpm stable par section, JAMAIS de métronome** (refus explicite).
   3. **Migration IndexedDB** (socle pour l'audio) : S en mémoire, persistance async, migration
      one-shot depuis localStorage, export/import JSON conservé. Adapter `test.mjs` (fake-indexeddb).
   4. **Enregistrement audio** (dépend de 3) : MediaRecorder en séance, blobs en IndexedDB, rattachés
