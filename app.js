@@ -5,7 +5,7 @@
 
 const KEY = 'pianoV2';
 const IMPROV = '__improv__';
-const APP_VERSION = 'Bêta 3.4'; // à synchroniser avec CACHE dans sw.js à chaque release
+const APP_VERSION = 'Bêta 3.5'; // à synchroniser avec CACHE dans sw.js à chaque release
 
 const STONES = [
   {n:'Apprenti',h:10,c:'#E0A83B'},{n:'Élève',h:20,c:'#C9CDDA'},{n:'Musicien',h:30,c:'#9BA0AE'},
@@ -317,10 +317,11 @@ function go(name){
 }
 let toastT;function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),1900);}
 function openSheet(html){
-  const sheet=document.getElementById('sheet');
+  const sheet=document.getElementById('sheet'),bg=document.getElementById('sheet-bg');
   sheet.style.transition='';sheet.style.animation='';sheet.style.transform='';
+  bg.style.transition='';bg.style.background='';
   sheet.innerHTML='<div class="handle"></div>'+html;
-  document.getElementById('sheet-bg').classList.add('show');
+  bg.classList.add('show');
 }
 let _recUrls=[];
 function closeSheet(){document.getElementById('sheet-bg').classList.remove('show');_recUrls.forEach(u=>{try{URL.revokeObjectURL(u);}catch(e){}});_recUrls=[];}
@@ -329,26 +330,31 @@ document.getElementById('sheet-bg').addEventListener('click',e=>{if(e.target.id=
 /* ---------- Fermeture de la feuille au glisser (poignée) ---------- */
 let _sheetDrag=null;
 document.getElementById('sheet-bg').addEventListener('pointerdown',e=>{
-  if(!e.target.closest('.handle'))return;
+  const handle=e.target.closest('.handle');
+  if(!handle)return;
   const sheet=document.getElementById('sheet');
-  _sheetDrag={startY:e.clientY,y:0,h:sheet.getBoundingClientRect().height,pid:e.pointerId};
+  _sheetDrag={startY:e.clientY,y:0,h:sheet.getBoundingClientRect().height,pid:e.pointerId,t:Date.now(),vy:0};
   sheet.style.animation='none';sheet.style.transition='none';
-  try{sheet.setPointerCapture(e.pointerId);}catch(err){}
+  try{handle.setPointerCapture(e.pointerId);}catch(err){}
 });
 document.getElementById('sheet-bg').addEventListener('pointermove',e=>{
   if(!_sheetDrag||e.pointerId!==_sheetDrag.pid)return;
-  _sheetDrag.y=Math.max(0,e.clientY-_sheetDrag.startY);
-  document.getElementById('sheet').style.transform='translateY('+_sheetDrag.y+'px)';
+  const now=Date.now(),dt=Math.max(1,now-_sheetDrag.t),y=Math.max(0,e.clientY-_sheetDrag.startY);
+  _sheetDrag.vy=(y-_sheetDrag.y)/dt; // px/ms, geste rapide vers le bas si positif
+  _sheetDrag.y=y;_sheetDrag.t=now;
+  document.getElementById('sheet').style.transform='translateY('+y+'px)';
+  document.getElementById('sheet-bg').style.background='rgba(0,0,0,'+Math.max(0.08,0.5*(1-y/_sheetDrag.h)).toFixed(3)+')';
 });
 function endSheetDrag(e){
   if(!_sheetDrag||(e&&e.pointerId!==_sheetDrag.pid))return;
-  const sheet=document.getElementById('sheet'),drag=_sheetDrag;_sheetDrag=null;
-  sheet.style.transition='transform .2s ease';
-  if(drag.y>Math.min(120,drag.h*0.28)){
-    sheet.style.transform='translateY(100%)';
+  const sheet=document.getElementById('sheet'),bg=document.getElementById('sheet-bg'),drag=_sheetDrag;_sheetDrag=null;
+  sheet.style.transition='transform .2s ease';bg.style.transition='background .2s ease';
+  const closing=drag.y>Math.min(120,drag.h*0.28)||(drag.y>24&&drag.vy>0.5);
+  if(closing){
+    sheet.style.transform='translateY(100%)';bg.style.background='rgba(0,0,0,0)';
     setTimeout(closeSheet,180);
   }else{
-    sheet.style.transform='';
+    sheet.style.transform='';bg.style.background='';
   }
 }
 document.getElementById('sheet-bg').addEventListener('pointerup',endSheetDrag);
