@@ -5,7 +5,7 @@
 
 const KEY = 'pianoV2';
 const IMPROV = '__improv__';
-const APP_VERSION = 'Bêta 3.1'; // à synchroniser avec CACHE dans sw.js à chaque release
+const APP_VERSION = 'Bêta 3.2'; // à synchroniser avec CACHE dans sw.js à chaque release
 
 const STONES = [
   {n:'Apprenti',h:10,c:'#E0A83B'},{n:'Élève',h:20,c:'#C9CDDA'},{n:'Musicien',h:30,c:'#9BA0AE'},
@@ -78,6 +78,40 @@ function idbSet(key,val){
       tx.oncomplete=()=>resolve(true);
       tx.onerror=()=>resolve(false);
       tx.onabort=()=>resolve(false);
+    }catch(e){resolve(false);}
+  });
+}
+// Enregistrements audio : blobs stockés à part (jamais dans S / localStorage).
+function idbPutBlob(id,blob){
+  return new Promise(resolve=>{
+    if(!_db){resolve(false);return;}
+    try{
+      const tx=_db.transaction('recordings','readwrite');
+      tx.objectStore('recordings').put(blob,id);
+      tx.oncomplete=()=>resolve(true);
+      tx.onerror=()=>resolve(false);
+      tx.onabort=()=>resolve(false);
+    }catch(e){resolve(false);}
+  });
+}
+function idbGetBlob(id){
+  return new Promise(resolve=>{
+    if(!_db){resolve(null);return;}
+    try{
+      const rq=_db.transaction('recordings','readonly').objectStore('recordings').get(id);
+      rq.onsuccess=()=>resolve(rq.result||null);
+      rq.onerror=()=>resolve(null);
+    }catch(e){resolve(null);}
+  });
+}
+function idbDelBlob(id){
+  return new Promise(resolve=>{
+    if(!_db){resolve(false);return;}
+    try{
+      const tx=_db.transaction('recordings','readwrite');
+      tx.objectStore('recordings').delete(id);
+      tx.oncomplete=()=>resolve(true);
+      tx.onerror=()=>resolve(false);
     }catch(e){resolve(false);}
   });
 }
@@ -283,7 +317,8 @@ function go(name){
 }
 let toastT;function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),1900);}
 function openSheet(html){document.getElementById('sheet').innerHTML='<div class="handle"></div>'+html;document.getElementById('sheet-bg').classList.add('show');}
-function closeSheet(){document.getElementById('sheet-bg').classList.remove('show');}
+let _recUrls=[];
+function closeSheet(){document.getElementById('sheet-bg').classList.remove('show');_recUrls.forEach(u=>{try{URL.revokeObjectURL(u);}catch(e){}});_recUrls=[];}
 document.getElementById('sheet-bg').addEventListener('click',e=>{if(e.target.id==='sheet-bg')closeSheet();});
 
 /* ==========================================================================
@@ -466,6 +501,7 @@ function renderSession(){
     <div class="row" style="justify-content:center;gap:16px;margin-top:14px;">
       <button id="ss-pause" onclick="togglePause()" style="width:76px;height:76px;border-radius:50%;background:var(--acc);color:#191A1B;font-size:28px;">❚❚</button>
       <button onclick="stopSession()" style="width:76px;height:76px;border-radius:50%;border:1px solid var(--border);font-size:24px;">■</button>
+      ${recAvailable()?`<button id="ss-rec" onclick="toggleRecording()" style="width:76px;height:76px;border-radius:50%;border:1px solid var(--border);font-size:22px;">●</button>`:''}
     </div>
     <p class="muted" id="ss-pausehint" style="text-align:center;font-size:13px;margin-top:18px;display:none;">En pause, tu peux changer de morceau pour la reprise.</p>
     <h2>Répartition de la séance</h2>
@@ -490,6 +526,7 @@ function paintSession(){
   const iv=timer.interval;if(iv&&iv.phase==='break'){if(t)t.textContent=big(Math.max(0,iv.brk-iv.phaseSec));if(md)md.textContent='Pause · repose tes mains 🖐';}
   const pb=document.getElementById('ss-pause');if(pb){pb.textContent=timer.running?'❚❚':'▶';}
   const ph=document.getElementById('ss-pausehint');if(ph)ph.style.display=timer.running?'none':'block';
+  const rb=document.getElementById('ss-rec');if(rb){rb.textContent=_rec?'■':'●';rb.style.color=_rec?'#F0857A':'';rb.style.borderColor=_rec?'#F0857A':'';}
   const agg={};timer.blocks.forEach(b=>agg[b.piece]=(agg[b.piece]||0)+b.sec);
   const el=document.getElementById('ss-blocks');
   if(el)el.innerHTML=Object.keys(agg).map(id=>`<div class="item"><div class="title" style="${id===IMPROV?'font-style:italic;color:var(--tc);':''}">${esc(pieceName(id))}</div><div class="r num">${big(agg[id])}</div></div>`).join('')||'<p class="empty">—</p>';
@@ -508,7 +545,9 @@ function pauseSheet(){
 function resumeWith(id){const last=timer.blocks[timer.blocks.length-1];
   if(id!==last.piece){if(last.sec<1)last.piece=id;else timer.blocks.push({piece:id,sec:0});}
   timer.running=true;timer.last=Date.now();closeSheet();paintSession();}
-function stopSession(){timer.running=false;clearInterval(tickInt);const total=Math.round(timer.total);
+function stopSession(){
+  if(_rec){toast("Arrête d'abord l'enregistrement en cours");return;}
+  timer.running=false;clearInterval(tickInt);const total=Math.round(timer.total);
   if(total<5){if(!confirm('Séance très courte. L\'enregistrer quand même ?')){timer=null;go('home');return;}}
   carnetSheet(total);}
 function quickCarnet(){toast('Le carnet se remplit en fin de séance');}
@@ -611,6 +650,107 @@ function commitSession(total){
   else toast('Séance enregistrée · '+dur(total));
 }
 function buzz(){try{navigator.vibrate&&navigator.vibrate([50,40,50]);}catch(e){}}
+
+/* ---------- Enregistrement audio (étape 4 V3) ---------- */
+let _rec=null,_recDraft=null;
+function recAvailable(){return typeof MediaRecorder!=='undefined'&&!!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia);}
+function recMime(){
+  if(typeof MediaRecorder==='undefined')return '';
+  const cands=['audio/mp4','audio/aac','audio/webm;codecs=opus','audio/webm','audio/ogg'];
+  for(const m of cands){try{if(MediaRecorder.isTypeSupported(m))return m;}catch(e){}}
+  return '';
+}
+async function toggleRecording(){
+  if(!timer)return;
+  if(_rec){stopRecording();return;}
+  if(!recAvailable()){toast('Enregistrement audio indisponible sur cet appareil');return;}
+  const cur=timer.blocks[timer.blocks.length-1].piece;
+  if(cur===IMPROV){toast('Choisis un morceau pour enregistrer');return;}
+  let stream;
+  try{stream=await navigator.mediaDevices.getUserMedia({audio:true});}
+  catch(e){toast('Micro indisponible ou refusé');return;}
+  const mime=recMime();
+  let mr;
+  try{mr=mime?new MediaRecorder(stream,{mimeType:mime}):new MediaRecorder(stream);}
+  catch(e){toast('Enregistrement impossible sur cet appareil');stream.getTracks().forEach(t=>t.stop());return;}
+  const chunks=[];
+  mr.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};
+  mr.onstop=()=>{
+    stream.getTracks().forEach(t=>t.stop());
+    const startTs=_rec.startTs,pieceId=_rec.pieceId;
+    const blob=new Blob(chunks,{type:mr.mimeType||mime||'audio/webm'});
+    _rec=null;paintSession();
+    finishRecording(pieceId,blob,Math.max(1,Math.round((Date.now()-startTs)/1000)));
+  };
+  _rec={mr,pieceId:cur,startTs:Date.now()};
+  mr.start();
+  paintSession();
+}
+function stopRecording(){if(_rec&&_rec.mr&&_rec.mr.state!=='inactive')_rec.mr.stop();}
+function finishRecording(pieceId,blob,durSec){
+  const p=pieceById(pieceId);
+  _recDraft={pieceId,blob,durSec,section:'',feel:''};
+  const secs=p?secList(p):[];
+  openSheet(`<h3>Enregistrement</h3>
+    <p class="muted" style="font-size:13px;margin-top:-6px;">${dur(durSec)} · ${esc(p?p.title:'')}</p>
+    ${secs.length?`<div class="field"><label>Section (optionnel)</label><div class="chips" id="rec-secs">${secs.map(s=>`<button type="button" class="chip" onclick="pickRecSec('${s.id}',this)">${esc(s.name)}</button>`).join('')}</div></div>`:''}
+    <div class="field"><label>Ressenti à l'écoute (optionnel)</label><div class="dyn" id="rec-f">${FEEL_ORDER.map(f=>`<button data-f="${f}" onclick="pickRecFeel('${f}',this)">${f}</button>`).join('')}</div>
+      <div class="muted" id="rec-fl" style="font-size:13px;margin-top:7px;text-align:center;">—</div></div>
+    <button class="btn primary" onclick="saveRecording()">Enregistrer</button>
+    <button class="btn ghost sm" style="width:100%;margin-top:10px;" onclick="discardRecording()">Ne pas garder</button>`);
+}
+function pickRecSec(id,el){const was=_recDraft.section===id;_recDraft.section=was?'':id;
+  document.querySelectorAll('#rec-secs .chip').forEach(b=>b.classList.toggle('on',!was&&b===el));}
+function pickRecFeel(f,el){_recDraft.feel=f;const idx=FEEL_ORDER.indexOf(f);document.querySelectorAll('#rec-f button').forEach((b,i)=>b.classList.toggle('on',i<=idx));document.getElementById('rec-fl').textContent=FEEL[f];}
+async function saveRecording(){
+  if(!_recDraft)return;
+  const {pieceId,blob,durSec,section,feel}=_recDraft;
+  const p=pieceById(pieceId);
+  if(!p){closeSheet();_recDraft=null;return;}
+  const id=uid();
+  const ok=await idbPutBlob(id,blob);
+  if(!ok){toast("Impossible d'enregistrer l'audio");closeSheet();_recDraft=null;return;}
+  p.recordings=p.recordings||[];
+  const sec=section?secList(p).find(s=>s.id===section):null;
+  const bpm=sec&&sec.bpm&&sec.bpm.length?sec.bpm[sec.bpm.length-1].v:null;
+  p.recordings.push({id,date:dkey(),dur:durSec,section,bpm,feel,size:blob.size,mime:blob.type});
+  save();closeSheet();_recDraft=null;toast('Enregistrement ajouté');
+}
+function discardRecording(){_recDraft=null;closeSheet();}
+function fmtBytes(n){if(!n)return '';if(n<1024*1024)return Math.round(n/1024)+' Ko';return (n/1024/1024).toFixed(1)+' Mo';}
+function renderRecordings(p){
+  const recs=[...(p.recordings||[])].reverse();
+  if(!recs.length)return '<div class="empty" style="padding:14px;">Aucun enregistrement.</div>';
+  return recs.map(r=>{
+    const label=[r.section?secName(p,r.section):'',frShort(r.date),r.bpm?r.bpm+' bpm':''].filter(Boolean).join(' · ');
+    return `<div class="card" style="padding:12px 14px;margin-bottom:10px;">
+      <div class="between" style="align-items:flex-start;">
+        <div style="min-width:0;">
+          <div style="font-size:13px;font-weight:600;">${esc(label||frShort(r.date))}</div>
+          <div class="muted" style="font-size:11px;margin-top:2px;">${dur(r.dur)} · ${fmtBytes(r.size)}${r.feel?' · '+esc(feelLabel(r.feel)):''}</div>
+        </div>
+        <button class="btn ghost sm" style="flex:0 0 auto;color:#F0857A;border-color:#5a2f2b;" onclick="deleteRecording('${p.id}','${r.id}')">Suppr.</button>
+      </div>
+      <div id="rec-pl-${r.id}" style="margin-top:10px;">
+        <button class="btn ghost sm" style="width:100%;" onclick="playRecording('${r.id}')">${playSvg()} Écouter</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+async function playRecording(rid){
+  const box=document.getElementById('rec-pl-'+rid);if(!box)return;
+  box.innerHTML='<span class="muted" style="font-size:12px;">Chargement…</span>';
+  const blob=await idbGetBlob(rid);
+  if(!blob){box.innerHTML='<span class="muted" style="font-size:12px;">Audio introuvable.</span>';return;}
+  const url=URL.createObjectURL(blob);_recUrls.push(url);
+  box.innerHTML=`<audio controls autoplay style="width:100%;" src="${url}"></audio>`;
+}
+function deleteRecording(pid,rid){
+  if(!confirm('Supprimer cet enregistrement ?'))return;
+  const p=pieceById(pid);if(!p)return;
+  p.recordings=(p.recordings||[]).filter(r=>r.id!==rid);
+  save();idbDelBlob(rid);pieceDetail(pid);
+}
 
 /* ---------- Séance a posteriori (ajout / édition) ---------- */
 function aposterioriSheet(sess){
@@ -945,6 +1085,7 @@ function pieceDetail(id){const p=pieceById(id);if(!p)return;
       <div class="grid2" style="margin-top:10px;"><button class="btn ghost sm" onclick="editPiece('${p.id}')">Modifier</button><button class="btn ghost sm" onclick="setPieceStatus('${p.id}','archived')">Archiver</button></div>
       <div class="between" style="margin:20px 0 10px;"><h2 style="margin:0;">Sections</h2>${secList(p).length?`<button class="btn ghost sm" onclick="addSection('${p.id}')">+ Ajouter</button>`:''}</div>
       ${renderSections(p)}`}
+    ${!isWish?`<h2 style="margin-top:18px;">Enregistrements</h2>${renderRecordings(p)}`:''}
     <h2 style="margin-top:18px;">Notes</h2>${notes}`);
 }
 function detailPlay(id){closeSheet();quickStart(id);}

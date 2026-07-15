@@ -9,9 +9,10 @@ carnet de travail, et se motiver par la gamification. Cible : iPhone (PWA instal
 
 ## Nature technique
 - **PWA en JavaScript pur** (pas de framework, **pas d'étape de build**). Fichiers statiques.
-- Stockage **local** : **IndexedDB** (base `pianoV2`, store `state`, clé `'S'` = JSON de tout l'état),
-  via `loadState()` / `save()` / `saveNow()`. `localStorage['pianoV2']` reste un **miroir** best-effort
-  (filet de sécurité pendant le rodage, `LS_MIRROR` — sera retiré à l'étape 4). Voir « Architecture ».
+- Stockage **local** : **IndexedDB** (base `pianoV2`, stores `state` et `recordings`), clé `'S'` du
+  store `state` = JSON de tout l'état, via `loadState()` / `save()` / `saveNow()`.
+  `localStorage['pianoV2']` reste un **miroir** best-effort (filet de sécurité pendant le rodage,
+  `LS_MIRROR` — à retirer une fois le rodage jugé suffisant, aucune échéance fixée). Voir « Architecture ».
 - Langue de l'interface : **français**. Ton sobre, haut de gamme.
 - Versionnage affiché : **Bêta 3.N** (cycle V3 de la feuille de route), synchronisé avec `CACHE` dans `sw.js`.
 
@@ -46,6 +47,15 @@ carnet de travail, et se motiver par la gamification. Cible : iPhone (PWA instal
   contient des données, elles sont importées puis IndexedDB fait autorité (`localStorage` n'est pas
   effacé, reste le miroir). Si IndexedDB est indisponible (mode privé, quota…), repli silencieux sur
   `localStorage` seul.
+- **Audio (étape 4)** : store IndexedDB `recordings` (clé libre = `id`, valeur = `Blob` brut, pas de
+  JSON) via `idbPutBlob`/`idbGetBlob`/`idbDelBlob` — indépendant de `state`/`S`. Capture en séance
+  (`toggleRecording`, bouton ● dans `renderSession`, masqué si `!recAvailable()`) : `getUserMedia` +
+  `MediaRecorder`, format choisi par `recMime()` (mp4/aac préférés pour iOS Safari, repli webm/ogg).
+  Échec micro/permission/API → `toast` et abandon propre, jamais de crash. Fin d'enregistrement
+  (`finishRecording`) ouvre une feuille d'auto-éval (section optionnelle + pp–ff `dynScale`-like) qui
+  écrit le blob en IndexedDB et pousse la métadonnée dans `p.recordings`. Réécoute paresseuse
+  (`playRecording`, un blob chargé à la demande, jamais tous d'un coup) ; URLs objet révoquées à la
+  fermeture de feuille (`closeSheet`/`_recUrls`).
 - Chaque écran a une fonction `renderX()` qui construit `innerHTML` de `#s-x`.
 - Navigation : `go(name)` — écrans : `home, session, carnet, rep, voyage, stats, settings`.
   `FULL={session,settings}` masquent la tab bar.
@@ -69,6 +79,7 @@ carnet de travail, et se motiver par la gamification. Cible : iPhone (PWA instal
   (`wishlist[]` **fusionnée** dans `pieces` via `status:'wishlist'` — migration auto dans `migrate()`, tableau conservé vide. Accessible uniquement via le filtre « Apprendre » du Répertoire.)
 - `challenges{week,month,log[]}`, `settings{tolerance,dailyGoal,weeklyTime,weeklyDays,monthly,revisionDays,estimates,notif{…,monthly},theme,nas{}}`. `weeklyTime`/`monthly` peuvent être `null` (« non défini » → alerte accueil).
 - Divers : `lastReportSeen`, `lastMonthSeen`, `lastBackup`, `opusSyncedAt`.
+- **Enregistrements audio (V3 étape 4)** : `p.recordings?[] = {id,date,dur(sec),section?,bpm?(dernier bpm connu de la section au moment de l'enregistrement),feel?(pp–ff),size(octets),mime}`, **facultatif**. Le blob audio n'est **jamais** dans `S`/localStorage : il vit à part dans IndexedDB, store `recordings`, clé = `id` (voir « Architecture »). `deleteRecording` supprime la métadonnée **et** le blob.
 
 ## Design tokens (dans `index.html :root`)
 Fond `#191A1B` · surface `#242833` · surface haute `#2E3242` · bordure `#515060` · texte2 `#9B97A8`
@@ -119,8 +130,12 @@ Polices : titres **Playfair Display**, interface **DM Sans**, chiffres **EB Gara
      localStorage (miroir conservé, `LS_MIRROR`), export/import JSON adapté (`saveNow()` avant le
      toast), store `recordings` créé vide (prêt pour l'étape 4). `test.mjs` adapté (`fake-indexeddb`,
      `window.__ready`/`__flush`). Nommage de version : **Bêta 3.N**.
-  4. **Enregistrement audio** (dépend de 3) : MediaRecorder en séance, blobs en IndexedDB, rattachés
-     à la pièce/section, réécoute + auto-éval pp–ff dans la fiche. Tester le format sur iOS réel.
+  4. ✅ **Enregistrement audio** (dépendait de 3) : bouton ● en séance (`toggleRecording`, masqué si
+     l'appareil ne supporte pas `MediaRecorder`/`getUserMedia`), blob dans IndexedDB (store
+     `recordings`, jamais dans `S`), rattaché à la pièce (et section si étape 2 faite) avec date/durée,
+     réécoute paresseuse + suppression + taille affichée dans `pieceDetail`, auto-éval pp–ff à la fin
+     de l'enregistrement. **Format à valider sur iPhone réel** (mp4/aac attendu côté Safari — non
+     testé en conditions réelles, seulement le repli permission/API refusée).
   5. **Bilans & insights** : croisements (ressenti × moment, stagnation), rétrospective annuelle
      sobre ; **push iOS réel** = nécessite serveur VAPID → à valider séparément (sinon rester en
      notifications locales).
