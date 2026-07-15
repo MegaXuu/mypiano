@@ -1,0 +1,17 @@
+# Système
+.DS_Store
+Thumbs.db
+
+# Dépendances / outils
+node_modules/
+
+# Fichiers temporaires de test / conversion
+*.pdf
+page-*.jpg
+pg-*.jpg
+v*-*.jpg
+vchk-*.jpg
+
+# Sauvegardes de données exportées (ne pas versionner tes données perso)
+piano_sauvegarde*.json
+piano_historique*.csv
