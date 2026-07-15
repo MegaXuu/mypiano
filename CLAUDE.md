@@ -9,27 +9,43 @@ carnet de travail, et se motiver par la gamification. Cible : iPhone (PWA instal
 
 ## Nature technique
 - **PWA en JavaScript pur** (pas de framework, **pas d'étape de build**). Fichiers statiques.
-- Stockage **local** : `localStorage`, clé `pianoV2`, via `load()` / `save()`.
+- Stockage **local** : **IndexedDB** (base `pianoV2`, store `state`, clé `'S'` = JSON de tout l'état),
+  via `loadState()` / `save()` / `saveNow()`. `localStorage['pianoV2']` reste un **miroir** best-effort
+  (filet de sécurité pendant le rodage, `LS_MIRROR` — sera retiré à l'étape 4). Voir « Architecture ».
 - Langue de l'interface : **français**. Ton sobre, haut de gamme.
+- Versionnage affiché : **Bêta 3.N** (cycle V3 de la feuille de route), synchronisé avec `CACHE` dans `sw.js`.
 
 ## Fichiers
 - `index.html` — squelette + **tous les styles CSS** (`<style>`) + conteneurs d'écrans (`#s-*`) + tab bar + fonts Google.
 - `app.js` — **toute la logique et le rendu** (~2000 lignes, un seul fichier pour l'instant).
 - `opus.js` — base de compositeurs (7 favoris avec id, ~100 en tout) + helpers API Open Opus.
-- `sw.js` — service worker (cache hors-ligne). **Incrémenter `CACHE` à chaque release** (`piano-v2-N`).
+- `sw.js` — service worker (cache hors-ligne). **Incrémenter `CACHE` à chaque release** (`piano-b3-N`).
 - `manifest.webmanifest`, `icon-180/192/512.png`.
 
 ## Lancer / tester
 - Ouvrir `index.html` dans un navigateur. Les fonctions PWA (service worker, install, stockage
-  persistant) exigent du **HTTPS** (ou `localhost`) — une IP `http://` ne suffit pas.
+  persistant, IndexedDB) exigent du **HTTPS** (ou `localhost`) — une IP `http://` ne suffit pas.
 - **Vérif syntaxe** : `node --check app.js`.
-- **Test fumée** (recommandé après chaque changement) : charger `index.html` sous `jsdom` en inlinant
-  `opus.js` + `app.js`, exécuter les fonctions clés (`go`, `startSheet`/`beginSession`/`commitSession`,
-  `renderRep`, etc.) et vérifier `aucune erreur runtime`. (Pattern déjà utilisé pendant le dev.)
-- **À chaque release** : incrémenter `CACHE` dans `sw.js`, sinon l'app installée garde l'ancienne version.
+- **Test fumée** (recommandé après chaque changement) : `npm test` — charge `index.html` sous `jsdom`
+  (avec `fake-indexeddb` injecté, `jsdom` n'a pas IndexedDB nativement) en inlinant `opus.js` + `app.js`,
+  attend la fin du boot asynchrone (`await window.__ready()`), exécute les fonctions clés (`go`,
+  `startSheet`/`beginSession`/`commitSession`, `renderRep`, etc.), vérifie la migration
+  localStorage → IndexedDB et `aucune erreur runtime`.
+- **À chaque release** : incrémenter `CACHE` dans `sw.js` **et** `APP_VERSION` dans `app.js` (même
+  numéro, ex. `piano-b3-2` / `'Bêta 3.2'`), sinon l'app installée garde l'ancienne version.
 
 ## Architecture (conventions)
-- État global unique `S` (objet) → `localStorage`. `save()` après chaque mutation.
+- État global unique `S` (objet) → IndexedDB. `save()` après chaque mutation (signature inchangée,
+  42 sites d'appel) : mirror synchrone dans `localStorage`, puis écriture IndexedDB **débouncée
+  150 ms** (coalesce les rafales, un seul write en vol à la fois). `saveNow()` (async, attend le
+  disque) pour les moments critiques : import JSON, `visibilitychange→hidden`, `pagehide` (iOS peut
+  tuer une PWA en arrière-plan sans avertir).
+- Boot asynchrone : `S` vaut `defaults()` en mémoire dès le parse (jamais `null`), `boot()` charge
+  l'état réel via `loadState()` puis appelle `renderHome()` ; `READY` = promesse du boot, à `await`
+  dans un contexte de test. Migration one-shot : si IndexedDB est vide et `localStorage['pianoV2']`
+  contient des données, elles sont importées puis IndexedDB fait autorité (`localStorage` n'est pas
+  effacé, reste le miroir). Si IndexedDB est indisponible (mode privé, quota…), repli silencieux sur
+  `localStorage` seul.
 - Chaque écran a une fonction `renderX()` qui construit `innerHTML` de `#s-x`.
 - Navigation : `go(name)` — écrans : `home, session, carnet, rep, voyage, stats, settings`.
   `FULL={session,settings}` masquent la tab bar.
@@ -73,8 +89,9 @@ Polices : titres **Playfair Display**, interface **DM Sans**, chiffres **EB Gara
 
 ## Règles / pièges à connaître
 - **Incrémenter `CACHE` (sw.js) à chaque release**, et synchroniser `APP_VERSION` (app.js, affiché en
-  pied de page des réglages) sur le même numéro.
+  pied de page des réglages) sur le même numéro. Format : `piano-b3-N` / `'Bêta 3.N'`.
 - Les données sont **liées à l'origine (l'URL)** : changer d'hébergement = stockage vide → **exporter le JSON avant, réimporter après**.
+- IndexedDB est aussi lié à l'origine, comme `localStorage` — même piège, même parade (export/import JSON).
 - Difficulté = **Henle 1–9**. Ressenti/humeur/énergie = **nuances pp–ff**. **Pas de boutique**.
 - Pas d'emoji dans l'UI (sauf rares exceptions déjà en place). Français partout.
 - **Pas de métronome** (refus explicite). Le suivi de tempo = **saisie manuelle du bpm stable**.
@@ -97,8 +114,11 @@ Polices : titres **Playfair Display**, interface **DM Sans**, chiffres **EB Gara
      données ci-dessus), avancement dérivé des mesures « au point », carte de couverture + courbe
      de progression, découpage assisté, suggestion « à travailler aujourd'hui ». **Suivi de tempo =
      saisie manuelle du bpm stable par section, JAMAIS de métronome** (refus explicite).
-  3. **Migration IndexedDB** (socle pour l'audio) : S en mémoire, persistance async, migration
-     one-shot depuis localStorage, export/import JSON conservé. Adapter `test.mjs` (fake-indexeddb).
+  3. ✅ **Migration IndexedDB** (socle pour l'audio) : `S` en mémoire, persistance async débouncée
+     (`save()`/`saveNow()`), boot async (`loadState()`/`READY`), migration one-shot depuis
+     localStorage (miroir conservé, `LS_MIRROR`), export/import JSON adapté (`saveNow()` avant le
+     toast), store `recordings` créé vide (prêt pour l'étape 4). `test.mjs` adapté (`fake-indexeddb`,
+     `window.__ready`/`__flush`). Nommage de version : **Bêta 3.N**.
   4. **Enregistrement audio** (dépend de 3) : MediaRecorder en séance, blobs en IndexedDB, rattachés
      à la pièce/section, réécoute + auto-éval pp–ff dans la fiche. Tester le format sur iOS réel.
   5. **Bilans & insights** : croisements (ressenti × moment, stagnation), rétrospective annuelle

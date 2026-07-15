@@ -4,19 +4,24 @@
    Lancer :  npm test           (après « npm install » une première fois)
 
    Note : dans app.js, l'état `let S` n'est PAS une propriété de window.
-   On seed donc via localStorage AVANT l'exécution (c'est load() qui le lit),
-   et on lit l'état via un petit accesseur window.__S injecté après app.js.
+   On seed donc via localStorage AVANT l'exécution (c'est loadState() qui migre
+   depuis là au premier boot), et on lit l'état via un petit accesseur
+   window.__S injecté après app.js. Le boot est désormais asynchrone
+   (IndexedDB) : window.__ready renvoie la promesse de boot, window.__flush
+   force l'écriture disque avant qu'on aille inspecter IndexedDB directement.
+   jsdom n'implémente pas IndexedDB → on injecte fake-indexeddb.
    ========================================================================== */
 import { readFileSync } from 'node:fs';
 import { JSDOM } from 'jsdom';
+import { indexedDB, IDBKeyRange } from 'fake-indexeddb';
 
 const root = new URL('.', import.meta.url).pathname;
 const read = f => readFileSync(root + f, 'utf8');
 
-// Inline opus.js + app.js, puis un accesseur d'état (partage le scope lexical).
+// Inline opus.js + app.js, puis des accesseurs (partage le scope lexical).
 const html = read('index.html')
   .replace('<script src="opus.js"></script>', `<script>${read('opus.js')}</script>`)
-  .replace('<script src="app.js"></script>',  `<script>${read('app.js')}</script>\n<script>window.__S=function(){return S;};</script>`);
+  .replace('<script src="app.js"></script>',  `<script>${read('app.js')}</script>\n<script>window.__S=function(){return S;};window.__ready=function(){return READY;};window.__flush=function(){return saveNow();};</script>`);
 
 const now = Date.now();
 const seed = {
@@ -48,6 +53,10 @@ const dom = new JSDOM(html, {
     // Réseau coupé + hors-ligne : pas d'appel Open Opus pendant le test.
     win.fetch = () => Promise.reject(new Error('offline (test)'));
     Object.defineProperty(win.navigator, 'onLine', { get: () => false });
+    // jsdom n'implémente pas IndexedDB : on injecte fake-indexeddb (même instance
+    // que celle importée ci-dessus dans ce script, pour pouvoir l'inspecter après boot).
+    win.indexedDB = indexedDB;
+    win.IDBKeyRange = IDBKeyRange;
     // jsdom n'implémente pas scrollTo : no-op pour éviter le bruit console.
     win.scrollTo = () => {};
     // idem pour confirm() (dialogues non implémentés en jsdom) : on approuve toujours.
@@ -64,6 +73,7 @@ const dom = new JSDOM(html, {
 });
 
 const win = dom.window;
+if (typeof win.__ready === 'function') await win.__ready();
 const S = typeof win.__S === 'function' ? win.__S() : undefined;
 
 // 1) Le boot a-t-il produit un état exploitable ?
@@ -73,6 +83,34 @@ if (!S) fails.push('boot → état S inaccessible (app.js n’a pas exécuté / 
 if (S) {
   if (S.wishlist.length !== 0) fails.push('migration → wishlist non vidée');
   if (!S.pieces.some(p => p.status === 'wishlist')) fails.push('migration → aucune pièce « à apprendre »');
+}
+
+// 2bis) Migration localStorage → IndexedDB (étape 3 V3).
+function idbGetDirect(key) {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('pianoV2', 1);
+    req.onsuccess = () => {
+      const db = req.result;
+      const rq = db.transaction('state', 'readonly').objectStore('state').get(key);
+      rq.onsuccess = () => resolve(rq.result);
+      rq.onerror = () => reject(rq.error);
+    };
+    req.onerror = () => reject(req.error);
+  });
+}
+try {
+  const idbRaw = await idbGetDirect('S');
+  if (!idbRaw) fails.push('IndexedDB → clé "S" absente après boot');
+  else {
+    const idbState = JSON.parse(idbRaw);
+    if (!Array.isArray(idbState.pieces) || idbState.pieces.length !== S.pieces.length)
+      fails.push('IndexedDB → nombre de pièces divergent de l’état en mémoire');
+  }
+  const idbMeta = await idbGetDirect('meta');
+  if (!idbMeta || idbMeta.from !== 'localStorage')
+    fails.push('IndexedDB → meta.from attendu "localStorage" (migration depuis le seed localStorage)');
+} catch (e) {
+  fails.push('IndexedDB → lecture directe en échec : ' + (e && e.message ? e.message : e));
 }
 
 // 3) Batterie d'appels : chaque fonction ne doit pas throw.
@@ -138,6 +176,11 @@ call('carnetSheet+commitSession(sections)', () => {
   if (bpmInput) bpmInput.value = '96';
   win.commitSession(0);
 });
+
+// 3ter) Écriture immédiate (utilisée par l'import JSON et la mise en arrière-plan).
+if (typeof win.__flush === 'function') {
+  try { await win.__flush(); } catch (e) { onError('saveNow (flush)', e); }
+}
 
 // 4) Bilan.
 if (fails.length) {

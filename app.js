@@ -5,7 +5,7 @@
 
 const KEY = 'pianoV2';
 const IMPROV = '__improv__';
-const APP_VERSION = '2.12'; // à synchroniser avec CACHE dans sw.js à chaque release
+const APP_VERSION = 'Bêta 3.1'; // à synchroniser avec CACHE dans sw.js à chaque release
 
 const STONES = [
   {n:'Apprenti',h:10,c:'#E0A83B'},{n:'Élève',h:20,c:'#C9CDDA'},{n:'Musicien',h:30,c:'#9BA0AE'},
@@ -26,9 +26,11 @@ const FEEL_ORDER = ['pp','p','mf','f','ff'];
 function feelLabel(f){return f&&FEEL[f]?f+' · '+FEEL[f]:(f||'');}
 
 /* ---------- State ---------- */
-let S = load();
-function load(){
-  try{const r=JSON.parse(localStorage.getItem(KEY));if(r)return migrate(r);}catch(e){}
+const IDB_NAME = 'pianoV2';
+const IDB_VERSION = 1;
+const LS_MIRROR = true; // filet de secours pendant la période de rodage d'IndexedDB (retiré à l'étape 4)
+
+function defaults(){
   return {pieces:[],sessions:[],wishlist:[],journal:{},opusCache:{},challenges:{week:null,month:null,log:[]},
     settings:{tolerance:1,dailyGoal:30,weeklyTime:null,weeklyDays:5,monthly:null,
       notif:{daily:true,dailyTime:'17:00',streak:true,weekly:true,palier:true,monthly:true},theme:'dark',nas:{enabled:false,ip:'',last:''}}};
@@ -41,7 +43,95 @@ function migrate(r){r.pieces=r.pieces||[];r.sessions=r.sessions||[];r.wishlist=r
     notif:{daily:true,dailyTime:'17:00',streak:true,weekly:true,palier:true,monthly:true},theme:'dark',nas:{enabled:false,ip:'',last:''}},r.settings||{});
   r.pieces.forEach(p=>{if(p.status==='mastered'&&!p.revInterval)p.revInterval=r.settings.revisionDays||18;});
   return r;}
-function save(){localStorage.setItem(KEY,JSON.stringify(S));}
+
+let S = defaults();
+let _db=null;
+
+function openDb(){
+  return new Promise(resolve=>{
+    if(typeof indexedDB==='undefined'){resolve(null);return;}
+    let req;
+    try{req=indexedDB.open(IDB_NAME,IDB_VERSION);}catch(e){resolve(null);return;}
+    req.onupgradeneeded=()=>{
+      const db=req.result;
+      if(!db.objectStoreNames.contains('state'))db.createObjectStore('state');
+      if(!db.objectStoreNames.contains('recordings'))db.createObjectStore('recordings');
+    };
+    req.onsuccess=()=>resolve(req.result);
+    req.onerror=()=>resolve(null);
+  });
+}
+function idbGet(key){
+  return new Promise(resolve=>{
+    try{
+      const rq=_db.transaction('state','readonly').objectStore('state').get(key);
+      rq.onsuccess=()=>resolve(rq.result);
+      rq.onerror=()=>resolve(undefined);
+    }catch(e){resolve(undefined);}
+  });
+}
+function idbSet(key,val){
+  return new Promise(resolve=>{
+    try{
+      const tx=_db.transaction('state','readwrite');
+      tx.objectStore('state').put(val,key);
+      tx.oncomplete=()=>resolve(true);
+      tx.onerror=()=>resolve(false);
+      tx.onabort=()=>resolve(false);
+    }catch(e){resolve(false);}
+  });
+}
+
+async function loadState(){
+  _db=await openDb();
+  let lsRaw=null;
+  try{lsRaw=localStorage.getItem(KEY);}catch(e){}
+  if(_db){
+    const raw=await idbGet('S');
+    if(raw){try{return migrate(JSON.parse(raw));}catch(e){}}
+    // Rien en IndexedDB : migration one-shot depuis localStorage (localStorage n'est pas effacé).
+    if(lsRaw){
+      try{
+        const parsed=migrate(JSON.parse(lsRaw));
+        await idbSet('S',JSON.stringify(parsed));
+        await idbSet('meta',{migratedAt:Date.now(),from:'localStorage',version:IDB_VERSION});
+        return parsed;
+      }catch(e){}
+    }
+    return defaults();
+  }
+  // IndexedDB indisponible (mode privé, quota, etc.) : on retombe sur localStorage seul.
+  if(lsRaw){try{return migrate(JSON.parse(lsRaw));}catch(e){}}
+  return defaults();
+}
+
+let _dirty=false,_writing=false,_saveTimer=null;
+function mirrorLS(){try{if(LS_MIRROR)localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
+async function writeState(){
+  if(!_db)return;
+  let ok=await idbSet('S',JSON.stringify(S));
+  if(!ok)ok=await idbSet('S',JSON.stringify(S)); // un retry avant d'alerter
+  if(!ok)toast('Sauvegarde impossible');
+}
+function flush(){
+  _saveTimer=null;
+  if(_writing){_saveTimer=setTimeout(flush,150);return;}
+  if(!_dirty)return;
+  _dirty=false;_writing=true;
+  writeState().finally(()=>{_writing=false;if(_dirty&&!_saveTimer)_saveTimer=setTimeout(flush,150);});
+}
+function save(){
+  mirrorLS();
+  _dirty=true;
+  if(!_saveTimer)_saveTimer=setTimeout(flush,150);
+}
+// Écriture immédiate (import JSON, mise en arrière-plan de l'app) : attend la fin du disque.
+function saveNow(){
+  mirrorLS();
+  if(_saveTimer){clearTimeout(_saveTimer);_saveTimer=null;}
+  _dirty=false;
+  return writeState();
+}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 
@@ -1222,7 +1312,7 @@ function renderSettings(){
       <div class="between"><span style="font-weight:600;">Sauvegarde NAS</span><div class="toggle ${S.settings.nas.enabled?'on':''}" onclick="toggleNas()"></div></div>
       <p class="muted" style="font-size:13px;margin:10px 0 0;">${S.settings.nas.enabled?'Prépare l\'envoi des sauvegardes vers ton NAS (configuration en étape B).':'Désactivé. Ton NAS pourra recevoir des sauvegardes automatiques plus tard.'}</p>
     </div>
-    <p class="muted" style="font-size:12px;text-align:center;margin-top:22px;">MyPiano · v${APP_VERSION}</p>
+    <p class="muted" style="font-size:12px;text-align:center;margin-top:22px;">MyPiano · ${APP_VERSION}</p>
     <input type="file" id="imp" accept="application/json" style="display:none" onchange="doImport(event)">`;
 }
 function setLine(l,v,fn,last){return `<div class="between" style="padding:13px 0;${last?'':'border-bottom:1px solid rgba(255,255,255,.05);'}cursor:pointer;" onclick="${fn}"><span>${l}</span><span class="row" style="gap:8px;"><span class="muted">${v}</span><span class="muted">›</span></span></div>`;}
@@ -1245,7 +1335,7 @@ function backupDue(){if(!S.sessions.length)return false;return (Date.now()-(S.la
 function exportJSON(){S.lastBackup=Date.now();save();download('piano_sauvegarde.json',JSON.stringify(S,null,2),'application/json');toast('Sauvegarde exportée');
   if(document.getElementById('s-settings').classList.contains('active'))renderSettings();}
 function importJSON(){document.getElementById('imp').click();}
-function doImport(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.sessions)throw 0;if(confirm('Remplacer toutes tes données par ce fichier ?')){S=migrate(d);save();renderSettings();toast('Données importées');}}catch(err){toast('Fichier invalide');}};r.readAsText(f);}
+function doImport(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.sessions)throw 0;if(confirm('Remplacer toutes tes données par ce fichier ?')){S=migrate(d);saveNow().then(()=>{renderSettings();toast('Données importées');});}}catch(err){toast('Fichier invalide');}};r.readAsText(f);}
 
 /* ==========================================================================
    ÉTAPE B — Notes ♪, succès, défis (sans boutique)
@@ -1563,8 +1653,15 @@ function monthReportSheet(){const r=lastMonthReport();S.lastMonthSeen=r.mk;save(
 function maybeNotifyMonth(){if(monthReportReady()&&S.settings.notif.monthly&&typeof Notification!=='undefined'&&Notification.permission==='granted'){try{new Notification('Piano — rapport du mois',{body:'Ton bilan du mois est prêt.'});}catch(e){}}}
 
 /* ---------- Boot ---------- */
+async function boot(){
+  S=await loadState();
+  renderHome();
+  try{maybeNotifyReport();}catch(e){}
+  try{maybeNotifyMonth();}catch(e){}
+}
 try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();}catch(e){}
-renderHome();
-try{maybeNotifyReport();}catch(e){}
-try{maybeNotifyMonth();}catch(e){}
+const READY=boot();
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));}
+// iOS peut tuer une PWA en arrière-plan sans avertir : on force le disque avant que ça arrive.
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')saveNow();});
+window.addEventListener('pagehide',()=>{saveNow();});
