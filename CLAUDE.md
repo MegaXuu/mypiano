@@ -159,6 +159,16 @@ Polices : titres **Playfair Display**, interface **DM Sans**, chiffres **EB Gara
      serveur VAPID (backend + coût d'hébergement/maintenance) ; à retrancher séparément si voulu un
      jour, sinon on reste sur les notifications locales existantes.
 
+  **Cycle V3 : partie fonctionnelle terminée** (5/5 étapes ✅, Bêta 3.6). Il reste une **phase
+  d'optimisation UI/UX** (cf. « Cycle V3 finitions (UI/UX) » ci-dessous) avant de considérer V3 pleinement close. À planifier avant de passer à V4 ci-dessous.
+
+- **Cycle V3 finitions (UI/UX)** — Audit complet (Bêta 3.6) a défini 5 lots ordonnés, chacun = une release Bêta 3.N :
+  - **Lot A (Bêta 3.7)** ✅ : wake lock en séance (`acquireWakeLock`/`releaseWakeLock`, ré-acquis sur `visibilitychange→visible` si timer actif), édition de séance non destructive (`isRichSession` : séance multi-blocs ou avec `entries` → seules date/durée éditables, durée redistribuée au prorata des blocs, récap lecture seule ; création « séance oubliée » inchangée), morceau présélectionné au démarrage (`startSheet` → `recentPieces(1)`), micro-fixes (« 1 jour de série » singulier, emojis 🖐/🎉 retirés, placeholder recherche Répertoire raccourci). Doublon ressenti Carnet vérifié : pas de duplication réelle (code + libellé une seule fois), aucun changement nécessaire.
+  - **Lot B (Bêta 3.8)** : accueil réordonné (anneau compact, CTA au-dessus du pli), tokens --danger/--ok/--warn, `confirmSheet()` remplaçant `confirm()`, cibles tactiles ≥ 44 px, boutons de séance étiquetés + chrono d'enregistrement.
+  - **Lot C (Bêta 3.9)** : refonte Carnet (regroupement semaine, filtre), Stats (3 sous-onglets, historique supprimé), Répertoire (ajout unifié, « Enrichir la base » vers Réglages), Voyage (sans auto-scroll). Maquettes validées AVANT de coder.
+  - **Lot D (Bêta 3.10)** : jardin v2 (SVG organique), cartes recalibrées (Bronze 2/Argent 5/Or 10), célébrations unifiées. Maquettes validées AVANT de coder.
+  - **Lot E** : dettes V3 existantes (audio iPhone réel, retrait `LS_MIRROR`, découpage `app.js`).
+
 - **Reporté en V4** : **sauvegarde auto vers NAS Synology** (on reste sur GitHub Pages quelques
   mois) ; synchro multi-appareils ; éventuelle migration React+TS+Vite ou app SwiftUI native.
 

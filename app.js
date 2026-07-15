@@ -5,7 +5,7 @@
 
 const KEY = 'pianoV2';
 const IMPROV = '__improv__';
-const APP_VERSION = 'Bêta 3.6'; // à synchroniser avec CACHE dans sw.js à chaque release
+const APP_VERSION = 'Bêta 3.7'; // à synchroniser avec CACHE dans sw.js à chaque release
 
 const STONES = [
   {n:'Apprenti',h:10,c:'#E0A83B'},{n:'Élève',h:20,c:'#C9CDDA'},{n:'Musicien',h:30,c:'#9BA0AE'},
@@ -388,7 +388,7 @@ function renderHome(){
     <p class="serif" style="font-style:italic;color:var(--t2);font-size:16px;margin:6px 0 2px;">« ${q[0]} » — ${q[1]}</p>
 
     <div class="grid2" style="margin-top:18px;">
-      <div class="metric"><div class="row" style="gap:8px;align-items:flex-end;"><span class="flame" style="display:flex;">${flameSvg(23)}</span><span class="v" style="line-height:.82;">${streak}</span></div><div class="l">jours de série</div></div>
+      <div class="metric"><div class="row" style="gap:8px;align-items:flex-end;"><span class="flame" style="display:flex;">${flameSvg(23)}</span><span class="v" style="line-height:.82;">${streak}</span></div><div class="l">${streak===1?'jour de série':'jours de série'}</div></div>
       <div class="metric"><div class="v" style="color:var(--acc);">${notesTotal().toLocaleString('fr-FR')} ♪</div><div class="l">notes accumulées</div></div>
     </div>
 
@@ -462,6 +462,9 @@ function saveGoal(){S.settings.dailyGoal=parseInt(document.getElementById('gv').
    SÉANCE
    ========================================================================== */
 let timer=null,tickInt=null,_mode='chrono',_min=25,_piece=null,_interval=false;
+let _wakeLock=null;
+async function acquireWakeLock(){try{_wakeLock=await navigator.wakeLock.request('screen');}catch(e){}}
+function releaseWakeLock(){try{_wakeLock&&_wakeLock.release();}catch(e){}_wakeLock=null;}
 function toggleInterval(el){_interval=!_interval;el.classList.toggle('on');}
 function activePieces(){return S.pieces.filter(p=>!p.isEnsemble&&(p.status==='active'||p.status==='mastered'));}
 function chipLabel(p){return p.parentId?((pieceById(p.parentId)||{}).title?pieceById(p.parentId).title+' — '+p.title:p.title):p.title;}
@@ -484,7 +487,7 @@ function quickStart(id){_mode='chrono';_min=25;_piece=id;_interval=false;beginSe
 function todoLines(list){return list.map(p=>`<div style="display:flex;gap:9px;margin-bottom:10px;"><span style="color:var(--acc);font-size:16px;line-height:1.4;">♫</span><div style="min-width:0;"><div style="font-weight:600;font-size:14px;">${esc(p.title)}</div><div class="muted" style="font-size:13px;line-height:1.4;">${esc(p.todo)}</div></div></div>`).join('');}
 function showAllTodos(btn){const b=document.getElementById('home-todos');if(b)b.innerHTML=todoLines(S.pieces.filter(p=>p.todo&&p.todo.trim()));if(btn)btn.style.display='none';}
 function startSheet(){
-  _mode='chrono';_min=25;_piece=null;_interval=false;
+  _mode='chrono';_min=25;_piece=recentPieces(1)[0]||null;_interval=false;
   openSheet(`<h3>Nouvelle séance</h3>
     <div class="field"><label>Mode</label>
       <div class="seg" id="ms"><button class="on" onclick="pickMode('chrono',this)">Chrono ↑</button><button onclick="pickMode('minuteur',this)">Minuteur ↓</button></div></div>
@@ -493,9 +496,9 @@ function startSheet(){
     <div class="field" id="mf" style="display:none;"><label>Durée visée</label>
       <div class="stepper" style="margin:4px 0;"><button onclick="mStep(-5)">–</button><div class="v" id="mv">25 min</div><button onclick="mStep(5)">+</button></div></div>
     <div class="field"><label>Premier morceau</label>
-      ${recentPieces(4).length?`<div class="muted" style="font-size:12px;margin-bottom:6px;">Récents</div><div class="chips" id="sc-rec" style="margin-bottom:10px;">${recentPieces(4).map(id=>`<button class="chip" onclick="pickPiece('${id}',this)">${esc(chipLabel(pieceById(id)))}</button>`).join('')}</div>`:''}
+      ${recentPieces(4).length?`<div class="muted" style="font-size:12px;margin-bottom:6px;">Récents</div><div class="chips" id="sc-rec" style="margin-bottom:10px;">${recentPieces(4).map(id=>`<button class="chip ${id===_piece?'on':''}" onclick="pickPiece('${id}',this)">${esc(chipLabel(pieceById(id)))}</button>`).join('')}</div>`:''}
       <input id="sc-q" placeholder="Rechercher dans ton répertoire…" oninput="filterStartPieces(this.value)" autocomplete="off" style="margin-bottom:10px;">
-      <div class="chips" id="sc">${pieceChips(null,'pickPiece',new Set(recentPieces(4)))}</div>
+      <div class="chips" id="sc">${pieceChips(_piece,'pickPiece',new Set(recentPieces(4)))}</div>
       <div id="sc-hint"></div>
       ${activePieces().length?'':'<p class="muted" style="font-size:13px;margin-top:8px;">Ajoute des morceaux au répertoire, ou joue en improvisation.</p>'}</div>
     <button class="btn primary" onclick="beginSession()">Commencer</button>
@@ -508,7 +511,7 @@ function pickPiece(id,el){_piece=id;document.querySelectorAll('#sheet .chip').fo
 function beginSession(){
   if(!_piece){toast('Choisis un morceau');return;}
   timer={mode:_mode,target:_min*60,total:0,running:true,last:Date.now(),blocks:[{piece:_piece,sec:0}],goal:todayGoal(),interval:_interval?{work:1500,brk:300,phase:'work',phaseSec:0}:null};
-  closeSheet();go('session');renderSession();startTick();
+  closeSheet();go('session');renderSession();startTick();acquireWakeLock();
 }
 function startTick(){clearInterval(tickInt);tickInt=setInterval(tick,300);tick();}
 function tick(){
@@ -518,7 +521,7 @@ function tick(){
     if(iv&&iv.phase==='break'){iv.phaseSec+=dt;if(iv.phaseSec>=iv.brk){iv.phase='work';iv.phaseSec=0;buzz();toast('Reprise');}}
     else{
       timer.total+=dt;timer.blocks[timer.blocks.length-1].sec+=dt;
-      if(iv){iv.phaseSec+=dt;if(iv.phaseSec>=iv.work){iv.phase='break';iv.phaseSec=0;buzz();toast('Pause · repose tes mains 🖐');}}
+      if(iv){iv.phaseSec+=dt;if(iv.phaseSec>=iv.work){iv.phase='break';iv.phaseSec=0;buzz();toast('Pause · repose tes mains');}}
       if(timer.mode==='minuteur'&&timer.total>=timer.target){timer.total=timer.target;timer.running=false;buzz();toast('Minuteur terminé ✓');}
       if(timer.plan){const cb=timer.plan[timer.planIdx];
         if(timer.blocks[timer.blocks.length-1].sec>=cb.min*60){
@@ -566,7 +569,7 @@ function paintSession(){
         :secLine?`<div class="card" style="padding:12px 14px;border-left:2px solid var(--acc);border-radius:0 12px 12px 0;"><span class="muted" style="font-size:12px;">${esc(secLine)}</span></div>`:'';}
   }
   if(timer.plan&&md)md.textContent='Plan guidé';
-  const iv=timer.interval;if(iv&&iv.phase==='break'){if(t)t.textContent=big(Math.max(0,iv.brk-iv.phaseSec));if(md)md.textContent='Pause · repose tes mains 🖐';}
+  const iv=timer.interval;if(iv&&iv.phase==='break'){if(t)t.textContent=big(Math.max(0,iv.brk-iv.phaseSec));if(md)md.textContent='Pause · repose tes mains';}
   const pb=document.getElementById('ss-pause');if(pb){pb.textContent=timer.running?'❚❚':'▶';}
   const ph=document.getElementById('ss-pausehint');if(ph)ph.style.display=timer.running?'none':'block';
   const rb=document.getElementById('ss-rec');if(rb){rb.textContent=_rec?'■':'●';rb.style.color=_rec?'#F0857A':'';rb.style.borderColor=_rec?'#F0857A':'';}
@@ -591,7 +594,7 @@ function resumeWith(id){const last=timer.blocks[timer.blocks.length-1];
 function stopSession(){
   if(_rec){toast("Arrête d'abord l'enregistrement en cours");return;}
   timer.running=false;clearInterval(tickInt);const total=Math.round(timer.total);
-  if(total<5){if(!confirm('Séance très courte. L\'enregistrer quand même ?')){timer=null;go('home');return;}}
+  if(total<5){if(!confirm('Séance très courte. L\'enregistrer quand même ?')){timer=null;releaseWakeLock();go('home');return;}}
   carnetSheet(total);}
 function quickCarnet(){toast('Le carnet se remplit en fin de séance');}
 function carnetSheet(total){
@@ -686,7 +689,7 @@ function commitSession(total){
     if(_mastery[i]==='active'&&p.status==='mastered'){p.status='active';p.masteredAt=null;p.revInterval=S.settings.revisionDays||18;}
     else if(_mastery[i]==='mastered'&&p.status==='mastered'){p.revInterval=Math.min(120,Math.round((p.revInterval||S.settings.revisionDays||18)*1.6));}});
   S.sessions.push({id:uid(),date:dkey(),mode:timer.mode,goal:timer.goal,feeling:_feel,blocks,entries,ts:Date.now(),interval:!!timer.interval});
-  save();checkChallenges();timer=null;closeSheet();
+  save();checkChallenges();timer=null;releaseWakeLock();closeSheet();
   const after=currentStone();
   go('home');
   if(after&&(!before||after.n!==before.n))setTimeout(()=>celebrate('Nouveau rang',after.n),300);
@@ -796,16 +799,24 @@ function deleteRecording(pid,rid){
 }
 
 /* ---------- Séance a posteriori (ajout / édition) ---------- */
+function isRichSession(s){return s.blocks.length>1||!!(s.entries&&s.entries.length);}
+function richRecap(s){
+  const names=[...new Set(s.blocks.map(b=>pieceName(b.piece)))].join(' · ');
+  const prev=sessPreview(s);
+  return `<div style="font-weight:600;font-size:14px;">${esc(names)}</div>${prev?`<div class="muted" style="font-size:13px;margin-top:4px;">${esc(prev)}</div>`:''}`;
+}
 function aposterioriSheet(sess){
   const edit=!!sess;const s=sess||{date:dkey(),blocks:[{piece:activePieces()[0]?activePieces()[0].id:IMPROV,sec:1500}],worked:'',next:'',feeling:'',mode:'chrono'};
+  const rich=edit&&isRichSession(s);
   const minutes=Math.round(sessionSeconds(s)/60)||25;
   const pid=s.blocks[0].piece;
   openSheet(`<h3>${edit?'Modifier la séance':'Séance oubliée'}</h3>
     <div class="field"><label>Date</label><input type="date" id="a-date" value="${s.date}" max="${dkey()}"></div>
     <div class="field"><label>Durée (minutes)</label><input type="number" id="a-min" inputmode="numeric" value="${minutes}" min="1"></div>
-    <div class="field"><label>Morceau</label><div class="chips" id="a-sc">${pieceChips(pid,'aPick')}</div></div>
+    ${rich?`<div class="field"><label>Morceaux</label><div class="card" style="padding:12px 14px;">${richRecap(s)}</div></div>`
+      :`<div class="field"><label>Morceau</label><div class="chips" id="a-sc">${pieceChips(pid,'aPick')}</div></div>
     <div class="field"><label>Ce que j'ai travaillé</label><textarea id="a-w">${esc(s.worked||'')}</textarea></div>
-    <div class="field"><label>À faire la prochaine fois</label><textarea id="a-n">${esc(s.next||'')}</textarea></div>
+    <div class="field"><label>À faire la prochaine fois</label><textarea id="a-n">${esc(s.next||'')}</textarea></div>`}
     <button class="btn primary" onclick="saveApost('${edit?s.id:''}')">${edit?'Enregistrer':'Ajouter la séance'}</button>
     ${edit?`<button class="btn ghost sm" style="width:100%;margin-top:10px;color:#F0857A;border-color:#5a2f2b;" onclick="deleteSession('${s.id}')">Supprimer la séance</button>`:''}`);
   _apick=pid;
@@ -815,9 +826,19 @@ function aPick(id,el){_apick=id;document.querySelectorAll('#a-sc .chip').forEach
 function saveApost(id){
   const date=document.getElementById('a-date').value||dkey();
   const min=Math.max(1,parseInt(document.getElementById('a-min').value)||25);
-  const data={date,blocks:[{piece:_apick,sec:min*60}],worked:document.getElementById('a-w').value.trim(),next:document.getElementById('a-n').value.trim()};
-  if(id){const s=S.sessions.find(x=>x.id===id);Object.assign(s,data);}
-  else S.sessions.push(Object.assign({id:uid(),mode:'chrono',goal:todayGoal(),feeling:'',ts:Date.now()},data));
+  if(id){
+    const s=S.sessions.find(x=>x.id===id);
+    if(isRichSession(s)){
+      const totalSec=min*60,oldTotal=s.blocks.reduce((a,b)=>a+b.sec,0)||1;
+      s.blocks=s.blocks.map(b=>({...b,sec:Math.max(1,Math.round(b.sec/oldTotal*totalSec))}));
+      s.date=date;
+    }else{
+      Object.assign(s,{date,blocks:[{piece:_apick,sec:min*60}],worked:document.getElementById('a-w').value.trim(),next:document.getElementById('a-n').value.trim()});
+    }
+  }else{
+    const data={date,blocks:[{piece:_apick,sec:min*60}],worked:document.getElementById('a-w').value.trim(),next:document.getElementById('a-n').value.trim()};
+    S.sessions.push(Object.assign({id:uid(),mode:'chrono',goal:todayGoal(),feeling:'',ts:Date.now()},data));
+  }
   save();closeSheet();renderCarnet();toast('Séance enregistrée');
 }
 function deleteSession(id){if(!confirm('Supprimer cette séance ?'))return;S.sessions=S.sessions.filter(s=>s.id!==id);save();closeSheet();renderCarnet();toast('Séance supprimée');}
@@ -892,7 +913,7 @@ function renderRep(){
   document.getElementById('s-rep').innerHTML=`
     <div class="between"><h1>Répertoire</h1><div class="row" style="gap:8px;"><button class="btn ghost sm" onclick="workSheet()">+ Œuvre</button><button class="btn primary sm" onclick="addPieceSheet()">+ Ajouter</button></div></div>
     <div class="field" style="margin-top:16px;position:relative;">
-      <input id="rep-q" placeholder="Rechercher un compositeur ou une œuvre…" oninput="repSearch(this.value)" autocomplete="off">
+      <input id="rep-q" placeholder="Compositeur ou œuvre…" oninput="repSearch(this.value)" autocomplete="off">
       <div id="rep-sug"></div></div>
     <div class="row" style="gap:10px;margin:-2px 0 12px;align-items:center;justify-content:center;">
       <button id="sync-btn" class="btn ghost sm" style="flex:0 0 auto;" onclick="syncOpus(true)">↻ Enrichir la base</button>
@@ -1692,7 +1713,7 @@ function completeFree(period){const ch=S.challenges[period];if(ch&&ch.type==='fr
 function checkChallenges(){let changed=false;
   ['week','month'].forEach(period=>{const ch=S.challenges[period];if(!ch)return;
     if(challengeProgress(ch)>=ch.target){const id=period+':'+ch.key;
-      if(!(S.challenges.log||[]).some(l=>l.id===id)){S.challenges.log.push({id,reward:ch.reward,label:ch.label});changed=true;setTimeout(()=>toast('🎉 Défi réussi · +'+ch.reward+' ♪'),200);}}});
+      if(!(S.challenges.log||[]).some(l=>l.id===id)){S.challenges.log.push({id,reward:ch.reward,label:ch.label});changed=true;setTimeout(()=>toast('Défi réussi · +'+ch.reward+' ♪'),200);}}});
   if(changed)save();}
 function renderSucces(el){
   checkChallenges();
@@ -1818,13 +1839,13 @@ function planSheet(){const plan=_plan=generatePlan();
 }
 function startGuided(){if(!_plan||!_plan.length)return;closeSheet();const plan=_plan;const f=plan[0];
   timer={mode:'guided',target:0,total:0,running:true,last:Date.now(),blocks:[{piece:f.piece||IMPROV,sec:0}],goal:todayGoal(),plan,planIdx:0,interval:null};
-  go('session');renderSession();startTick();}
+  go('session');renderSession();startTick();acquireWakeLock();}
 function startRevision(){const list=revisionList().slice(0,3);if(!list.length)return;
   const min=Math.max(5,Math.round((S.settings.dailyGoal||30)/list.length));
   const plan=list.map(p=>({piece:p.id,focus:'Entretien',min,consigne:'Filage lent pour réactiver la mémoire.'}));
   _plan=plan;const f=plan[0];
   timer={mode:'guided',target:0,total:0,running:true,last:Date.now(),blocks:[{piece:f.piece,sec:0}],goal:min*plan.length,plan,planIdx:0,interval:null};
-  go('session');renderSession();startTick();}
+  go('session');renderSession();startTick();acquireWakeLock();}
 
 let _program=[],_concert=null,_concertInt=null;
 function concertSheet(){
@@ -1932,5 +1953,5 @@ try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();
 const READY=boot();
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));}
 // iOS peut tuer une PWA en arrière-plan sans avertir : on force le disque avant que ça arrive.
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')saveNow();});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')saveNow();else if(document.visibilityState==='visible'&&timer&&timer.running)acquireWakeLock();});
 window.addEventListener('pagehide',()=>{saveNow();});
