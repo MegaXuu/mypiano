@@ -5,6 +5,7 @@
 
 const KEY = 'pianoV2';
 const IMPROV = '__improv__';
+const APP_VERSION = '2.11'; // à synchroniser avec CACHE dans sw.js à chaque release
 
 const STONES = [
   {n:'Apprenti',h:10,c:'#E0A83B'},{n:'Élève',h:20,c:'#C9CDDA'},{n:'Musicien',h:30,c:'#9BA0AE'},
@@ -1221,7 +1222,7 @@ function renderSettings(){
       <div class="between"><span style="font-weight:600;">Sauvegarde NAS</span><div class="toggle ${S.settings.nas.enabled?'on':''}" onclick="toggleNas()"></div></div>
       <p class="muted" style="font-size:13px;margin:10px 0 0;">${S.settings.nas.enabled?'Prépare l\'envoi des sauvegardes vers ton NAS (configuration en étape B).':'Désactivé. Ton NAS pourra recevoir des sauvegardes automatiques plus tard.'}</p>
     </div>
-    <p class="muted" style="font-size:12px;text-align:center;margin-top:22px;">Piano — Pratique · v2 étape A · 100 % hors-ligne</p>
+    <p class="muted" style="font-size:12px;text-align:center;margin-top:22px;">MyPiano · v${APP_VERSION}</p>
     <input type="file" id="imp" accept="application/json" style="display:none" onchange="doImport(event)">`;
 }
 function setLine(l,v,fn,last){return `<div class="between" style="padding:13px 0;${last?'':'border-bottom:1px solid rgba(255,255,255,.05);'}cursor:pointer;" onclick="${fn}"><span>${l}</span><span class="row" style="gap:8px;"><span class="muted">${v}</span><span class="muted">›</span></span></div>`;}

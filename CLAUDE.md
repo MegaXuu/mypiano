@@ -72,7 +72,8 @@ Polices : titres **Playfair Display**, interface **DM Sans**, chiffres **EB Gara
 - App : `allWorksOf`, `appLocalSearch`, `syncOpus` (télécharge et cache les œuvres des favoris), `S.opusCache`.
 
 ## Règles / pièges à connaître
-- **Incrémenter `CACHE` (sw.js) à chaque release.**
+- **Incrémenter `CACHE` (sw.js) à chaque release**, et synchroniser `APP_VERSION` (app.js, affiché en
+  pied de page des réglages) sur le même numéro.
 - Les données sont **liées à l'origine (l'URL)** : changer d'hébergement = stockage vide → **exporter le JSON avant, réimporter après**.
 - Difficulté = **Henle 1–9**. Ressenti/humeur/énergie = **nuances pp–ff**. **Pas de boutique**.
 - Pas d'emoji dans l'UI (sauf rares exceptions déjà en place). Français partout.
