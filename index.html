@@ -125,7 +125,8 @@ svg.ic{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.6;str
 .grid2{min-width:0;}
 @keyframes up{from{transform:translateY(40px);}to{transform:none;}}
 @keyframes conffall{to{transform:translateY(112vh) rotate(400deg);opacity:.85;}}
-.handle{width:38px;height:4px;border-radius:2px;background:var(--border);margin:8px auto 16px;touch-action:none;cursor:grab;}
+.handle{width:100%;height:44px;display:flex;align-items:center;justify-content:center;margin:-8px 0 -8px;touch-action:none;cursor:grab;}
+.handle::after{content:'';width:38px;height:4px;border-radius:2px;background:var(--border);}
 .sheet h3{font-family:var(--serif);font-weight:400;font-size:22px;margin:0 0 14px;}
 .field{margin-bottom:14px;} .field>label{display:block;font-size:13px;color:var(--t2);margin-bottom:7px;}
 .stepper{display:flex;align-items:center;justify-content:center;gap:16px;}

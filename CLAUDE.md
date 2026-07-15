@@ -33,7 +33,7 @@ carnet de travail, et se motiver par la gamification. Cible : iPhone (PWA instal
   `startSheet`/`beginSession`/`commitSession`, `renderRep`, etc.), vérifie la migration
   localStorage → IndexedDB et `aucune erreur runtime`.
 - **À chaque release** : incrémenter `CACHE` dans `sw.js` **et** `APP_VERSION` dans `app.js` (même
-  numéro, ex. `piano-b3-2` / `'Bêta 3.2'`), sinon l'app installée garde l'ancienne version.
+  numéro, ex. `piano-b3-4` / `'Bêta 3.4'`), sinon l'app installée garde l'ancienne version.
 
 ## Architecture (conventions)
 - État global unique `S` (objet) → IndexedDB. `save()` après chaque mutation (signature inchangée,
@@ -59,7 +59,11 @@ carnet de travail, et se motiver par la gamification. Cible : iPhone (PWA instal
 - Chaque écran a une fonction `renderX()` qui construit `innerHTML` de `#s-x`.
 - Navigation : `go(name)` — écrans : `home, session, carnet, rep, voyage, stats, settings`.
   `FULL={session,settings}` masquent la tab bar.
-- Feuilles (modales bas d'écran) : `openSheet(html)` / `closeSheet()`.
+- Feuilles (modales bas d'écran) : `openSheet(html)` / `closeSheet()`. Fermeture aussi par tap en
+  dehors, ou par glisser vers le bas depuis la poignée (`.handle`, zone tactile pleine largeur ×
+  44px même si la barre visible reste 38×4px) — Pointer Events, suivi 1:1 du doigt, seuil ~28 % de
+  la hauteur de la feuille (plafond 120px) sinon rebond élastique. `openSheet` réinitialise le
+  transform/transition/animation résiduels à chaque ouverture.
 - Toujours échapper le texte utilisateur avec `esc()`.
 - **Éditer de façon ciblée** (petits diffs), ne pas réécrire des fichiers entiers.
 - **Carnet** = un seul écran (pas d'onglets) : historique chronologique des séances (`renderCarnetBody`).
