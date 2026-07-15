@@ -38,11 +38,12 @@ carnet de travail, et se motiver par la gamification. Cible : iPhone (PWA instal
 - **Éditer de façon ciblée** (petits diffs), ne pas réécrire des fichiers entiers.
 
 ## Modèle de données (S)
-- `pieces[]` : `{id,title,composer,epoch,opus,genre,key,diff(Henle 1–9),status(active|mastered|archived|abandoned),bpm,progress(0–100),tags[],notes[{id,date,section,text}],todo,createdAt,masteredAt,isEnsemble?,parentId?}`
+- `pieces[]` : `{id,title,composer,epoch,opus,genre,key,diff(Henle 1–9),status(wishlist|active|mastered|archived|abandoned),bpm,progress(0–100),tags[],notes[{id,date,section,text}],todo,createdAt,masteredAt,isEnsemble?,parentId?}`
+  - **Fiche unifiée** `pieceDetail(id)` (feuille) = point d'entrée depuis le répertoire : stats, avancement ±10, notes, transitions de statut. Formulaire `pieceSheet` allégé (champs primaires + dépliant « Détails »). **Phase** dérivée `piecePhase(p)` (À apprendre / Déchiffrage / Consolidation / Polissage / Maîtrisé / À entretenir…). Anti-doublon `findDuplicate` (normalisé).
 - `sessions[]` : `{id,date,mode(chrono|minuteur|guided|concert),goal,feeling(pp|p|mf|f|ff),blocks[{piece|'__improv__',sec}],entries[{piece,worked,next}],ts,concert?}`
-- `wishlist[]`, `journal{date:{mood,energy}}`, `opusCache{composer:[works]}`
-- `challenges{week,month,log[]}`, `settings{tolerance,dailyGoal,weeklyTime,weeklyDays,monthly,revisionDays,estimates,notif{},theme,nas{}}`
-- Divers : `lastReportSeen`, `lastBackup`, `opusSyncedAt`.
+- `journal{date:{mood,energy}}`, `opusCache{composer:[works]}`. (`wishlist[]` **fusionnée** dans `pieces` via `status:'wishlist'` — migration auto dans `migrate()`, tableau conservé vide.)
+- `challenges{week,month,log[]}`, `settings{tolerance,dailyGoal,weeklyTime,weeklyDays,monthly,revisionDays,estimates,notif{…,monthly},theme,nas{}}`. `weeklyTime`/`monthly` peuvent être `null` (« non défini » → alerte accueil).
+- Divers : `lastReportSeen`, `lastMonthSeen`, `lastBackup`, `opusSyncedAt`.
 
 ## Design tokens (dans `index.html :root`)
 Fond `#191A1B` · surface `#242833` · surface haute `#2E3242` · bordure `#515060` · texte2 `#8B8798`

@@ -33,6 +33,8 @@ function load(){
 }
 function migrate(r){r.pieces=r.pieces||[];r.sessions=r.sessions||[];r.wishlist=r.wishlist||[];r.journal=r.journal||{};
   r.opusCache=r.opusCache||{};r.challenges=r.challenges||{week:null,month:null,log:[]};r.challenges.log=r.challenges.log||[];
+  // Fusion : la wishlist devient un statut du répertoire ('à apprendre').
+  if(r.wishlist.length){r.wishlist.forEach(w=>{r.pieces.push({id:w.id||(Date.now().toString(36)+Math.random().toString(36).slice(2,6)),title:w.title||'',composer:w.composer||'',epoch:w.epoch||'',opus:'',genre:'',key:'',diff:0,bpm:'',status:'wishlist',progress:0,tags:[],notes:[],todo:'',createdAt:Date.now()});});r.wishlist=[];}
   r.settings=Object.assign({tolerance:1,dailyGoal:30,weeklyTime:null,weeklyDays:5,monthly:null,
     notif:{daily:true,dailyTime:'17:00',streak:true,weekly:true,palier:true,monthly:true},theme:'dark',nas:{enabled:false,ip:'',last:''}},r.settings||{});return r;}
 function save(){localStorage.setItem(KEY,JSON.stringify(S));}
@@ -65,6 +67,22 @@ function totalSeconds(){return S.sessions.reduce((a,s)=>a+sessionSeconds(s),0);}
 function pieceSeconds(id){let t=0;S.sessions.forEach(s=>s.blocks.forEach(b=>{if(b.piece===id)t+=b.sec;}));return t;}
 function practiceDays(){return new Set(S.sessions.map(s=>s.date));}
 function masteredCount(){return S.pieces.filter(p=>p.status==='mastered').length;}
+function pieceSessionCount(id){return S.sessions.filter(s=>s.blocks.some(b=>b.piece===id)).length;}
+function needsRevision(p){if(!p||p.status!=='mastered')return false;const days=S.settings.revisionDays||18;const lp=pieceLastPlayed(p.id);if(!lp)return false;return Math.floor((Date.now()-new Date(lp+'T00:00'))/86400000)>=days;}
+// Phase de travail dérivée (jamais stockée) — statut + avancement.
+function piecePhase(p){if(!p)return null;
+  if(p.status==='wishlist')return{k:'wishlist',label:'À apprendre',col:'var(--t2)'};
+  if(p.status==='archived')return{k:'archived',label:'Archivé',col:'var(--t2)'};
+  if(p.status==='abandoned')return{k:'abandoned',label:'Abandonné',col:'var(--t2)'};
+  if(p.status==='mastered')return needsRevision(p)?{k:'entretien',label:'À entretenir',col:'var(--gold)'}:{k:'mastered',label:'Maîtrisé',col:'var(--acc)'};
+  const pr=p.progress||0;
+  if(pr<30)return{k:'dechiffrage',label:'Déchiffrage',col:'#D2694A'};
+  if(pr<70)return{k:'consolidation',label:'Consolidation',col:'#7FC9C4'};
+  return{k:'polissage',label:'Polissage',col:'#9FC93C'};}
+function phaseChip(p){const ph=piecePhase(p);if(!ph)return '';return `<span class="tag" style="padding:2px 9px;font-size:11px;color:${ph.col};border-color:${ph.col}44;">${ph.label}</span>`;}
+function normStr(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,'');}
+function findDuplicate(title,composer,exceptId){const nt=normStr(title),nc=normStr(composer);if(!nt)return null;
+  return S.pieces.find(p=>!p.isEnsemble&&p.id!==exceptId&&normStr(p.title)===nt&&normStr(p.composer)===nc)||null;}
 function computeStreak(){const days=practiceDays();const tol=S.settings.tolerance||0;let st=0,miss=0,d=new Date();
   for(let i=0;i<800;i++){const k=dkey(d);if(days.has(k)){st++;miss=0;}else if(i>0){miss++;if(miss>tol)break;}d=addDays(d,-1);}return st;}
 function bestStreak(){const set=practiceDays();const arr=[...set].sort();if(!arr.length)return 0;const tol=S.settings.tolerance||0;
@@ -421,6 +439,7 @@ function renderCarnet(){
 function setCarnet(t){carnetTab=t;renderCarnet();}
 function renderCarnetBody(){
   const el=document.getElementById('carnet-body');
+  if(!el)return;
   if(carnetTab==='seances'){
     const list=[...S.sessions].reverse();
     el.innerHTML=`<button class="btn ghost sm" style="width:100%;margin-bottom:14px;" onclick="aposterioriSheet()">+ Ajouter une séance oubliée</button>`+
@@ -446,9 +465,9 @@ function renderCarnetBody(){
     const k=dkey(),j=S.journal[k]||{mood:'',energy:''};
     el.innerHTML=`<div class="card"><div class="between" style="margin-bottom:14px;"><span style="font-weight:600;">Aujourd'hui</span><span class="muted" style="font-size:13px;">${cap(frDate(new Date()))}</span></div>
       ${dynScale('Humeur',j.mood,'mood')}${dynScale('Énergie',j.energy,'energy')}</div>
-      <h2>Wishlist</h2>
+      <h2>À apprendre</h2>
       <button class="btn ghost sm" style="width:100%;margin-bottom:12px;" onclick="wishSheet()">+ Ajouter un morceau à apprendre</button>
-      ${S.wishlist.length?S.wishlist.map(w=>`<div class="item"><div style="min-width:0;"><div class="title">${esc(w.title)}</div><div class="meta">${esc(w.composer||'')}</div></div><div class="r"><button class="btn primary sm" onclick="wishToRep('${w.id}')">→ Répertoire</button></div></div>`).join(''):'<div class="empty">Rien pour l\'instant.</div>'}`;
+      ${(()=>{const wl=S.pieces.filter(p=>p.status==='wishlist');return wl.length?wl.map(w=>`<div class="item" onclick="pieceDetail('${w.id}')"><div style="min-width:0;"><div class="title">${esc(w.title)}</div><div class="meta">${esc(w.composer||'')}</div></div><div class="r"><button class="btn primary sm" onclick="event.stopPropagation();startLearning('${w.id}')">Commencer</button></div></div>`).join(''):'<div class="empty">Rien pour l\'instant.</div>';})()}`;
   }
 }
 let _carnetPiece=null,_pieceQ='';
@@ -462,7 +481,7 @@ function renderPieceList(){
 function selectPiece(id){_carnetPiece=id;renderPieceList();renderPieceDetail();}
 function renderPieceDetail(){
   const box=document.getElementById('pdetail');if(!box)return;const p=pieceById(_carnetPiece);if(!p){box.innerHTML='';return;}
-  box.innerHTML=`<div class="between" style="margin:4px 0 12px;"><span style="font-weight:600;">${esc(p.composer||'')} — ${esc(p.title)}</span><button class="btn primary sm" onclick="noteSheet('${p.id}')">+ Note</button></div>
+  box.innerHTML=`<div class="between" style="margin:4px 0 12px;"><span style="font-weight:600;">${esc(p.composer||'')} — ${esc(p.title)}</span><div class="row" style="gap:8px;"><button class="btn ghost sm" onclick="pieceDetail('${p.id}')">Fiche</button><button class="btn primary sm" onclick="noteSheet('${p.id}')">+ Note</button></div></div>
     ${(p.notes&&p.notes.length)?'<div class="tl">'+[...p.notes].reverse().map(n=>`<div class="n"><div class="between"><span class="muted" style="font-size:12px;">${frShort(n.date)}</span>${n.section?`<span class="tag" style="padding:3px 9px;">${esc(n.section)}</span>`:''}</div><div style="margin-top:5px;line-height:1.5;color:var(--tc);">${esc(n.text)}</div></div>`).join('')+'</div>':'<div class="empty">Aucune note pour cette pièce.</div>'}`;
 }
 function dynScale(label,val,field){const idx=FEEL_ORDER.indexOf(val);
@@ -475,7 +494,7 @@ function noteSheet(pid){openSheet(`<h3>Nouvelle note</h3>
   <div class="field"><label>Note</label><textarea id="n-t" placeholder="Le legato tient mieux, main droite plus fluide…"></textarea></div>
   <button class="btn primary" onclick="saveNote('${pid}')">Ajouter</button>`);}
 function saveNote(pid){const t=document.getElementById('n-t').value.trim();if(!t){toast('Écris une note');return;}
-  const p=pieceById(pid);p.notes=p.notes||[];p.notes.push({id:uid(),date:dkey(),section:document.getElementById('n-s').value.trim(),text:t});save();closeSheet();renderCarnetBody();toast('Note ajoutée');}
+  const p=pieceById(pid);p.notes=p.notes||[];p.notes.push({id:uid(),date:dkey(),section:document.getElementById('n-s').value.trim(),text:t});save();refreshScreen();pieceDetail(pid);toast('Note ajoutée');}
 function wishSheet(){_worksCache=[];
   const comps=OPUS.ALL.map(c=>`<option value="${c.name}"></option>`).join('');
   openSheet(`<h3>À apprendre un jour</h3>
@@ -484,9 +503,11 @@ function wishSheet(){_worksCache=[];
       <div class="muted" style="font-size:12px;margin-top:6px;">Choisis un compositeur pré-chargé pour l'autocomplétion.</div></div>
     <button class="btn primary" onclick="saveWish()">Ajouter à la wishlist</button>`);}
 function saveWish(){const t=document.getElementById('p-t').value.trim();if(!t){toast('Donne un titre');return;}
-  S.wishlist.push({id:uid(),title:t,composer:document.getElementById('p-c').value.trim()});save();closeSheet();renderCarnetBody();toast('Ajouté à la wishlist');}
-function wishToRep(id){const w=S.wishlist.find(x=>x.id===id);S.pieces.push({id:uid(),title:w.title,composer:w.composer,status:'active',diff:0,notes:[],createdAt:Date.now()});
-  S.wishlist=S.wishlist.filter(x=>x.id!==id);save();renderCarnetBody();toast('Déplacé vers le répertoire');}
+  const composer=document.getElementById('p-c').value.trim();
+  const dup=findDuplicate(t,composer);if(dup){closeSheet();toast('Ce morceau est déjà dans ta liste');pieceDetail(dup.id);return;}
+  S.pieces.push({id:uid(),title:t,composer,epoch:(document.getElementById('p-e')||{}).value||'',status:'wishlist',diff:0,progress:0,tags:[],notes:[],todo:'',createdAt:Date.now()});
+  save();closeSheet();refreshScreen();toast('Ajouté à « à apprendre »');}
+function startLearning(id){const p=pieceById(id);if(!p)return;p.status='active';if(p.createdAt==null)p.createdAt=Date.now();save();closeSheet();refreshScreen();toast('Direction le répertoire · en cours');}
 
 /* ==========================================================================
    RÉPERTOIRE
@@ -506,9 +527,10 @@ function renderRep(){
     <div style="text-align:center;margin:-2px 0 12px;"><button id="sync-btn" class="btn ghost sm" onclick="syncOpus(true)">↻ Enrichir la base (Open Opus)</button>
       <div class="muted" style="font-size:11px;margin-top:6px;">${Object.values(S.opusCache||{}).reduce((a,x)=>a+x.length,0)?Object.values(S.opusCache).reduce((a,x)=>a+x.length,0)+' œuvres en base':'connecte-toi une fois pour tout charger'}</div></div>
     <div class="seg" style="margin:6px 0 12px;">
-      <button class="${repFilter==='active'?'on':''}" onclick="setRep('active')">En cours</button>
-      <button class="${repFilter==='mastered'?'on':''}" onclick="setRep('mastered')">Maîtrisés</button>
-      <button class="${repFilter==='archived'?'on':''}" onclick="setRep('archived')">Archivés</button>
+      <button class="${repFilter==='wishlist'?'on':''}" onclick="setRep('wishlist')" style="font-size:12px;">À apprendre</button>
+      <button class="${repFilter==='active'?'on':''}" onclick="setRep('active')" style="font-size:12px;">En cours</button>
+      <button class="${repFilter==='mastered'?'on':''}" onclick="setRep('mastered')" style="font-size:12px;">Maîtrisés</button>
+      <button class="${repFilter==='archived'?'on':''}" onclick="setRep('archived')" style="font-size:12px;">Archivés</button>
     </div>
     <div class="row" style="gap:8px;margin-bottom:14px;">
       <button class="btn ghost sm" style="flex:1;" onclick="repSortSheet()">Trier : ${SORT_LABELS[repSort]}</button>
@@ -530,7 +552,7 @@ function passFilter(p){
 }
 function renderRepList(){
   const el=document.getElementById('rep-list');
-  const match=p=>repFilter==='active'?p.status==='active':repFilter==='mastered'?p.status==='mastered':(p.status==='archived'||p.status==='abandoned');
+  const match=p=>repFilter==='wishlist'?p.status==='wishlist':repFilter==='active'?p.status==='active':repFilter==='mastered'?p.status==='mastered':(p.status==='archived'||p.status==='abandoned');
   const sorters={
     composer:(a,b)=>(a.composer||'~').localeCompare(b.composer||'~')||a.title.localeCompare(b.title),
     title:(a,b)=>a.title.localeCompare(b.title),
@@ -591,12 +613,11 @@ function applyFilters(){const v=id=>document.getElementById(id).value;
   closeSheet();renderRep();}
 function resetFilters(){repF={composer:'',epoch:'',genre:'',tag:'',diffMin:1,diffMax:9,notPlayed:0};closeSheet();renderRep();}
 function repRow(p,sub){
-  const badge=p.status==='mastered'?'<span class="tag acc">Maîtrisé</span>':p.status==='active'?'<span class="tag">En cours</span>':`<span class="tag">${p.status==='archived'?'Archivé':'Abandonné'}</span>`;
-  const meta=[p.composer,p.diff?('Henle '+p.diff):'',dur(pieceSeconds(p.id))+' joués'].filter(Boolean).join(' · ');
+  const meta=[p.composer,p.diff?('Henle '+p.diff):'',pieceSeconds(p.id)?dur(pieceSeconds(p.id))+' joués':''].filter(Boolean).join(' · ');
   const tags=(p.tags||[]).length?`<div style="margin-top:6px;display:flex;gap:5px;flex-wrap:wrap;">${p.tags.map(t=>`<span class="tag" style="padding:2px 8px;font-size:11px;">${esc(t)}</span>`).join('')}</div>`:'';
-  return `<div class="item" style="${sub?'margin-bottom:8px;background:var(--surface2);':''}" onclick="pieceSheet('${p.id}')">
+  return `<div class="item" style="${sub?'margin-bottom:8px;background:var(--surface2);':''}" onclick="pieceDetail('${p.id}')">
     <div style="min-width:0;"><div class="title">${esc(p.title)}</div><div class="meta">${esc(meta)}</div>${tags}</div>
-    <div class="r">${badge}<span class="muted">›</span></div></div>`;
+    <div class="r">${phaseChip(p)}<span class="muted">›</span></div></div>`;
 }
 function toggleEns(id){_ensOpen[id]=!_ensOpen[id];renderRepList();}
 let _searchTO,_sugList=[];
@@ -638,17 +659,20 @@ function pieceSheet(id,prefill){
     <div class="field"><label>Compositeur</label><input id="p-c" list="dl-comp" value="${esc(p.composer)}" placeholder="Chopin" oninput="onComposerInput(this.value)" autocomplete="off"><datalist id="dl-comp">${comps}</datalist></div>
     <div class="field"><label>Titre / œuvre</label><input id="p-t" list="dl-works" value="${esc(p.title)}" placeholder="Nocturne op. 9 no 2" oninput="onTitleInput(this.value)" autocomplete="off"><datalist id="dl-works"></datalist>
       <div class="muted" style="font-size:12px;margin-top:6px;">Un compositeur pré-chargé complète l'opus, le genre, la tonalité et la difficulté.</div></div>
-    <div class="grid2"><div class="field"><label>Époque</label><input id="p-e" value="${esc(p.epoch)}" placeholder="Romantique"></div>
-      <div class="field"><label>Opus</label><input id="p-o" value="${esc(p.opus)}" placeholder="op. 9 no 2"></div></div>
-    <div class="grid2"><div class="field"><label>Genre</label><input id="p-g" value="${esc(p.genre)}" placeholder="Nocturne"></div>
-      <div class="field"><label>Tonalité</label><input id="p-k" value="${esc(p.key)}" placeholder="Mi♭ majeur"></div></div>
-    <div class="field"><label>Tempo cible (bpm)</label><input id="p-b" inputmode="numeric" value="${esc(p.bpm)}" placeholder="92"></div>
-    <div class="field"><label>Tags (séparés par des virgules)</label><input id="p-tags" value="${esc((p.tags||[]).join(', '))}" placeholder="concert, par cœur, déchiffrage"></div>
     <div class="field"><label>Difficulté · Henle 1–9</label><div class="row" id="p-diff" style="gap:5px;">${[1,2,3,4,5,6,7,8,9].map(i=>`<button onclick="setDiff(${i})" data-i="${i}" style="flex:1;height:22px;border-radius:5px;background:${i<=_pdiff?'var(--acc)':'var(--surface2)'};"></button>`).join('')}</div>
       <div class="muted" id="p-diffl" style="font-size:13px;margin-top:6px;">${_pdiff?'Niveau '+_pdiff:'Non défini'}</div></div>
-    <div class="field"><label>Avancement · <span id="p-progl">${_pprog}</span> %</label><input id="p-prog" type="range" min="0" max="100" step="5" value="${_pprog}" oninput="document.getElementById('p-progl').textContent=this.value"></div>
-    <div class="field"><label>Statut</label><div class="seg" id="p-st"><button class="${_pstatus==='active'?'on':''}" onclick="setPStatus('active',this)">En cours</button><button class="${_pstatus==='mastered'?'on':''}" onclick="setPStatus('mastered',this)">Maîtrisé</button></div></div>
-    <button class="btn primary" onclick="savePiece('${isNew?'':p.id}')">${isNew?'Ajouter':'Enregistrer'}</button>
+    <button type="button" class="btn ghost sm" id="p-more-btn" style="width:100%;margin:4px 0 2px;" onclick="togglePMore()">${isNew?'Détails (facultatif) ⌄':'Masquer les détails ⌃'}</button>
+    <div id="p-more" style="display:${isNew?'none':'block'};">
+      <div class="grid2"><div class="field"><label>Époque</label><input id="p-e" value="${esc(p.epoch)}" placeholder="Romantique"></div>
+        <div class="field"><label>Opus</label><input id="p-o" value="${esc(p.opus)}" placeholder="op. 9 no 2"></div></div>
+      <div class="grid2"><div class="field"><label>Genre</label><input id="p-g" value="${esc(p.genre)}" placeholder="Nocturne"></div>
+        <div class="field"><label>Tonalité</label><input id="p-k" value="${esc(p.key)}" placeholder="Mi♭ majeur"></div></div>
+      <div class="field"><label>Tempo cible (bpm)</label><input id="p-b" inputmode="numeric" value="${esc(p.bpm)}" placeholder="92"></div>
+      <div class="field"><label>Tags (séparés par des virgules)</label><input id="p-tags" value="${esc((p.tags||[]).join(', '))}" placeholder="concert, par cœur, déchiffrage"></div>
+      <div class="field"><label>Avancement · <span id="p-progl">${_pprog}</span> %</label><input id="p-prog" type="range" min="0" max="100" step="5" value="${_pprog}" oninput="document.getElementById('p-progl').textContent=this.value"></div>
+      <div class="field"><label>Statut</label><div class="seg" id="p-st"><button class="${_pstatus==='active'?'on':''}" onclick="setPStatus('active',this)">En cours</button><button class="${_pstatus==='mastered'?'on':''}" onclick="setPStatus('mastered',this)">Maîtrisé</button></div></div>
+    </div>
+    <button class="btn primary" style="margin-top:6px;" onclick="savePiece('${isNew?'':p.id}')">${isNew?'Ajouter':'Enregistrer'}</button>
     ${isNew?'':`<div class="grid2" style="margin-top:10px;"><button class="btn ghost sm" style="width:100%;" onclick="setPieceStatus('${p.id}','archived')">Archiver</button><button class="btn ghost sm" style="width:100%;color:#F0857A;border-color:#5a2f2b;" onclick="setPieceStatus('${p.id}','abandoned')">Abandonner</button></div>`}
     ${isNew?'':`<div class="card" style="margin-top:14px;padding:12px 14px;"><div class="muted" style="font-size:12px;">Maturité</div>
       <div style="font-size:13px;margin-top:4px;">Ajouté ${p.createdAt?'le '+new Date(p.createdAt).toLocaleDateString('fr-FR'):'—'}${p.masteredAt?' · maîtrisé le '+new Date(p.masteredAt).toLocaleDateString('fr-FR'):''}</div>
@@ -686,10 +710,59 @@ function savePiece(id){const title=document.getElementById('p-t').value.trim();i
   let newlyMastered=false;
   if(id){const p=pieceById(id);const was=p.status==='mastered';Object.assign(p,data);
     if(p.status==='mastered'){if(!p.masteredAt)p.masteredAt=Date.now();if(!was)newlyMastered=true;}}
-  else{const np=Object.assign({id:uid(),notes:[],createdAt:Date.now()},data);if(np.status==='mastered')np.masteredAt=Date.now();S.pieces.push(np);}
+  else{
+    const dup=findDuplicate(data.title,data.composer);
+    if(dup){if(confirm('« '+dup.title+' » est déjà dans ton répertoire. Ouvrir sa fiche ?')){closeSheet();pieceDetail(dup.id);return;}}
+    const np=Object.assign({id:uid(),notes:[],createdAt:Date.now()},data);if(np.status==='mastered')np.masteredAt=Date.now();S.pieces.push(np);}
   save();closeSheet();renderRep();
   if(newlyMastered)celebrate('Morceau maîtrisé !',title);else toast('Enregistré');}
+function togglePMore(){const m=document.getElementById('p-more'),b=document.getElementById('p-more-btn');if(!m)return;
+  const open=m.style.display!=='none';m.style.display=open?'none':'block';if(b)b.textContent=open?'Détails (facultatif) ⌄':'Masquer les détails ⌃';}
 function setPieceStatus(id,st){pieceById(id).status=st;save();closeSheet();renderRep();toast(st==='archived'?'Archivé':'Abandonné');}
+function refreshScreen(){const a=document.querySelector('.screen.active');if(!a)return;const n=a.id.replace('s-','');
+  ({home:renderHome,carnet:renderCarnet,rep:renderRep,voyage:renderVoyage,stats:renderStats,settings:renderSettings}[n]||(()=>{}))();}
+
+/* ---------- Fiche morceau unifiée ---------- */
+function pieceDetail(id){const p=pieceById(id);if(!p)return;
+  const ph=piecePhase(p),played=pieceSeconds(p.id),lp=pieceLastPlayed(p.id),nSess=pieceSessionCount(p.id);
+  const meta=[p.composer,p.epoch,p.opus].filter(Boolean).join(' · ');
+  const stat=(v,l)=>`<div class="metric" style="padding:12px;"><div class="v" style="font-size:20px;">${v}</div><div class="l">${l}</div></div>`;
+  const isWish=p.status==='wishlist',closed=p.status==='archived'||p.status==='abandoned';
+  const notes=(p.notes||[]).length?'<div class="tl" style="margin-top:6px;">'+[...p.notes].reverse().slice(0,12).map(n=>`<div class="n"><div class="between"><span class="muted" style="font-size:12px;">${frShort(n.date)}</span>${n.section?`<span class="tag" style="padding:3px 9px;">${esc(n.section)}</span>`:''}</div><div style="margin-top:5px;line-height:1.5;color:var(--tc);">${esc(n.text)}</div></div>`).join('')+'</div>':'<div class="empty" style="padding:14px;">Aucune note pour l\'instant.</div>';
+  openSheet(`<div class="between" style="align-items:flex-start;">
+      <div style="min-width:0;"><h3 style="margin:0;">${esc(p.title)}</h3>${meta?`<div class="muted" style="font-size:13px;margin-top:3px;">${esc(meta)}</div>`:''}</div>
+      ${phaseChip(p)}</div>
+    <div class="row" style="gap:7px;margin:12px 0;flex-wrap:wrap;">
+      ${p.diff?`<span class="tag">Henle ${p.diff}</span>`:''}
+      ${p.key?`<span class="tag">${esc(p.key)}</span>`:''}
+      ${p.genre?`<span class="tag">${esc(p.genre)}</span>`:''}
+      ${(p.tags||[]).map(t=>`<span class="tag" style="padding:2px 8px;">${esc(t)}</span>`).join('')}</div>
+    <div class="grid2" style="gap:8px;margin-bottom:6px;">${stat(played?dur(played):'—','temps joué')}${stat(nSess||'—','séances')}</div>
+    <div class="metric" style="padding:12px;margin-bottom:12px;"><div class="v" style="font-size:16px;">${lp?frShort(lp):'jamais'}</div><div class="l">dernière fois</div></div>
+    ${!isWish&&!closed?`<div class="card" style="padding:12px 14px;margin-bottom:12px;">
+      <div class="between"><span class="muted" style="font-size:13px;">Avancement</span><span style="font-weight:600;">${p.progress||0} %</span></div>
+      <div class="row" style="gap:8px;margin-top:10px;">
+        <button class="btn ghost sm" style="flex:1;" onclick="nudgeProgress('${p.id}',-10)">– 10</button>
+        <button class="btn ghost sm" style="flex:1;" onclick="nudgeProgress('${p.id}',10)">+ 10</button>
+        ${p.status!=='mastered'?`<button class="btn primary sm" style="flex:1;" onclick="markMastered('${p.id}')">Maîtrisé ✓</button>`:''}</div>
+      ${estimateText(p)?`<div style="font-size:12px;margin-top:8px;color:var(--acc);">${estimateText(p)}</div>`:''}</div>`:''}
+    ${p.todo&&p.todo.trim()?`<div class="card" style="padding:12px 14px;margin-bottom:12px;border-left:2px solid var(--acc);border-radius:0 12px 12px 0;"><span class="muted" style="font-size:12px;">À faire</span><div style="font-size:14px;margin-top:3px;">${esc(p.todo)}</div></div>`:''}
+    ${isWish?`<button class="btn primary" onclick="startLearning('${p.id}')">Commencer à apprendre</button>
+      <div class="grid2" style="margin-top:10px;"><button class="btn ghost sm" onclick="editPiece('${p.id}')">Modifier</button><button class="btn ghost sm" style="color:#F0857A;border-color:#5a2f2b;" onclick="deleteWish('${p.id}')">Retirer</button></div>`
+    :closed?`<button class="btn primary" onclick="reopenPiece('${p.id}')">Réactiver (en cours)</button>
+      <button class="btn ghost sm" style="width:100%;margin-top:10px;" onclick="editPiece('${p.id}')">Modifier</button>`
+    :`<div class="grid2"><button class="btn primary" onclick="detailPlay('${p.id}')">${playSvg()} Jouer</button><button class="btn ghost" onclick="noteSheet('${p.id}')">+ Note</button></div>
+      <div class="grid2" style="margin-top:10px;"><button class="btn ghost sm" onclick="editPiece('${p.id}')">Modifier</button><button class="btn ghost sm" onclick="setPieceStatus('${p.id}','archived')">Archiver</button></div>`}
+    <h2 style="margin-top:18px;">Notes</h2>${notes}`);
+}
+function detailPlay(id){closeSheet();quickStart(id);}
+function editPiece(id){pieceSheet(id);}
+function nudgeProgress(id,d){const p=pieceById(id);if(!p)return;p.progress=Math.max(0,Math.min(100,(p.progress||0)+d));
+  if(p.progress>=100&&p.status!=='mastered'){markMastered(id);return;}save();pieceDetail(id);}
+function markMastered(id){const p=pieceById(id);if(!p)return;const was=p.status==='mastered';p.status='mastered';p.progress=100;if(!p.masteredAt)p.masteredAt=Date.now();
+  save();closeSheet();refreshScreen();if(!was)celebrate('Morceau maîtrisé !',p.title);else toast('Maîtrisé');}
+function reopenPiece(id){const p=pieceById(id);if(!p)return;p.status='active';save();pieceDetail(id);toast('Réactivé · en cours');}
+function deleteWish(id){if(!confirm('Retirer ce morceau de « à apprendre » ?'))return;S.pieces=S.pieces.filter(p=>p.id!==id);save();closeSheet();refreshScreen();toast('Retiré');}
 
 /* ---------- Œuvre / recueil à plusieurs mouvements ---------- */
 let _workMovs=[];
