@@ -41,6 +41,13 @@ const dom = new JSDOM(html, {
     // Réseau coupé + hors-ligne : pas d'appel Open Opus pendant le test.
     win.fetch = () => Promise.reject(new Error('offline (test)'));
     Object.defineProperty(win.navigator, 'onLine', { get: () => false });
+    // jsdom n'implémente pas scrollTo : no-op pour éviter le bruit console.
+    win.scrollTo = () => {};
+    // app.js déclare une fonction globale history() (liste des séances) ;
+    // en vrai navigateur elle masque sans souci window.history (vérifié),
+    // mais l'objet History de jsdom est non-configurable et bloque le
+    // shadowing — on le libère avant l'exécution du script.
+    try { delete win.history; } catch (e) {}
     // Seed AVANT que app.js exécute load() au boot.
     win.localStorage.setItem('pianoV2', JSON.stringify(seed));
     win.addEventListener('error', e => onError('window.onerror', e.error || e.message));
