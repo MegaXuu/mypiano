@@ -5,7 +5,7 @@
 
 const KEY = 'pianoV2';
 const IMPROV = '__improv__';
-const APP_VERSION = 'Bêta 3.2'; // à synchroniser avec CACHE dans sw.js à chaque release
+const APP_VERSION = 'Bêta 3.3'; // à synchroniser avec CACHE dans sw.js à chaque release
 
 const STONES = [
   {n:'Apprenti',h:10,c:'#E0A83B'},{n:'Élève',h:20,c:'#C9CDDA'},{n:'Musicien',h:30,c:'#9BA0AE'},
@@ -316,10 +316,43 @@ function go(name){
   ({home:renderHome,carnet:renderCarnet,rep:renderRep,voyage:renderVoyage,stats:renderStats,settings:renderSettings}[name]||(()=>{}))();
 }
 let toastT;function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),1900);}
-function openSheet(html){document.getElementById('sheet').innerHTML='<div class="handle"></div>'+html;document.getElementById('sheet-bg').classList.add('show');}
+function openSheet(html){
+  const sheet=document.getElementById('sheet');
+  sheet.style.transition='';sheet.style.animation='';sheet.style.transform='';
+  sheet.innerHTML='<div class="handle"></div>'+html;
+  document.getElementById('sheet-bg').classList.add('show');
+}
 let _recUrls=[];
 function closeSheet(){document.getElementById('sheet-bg').classList.remove('show');_recUrls.forEach(u=>{try{URL.revokeObjectURL(u);}catch(e){}});_recUrls=[];}
 document.getElementById('sheet-bg').addEventListener('click',e=>{if(e.target.id==='sheet-bg')closeSheet();});
+
+/* ---------- Fermeture de la feuille au glisser (poignée) ---------- */
+let _sheetDrag=null;
+document.getElementById('sheet-bg').addEventListener('pointerdown',e=>{
+  if(!e.target.closest('.handle'))return;
+  const sheet=document.getElementById('sheet');
+  _sheetDrag={startY:e.clientY,y:0,h:sheet.getBoundingClientRect().height,pid:e.pointerId};
+  sheet.style.animation='none';sheet.style.transition='none';
+  try{sheet.setPointerCapture(e.pointerId);}catch(err){}
+});
+document.getElementById('sheet-bg').addEventListener('pointermove',e=>{
+  if(!_sheetDrag||e.pointerId!==_sheetDrag.pid)return;
+  _sheetDrag.y=Math.max(0,e.clientY-_sheetDrag.startY);
+  document.getElementById('sheet').style.transform='translateY('+_sheetDrag.y+'px)';
+});
+function endSheetDrag(e){
+  if(!_sheetDrag||(e&&e.pointerId!==_sheetDrag.pid))return;
+  const sheet=document.getElementById('sheet'),drag=_sheetDrag;_sheetDrag=null;
+  sheet.style.transition='transform .2s ease';
+  if(drag.y>Math.min(120,drag.h*0.28)){
+    sheet.style.transform='translateY(100%)';
+    setTimeout(closeSheet,180);
+  }else{
+    sheet.style.transform='';
+  }
+}
+document.getElementById('sheet-bg').addEventListener('pointerup',endSheetDrag);
+document.getElementById('sheet-bg').addEventListener('pointercancel',endSheetDrag);
 
 /* ==========================================================================
    ACCUEIL
