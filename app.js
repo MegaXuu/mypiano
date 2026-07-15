@@ -37,7 +37,9 @@ function migrate(r){r.pieces=r.pieces||[];r.sessions=r.sessions||[];r.wishlist=r
   // Fusion : la wishlist devient un statut du répertoire ('à apprendre').
   if(r.wishlist.length){r.wishlist.forEach(w=>{r.pieces.push({id:w.id||(Date.now().toString(36)+Math.random().toString(36).slice(2,6)),title:w.title||'',composer:w.composer||'',epoch:w.epoch||'',opus:'',genre:'',key:'',diff:0,bpm:'',status:'wishlist',progress:0,tags:[],notes:[],todo:'',createdAt:Date.now()});});r.wishlist=[];}
   r.settings=Object.assign({tolerance:1,dailyGoal:30,weeklyTime:null,weeklyDays:5,monthly:null,
-    notif:{daily:true,dailyTime:'17:00',streak:true,weekly:true,palier:true,monthly:true},theme:'dark',nas:{enabled:false,ip:'',last:''}},r.settings||{});return r;}
+    notif:{daily:true,dailyTime:'17:00',streak:true,weekly:true,palier:true,monthly:true},theme:'dark',nas:{enabled:false,ip:'',last:''}},r.settings||{});
+  r.pieces.forEach(p=>{if(p.status==='mastered'&&!p.revInterval)p.revInterval=r.settings.revisionDays||18;});
+  return r;}
 function save(){localStorage.setItem(KEY,JSON.stringify(S));}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
@@ -69,7 +71,7 @@ function pieceSeconds(id){let t=0;S.sessions.forEach(s=>s.blocks.forEach(b=>{if(
 function practiceDays(){return new Set(S.sessions.map(s=>s.date));}
 function masteredCount(){return S.pieces.filter(p=>p.status==='mastered').length;}
 function pieceSessionCount(id){return S.sessions.filter(s=>s.blocks.some(b=>b.piece===id)).length;}
-function needsRevision(p){if(!p||p.status!=='mastered')return false;const days=S.settings.revisionDays||18;const lp=pieceLastPlayed(p.id);if(!lp)return false;return Math.floor((Date.now()-new Date(lp+'T00:00'))/86400000)>=days;}
+function needsRevision(p){if(!p||p.status!=='mastered')return false;const days=p.revInterval||S.settings.revisionDays||18;const lp=pieceLastPlayed(p.id);if(!lp)return false;return Math.floor((Date.now()-new Date(lp+'T00:00'))/86400000)>=days;}
 // Phase de travail dérivée (jamais stockée) — statut + avancement.
 function piecePhase(p){if(!p)return null;
   if(p.status==='wishlist')return{k:'wishlist',label:'À apprendre',col:'var(--t2)'};
@@ -206,7 +208,7 @@ function renderHome(){
       <div class="metric"><div class="v">${dur(weekSeconds())}</div><div class="l">temps joué</div></div>
       <div class="metric"><div class="v">${weekDays()}/7</div><div class="l">jours actifs</div></div>
     </div>
-    ${revisionList().length?`<h2>À entretenir</h2><div class="card" style="padding:14px 16px;">
+    ${revisionList().length?`<div class="between" style="margin-top:22px;margin-bottom:10px;"><h2 style="margin:0;">À entretenir</h2><button class="btn ghost sm" onclick="startRevision()">Réviser</button></div><div class="card" style="padding:14px 16px;">
       <p class="muted" style="font-size:13px;margin:0 0 8px;">Maîtrisés, mais pas rejoués depuis un moment :</p>
       ${revisionList().slice(0,3).map(p=>`<div class="between" style="padding:8px 0;"><div style="min-width:0;"><div style="font-weight:600;font-size:14px;">${esc(p.title)}</div><div class="muted" style="font-size:12px;">${esc(p.composer||'')}</div></div><button class="btn ghost sm" onclick="quickStart('${p.id}')">Jouer</button></div>`).join('')}</div>`:''}`;
 }
@@ -408,7 +410,8 @@ function commitSession(total){
   entries.forEach((e,i)=>{if(e.piece===IMPROV)return;const p=pieceById(e.piece);if(!p)return;
     if(e.worked||e.next){p.notes=p.notes||[];p.notes.push({id:uid(),date:dkey(),section:'',text:(e.worked||'')+(e.next?((e.worked?' · ':'')+'À faire : '+e.next):'')});}
     p.todo=e.next||'';
-    if(_mastery[i]==='active'&&p.status==='mastered'){p.status='active';p.masteredAt=null;}});
+    if(_mastery[i]==='active'&&p.status==='mastered'){p.status='active';p.masteredAt=null;p.revInterval=S.settings.revisionDays||18;}
+    else if(_mastery[i]==='mastered'&&p.status==='mastered'){p.revInterval=Math.min(120,Math.round((p.revInterval||S.settings.revisionDays||18)*1.6));}});
   S.sessions.push({id:uid(),date:dkey(),mode:timer.mode,goal:timer.goal,feeling:_feel,blocks,entries,ts:Date.now()});
   save();checkChallenges();timer=null;closeSheet();
   const after=currentStone();
@@ -1154,8 +1157,8 @@ function hourHeat(){
     <div style="display:flex;align-items:flex-end;gap:2px;height:66px;">${hrs.map((v,i)=>`<div style="flex:1;background:${v?'var(--acc)':'var(--surface2)'};height:${v?Math.max(7,Math.round(v/max*100)):4}%;border-radius:2px;opacity:${v?(0.45+0.55*v/max).toFixed(2):1};"></div>`).join('')}</div>
     <div class="sub" style="margin-top:6px;"><span>0h</span><span>12h</span><span>23h</span></div></div>`;
 }
-function revisionList(){const days=S.settings.revisionDays||18,now=Date.now();
-  return S.pieces.filter(p=>!p.isEnsemble&&p.status==='mastered').map(p=>{const lp=pieceLastPlayed(p.id);const d=lp?Math.floor((now-new Date(lp+'T00:00'))/86400000):9999;return {p,d};}).filter(x=>x.d>=days).sort((a,b)=>b.d-a.d).map(x=>x.p);}
+function revisionList(){const now=Date.now();
+  return S.pieces.filter(p=>!p.isEnsemble&&p.status==='mastered').map(p=>{const days=p.revInterval||S.settings.revisionDays||18;const lp=pieceLastPlayed(p.id);const d=lp?Math.floor((now-new Date(lp+'T00:00'))/86400000):9999;return {p,d,days};}).filter(x=>x.d>=x.days).sort((a,b)=>b.d-a.d).map(x=>x.p);}
 function estimateText(p){if(S.settings.estimates===false||!p||p.progress==null||p.progress>=100||!p.createdAt)return '';
   const days=(Date.now()-p.createdAt)/86400000;if(days<3||!p.progress)return '';const rate=p.progress/days;if(rate<=0)return '';
   const rem=(100-p.progress)/rate;if(rem>3650)return '';return 'Maîtrise estimée dans ~'+(rem<14?Math.round(rem)+' j':Math.round(rem/7)+' sem.');}
@@ -1184,6 +1187,12 @@ function planSheet(){const plan=_plan=generatePlan();
 }
 function startGuided(){if(!_plan||!_plan.length)return;closeSheet();const plan=_plan;const f=plan[0];
   timer={mode:'guided',target:0,total:0,running:true,last:Date.now(),blocks:[{piece:f.piece||IMPROV,sec:0}],goal:todayGoal(),plan,planIdx:0,interval:null};
+  go('session');renderSession();startTick();}
+function startRevision(){const list=revisionList().slice(0,3);if(!list.length)return;
+  const min=Math.max(5,Math.round((S.settings.dailyGoal||30)/list.length));
+  const plan=list.map(p=>({piece:p.id,focus:'Entretien',min,consigne:'Filage lent pour réactiver la mémoire.'}));
+  _plan=plan;const f=plan[0];
+  timer={mode:'guided',target:0,total:0,running:true,last:Date.now(),blocks:[{piece:f.piece,sec:0}],goal:min*plan.length,plan,planIdx:0,interval:null};
   go('session');renderSession();startTick();}
 
 let _program=[],_concert=null,_concertInt=null;

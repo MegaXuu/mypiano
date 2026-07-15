@@ -40,7 +40,12 @@ carnet de travail, et se motiver par la gamification. Cible : iPhone (PWA instal
   Les notes par morceau vivent dans la fiche unifiée (`pieceDetail`), pas dans le Carnet.
 
 ## Modèle de données (S)
-- `pieces[]` : `{id,title,composer,epoch,opus,genre,key,diff(Henle 1–9),status(wishlist|active|mastered|archived|abandoned),bpm,progress(0–100),tags[],notes[{id,date,section,text}],todo,createdAt,masteredAt,isEnsemble?,parentId?}`
+- `pieces[]` : `{id,title,composer,epoch,opus,genre,key,diff(Henle 1–9),status(wishlist|active|mastered|archived|abandoned),bpm,progress(0–100),tags[],notes[{id,date,section,text}],todo,createdAt,masteredAt,isEnsemble?,parentId?,revInterval?}`
+  - `revInterval` (jours, pièces `mastered` seulement) : intervalle d'entretien adaptatif, défaut
+    `settings.revisionDays` (18). S'allonge (`×1.6`, plafond 120 j) sur « Toujours maîtrisée » en fin
+    de séance, se réinitialise au défaut si repassée `active` (« À retravailler »). `needsRevision`/
+    `revisionList` l'utilisent au lieu de l'intervalle fixe. Bouton « Réviser » (accueil) = séance
+    entrelacée des 3 pièces les plus en retard (`startRevision`, réutilise `timer.plan/planIdx`).
   - **Fiche unifiée** `pieceDetail(id)` (feuille) = point d'entrée depuis le répertoire : stats, avancement ±10, notes, transitions de statut. Formulaire `pieceSheet` allégé (champs primaires + dépliant « Détails »). **Phase** dérivée `piecePhase(p)` (À apprendre / Déchiffrage / Consolidation / Polissage / Maîtrisé / À entretenir…). Anti-doublon `findDuplicate` (normalisé).
 - `sessions[]` : `{id,date,mode(chrono|minuteur|guided|concert),goal,feeling(pp|p|mf|f|ff),blocks[{piece|'__improv__',sec}],entries[{piece,worked,next}],ts,concert?}`
 - `journal{date:{mood,energy}}` — capturé en **fin de séance** (`carnetSheet`, bloc repliable « facultatif » sous le ressenti), pas d'écran dédié. `opusCache{composer:[works]}`.
@@ -83,8 +88,8 @@ Polices : titres **Playfair Display**, interface **DM Sans**, chiffres **EB Gara
 
 - **Feuille de route V3 (ordre imposé, dépendances techniques)** — étapes 2 et 3 : présenter
   plan/maquette et faire **valider avant de coder**. Détail dans le prompt Sonnet dédié.
-  1. **Révision adaptative** : intervalle d'entretien par morceau (`p.revInterval`, défaut =
-     `settings.revisionDays`) qui s'allonge sur « toujours maîtrisée » et se resserre sur
+  1. ✅ **Révision adaptative** : intervalle d'entretien par morceau (`p.revInterval`, défaut =
+     `settings.revisionDays`) qui s'allonge sur « toujours maîtrisée » et se réinitialise sur
      « à retravailler » ; bouton « Réviser » = séance **entrelacée** de 3 pièces à entretenir.
   2. **Sections & tempo** (cœur v3) : `p.sections[] = {id,name,todo,status,bpm:[{d,v}]}`
      **facultatives** ; édition dans `pieceDetail` + mini-courbe SVG du tempo. **Suivi de tempo =
