@@ -22,6 +22,7 @@ const QUOTES = [
 ];
 const FEEL = {pp:'Laborieux',p:'Difficile',mf:'Correct',f:'Satisfaisant',ff:'Excellent'};
 const FEEL_ORDER = ['pp','p','mf','f','ff'];
+function feelLabel(f){return f&&FEEL[f]?f+' · '+FEEL[f]:(f||'');}
 
 /* ---------- State ---------- */
 let S = load();
@@ -164,10 +165,6 @@ function renderHome(){
       </button>
     </div>
     ${st?`<div class="tag" style="margin-top:6px;background:var(--surface);">${noteIcon(st.c,17,rankGlyph(st))}<span style="color:var(--gold);">${st.n}</span><span class="muted">· ${Math.floor(totalSeconds()/3600)} h</span></div>`:`<div class="tag" style="margin-top:6px;">Début du voyage</div>`}
-    ${reportReady()?`<div class="card" style="margin-top:10px;padding:12px 14px;cursor:pointer;" onclick="reportSheet()"><div class="between"><span style="font-weight:600;font-size:14px;">Ton rapport de la semaine est prêt</span><span style="color:var(--acc);">Voir ›</span></div></div>`:''}
-    ${monthReportReady()?`<div class="card" style="margin-top:10px;padding:12px 14px;cursor:pointer;" onclick="monthReportSheet()"><div class="between"><span style="font-weight:600;font-size:14px;">Ton rapport du mois est prêt</span><span style="color:var(--acc);">Voir ›</span></div></div>`:''}
-    ${backupDue()?`<div class="card" style="margin-top:10px;padding:12px 14px;cursor:pointer;box-shadow:inset 0 0 0 1px rgba(228,197,138,.35);" onclick="exportJSON()"><div class="between"><span style="font-weight:600;font-size:14px;">Pense à sauvegarder tes données</span><span style="color:var(--gold);">Exporter ›</span></div></div>`:''}
-    ${goalsUnset()?`<div class="card" style="margin-top:10px;padding:12px 14px;cursor:pointer;" onclick="go('settings')"><div class="between"><span style="font-weight:600;font-size:14px;">Tu n'as pas encore choisi d'objectif hebdo ou mensuel</span><span style="color:var(--acc);">Régler ›</span></div></div>`:''}
     <h1 style="margin-top:12px;">Bonjour Florian</h1>
     <p class="serif" style="font-style:italic;color:var(--t2);font-size:16px;margin:6px 0 2px;">« ${q[0]} » — ${q[1]}</p>
 
@@ -191,14 +188,16 @@ function renderHome(){
       </div>
     </div>
 
+    <button class="btn primary" style="margin-top:18px;font-size:16px;padding:16px;" onclick="startSheet()">
+      ${playSvg()} Démarrer une séance</button>
+    <div class="grid2" style="margin-top:10px;"><button class="btn ghost" onclick="planSheet()">Plan guidé</button><button class="btn ghost" onclick="concertSheet()">Simulation</button></div>
+
+    ${homeAlertsHtml()}
+
     ${todos.length?`<div class="card" style="margin-top:14px;padding:16px;">
       <div class="tag acc" style="margin-bottom:12px;">À faire</div>
       <div id="home-todos">${todoLines(todos.slice(0,3))}</div>
       ${todos.length>3?`<button class="btn ghost sm" style="width:100%;margin-top:6px;" onclick="showAllTodos(this)">Voir les ${todos.length} œuvres</button>`:''}</div>`:''}
-
-    <button class="btn primary" style="margin-top:18px;font-size:16px;padding:16px;" onclick="startSheet()">
-      ${playSvg()} Démarrer une séance</button>
-    <div class="grid2" style="margin-top:10px;"><button class="btn ghost" onclick="planSheet()">Plan guidé</button><button class="btn ghost" onclick="concertSheet()">Simulation</button></div>
 
     ${recentPieces(4).length?`<h2>Reprendre</h2><div class="chips">${recentPieces(4).map(id=>`<button class="chip" onclick="quickStart('${id}')">${esc(pieceName(id))}</button>`).join('')}</div>`:''}
 
@@ -210,6 +209,20 @@ function renderHome(){
     ${revisionList().length?`<h2>À entretenir</h2><div class="card" style="padding:14px 16px;">
       <p class="muted" style="font-size:13px;margin:0 0 8px;">Maîtrisés, mais pas rejoués depuis un moment :</p>
       ${revisionList().slice(0,3).map(p=>`<div class="between" style="padding:8px 0;"><div style="min-width:0;"><div style="font-weight:600;font-size:14px;">${esc(p.title)}</div><div class="muted" style="font-size:12px;">${esc(p.composer||'')}</div></div><button class="btn ghost sm" onclick="quickStart('${p.id}')">Jouer</button></div>`).join('')}</div>`:''}`;
+}
+function homeAlerts(){
+  const items=[];
+  if(reportReady())items.push({label:'Rapport de la semaine prêt',action:"reportSheet()",cta:'Voir'});
+  if(monthReportReady())items.push({label:'Rapport du mois prêt',action:"monthReportSheet()",cta:'Voir'});
+  if(backupDue())items.push({label:'Pense à sauvegarder tes données',action:"exportJSON()",cta:'Exporter',gold:true});
+  if(goalsUnset())items.push({label:"Objectif hebdo ou mensuel non défini",action:"go('settings')",cta:'Régler'});
+  return items;
+}
+function homeAlertsHtml(){
+  const al=homeAlerts();if(!al.length)return '';
+  return `<div class="card" style="margin-top:14px;padding:2px 14px;">
+    ${al.map((a,i)=>`<div class="between" style="padding:11px 0;${i<al.length-1?'border-bottom:1px solid rgba(255,255,255,.05);':''}cursor:pointer;" onclick="${a.action}"><span style="font-size:13px;">${a.label}</span><span style="color:${a.gold?'var(--gold)':'var(--acc)'};font-size:13px;">${a.cta} ›</span></div>`).join('')}
+  </div>`;
 }
 function cap(s){return s.charAt(0).toUpperCase()+s.slice(1);}
 function flameSvg(sz){sz=sz||24;return '<svg viewBox="0 0 24 24" width="'+sz+'" height="'+sz+'" fill="currentColor" style="display:block;"><path d="M12 2s5 4 5 9a5 5 0 0 1-10 0c0-2 1-3 1-3s0 2 1.5 2S12 9 12 7s0-3 0-5Z"/></svg>';}
@@ -232,8 +245,9 @@ function saveGoal(){S.settings.dailyGoal=parseInt(document.getElementById('gv').
 let timer=null,tickInt=null,_mode='chrono',_min=25,_piece=null,_interval=false;
 function toggleInterval(el){_interval=!_interval;el.classList.toggle('on');}
 function activePieces(){return S.pieces.filter(p=>!p.isEnsemble&&(p.status==='active'||p.status==='mastered'));}
-function pieceChips(sel,fn){
-  return activePieces().map(p=>`<button class="chip ${p.id===sel?'on':''}" onclick="${fn}('${p.id}',this)">${esc(p.title)}</button>`).join('')
+function chipLabel(p){return p.parentId?((pieceById(p.parentId)||{}).title?pieceById(p.parentId).title+' — '+p.title:p.title):p.title;}
+function pieceChips(sel,fn,exclude){
+  return activePieces().filter(p=>!exclude||!exclude.has(p.id)).map(p=>`<button class="chip ${p.id===sel?'on':''}" onclick="${fn}('${p.id}',this)">${esc(chipLabel(p))}</button>`).join('')
     +`<button class="chip ${sel===IMPROV?'on':''}" onclick="${fn}('${IMPROV}',this)">Improvisation</button>`;
 }
 function recentPieces(n){const seen=new Set(),out=[];
@@ -243,8 +257,9 @@ function recentPieces(n){const seen=new Set(),out=[];
 function pieceLastPlayed(id){let d='';S.sessions.forEach(s=>{if(s.date>d&&s.blocks.some(b=>b.piece===id))d=s.date;});return d;}
 function sessPreview(s){if(s.entries&&s.entries.length){const e=s.entries.find(x=>x.worked||x.next);return e?(e.worked||e.next):'';}return s.worked||'';}
 function filterStartPieces(q){q=(q||'').toLowerCase();const box=document.getElementById('sc');if(!box)return;
-  const list=activePieces().filter(p=>!q||p.title.toLowerCase().includes(q)||(p.composer||'').toLowerCase().includes(q));
-  box.innerHTML=list.map(p=>`<button class="chip ${p.id===_piece?'on':''}" onclick="pickPiece('${p.id}',this)">${esc(p.title)}</button>`).join('')
+  let list=activePieces().filter(p=>!q||p.title.toLowerCase().includes(q)||(p.composer||'').toLowerCase().includes(q));
+  if(!q){const rec=new Set(recentPieces(4));list=list.filter(p=>!rec.has(p.id));}
+  box.innerHTML=list.map(p=>`<button class="chip ${p.id===_piece?'on':''}" onclick="pickPiece('${p.id}',this)">${esc(chipLabel(p))}</button>`).join('')
     +`<button class="chip ${_piece===IMPROV?'on':''}" onclick="pickPiece('${IMPROV}',this)">Improvisation</button>`;}
 function quickStart(id){_mode='chrono';_min=25;_piece=id;_interval=false;beginSession();}
 function todoLines(list){return list.map(p=>`<div style="display:flex;gap:9px;margin-bottom:10px;"><span style="color:var(--acc);font-size:16px;line-height:1.4;">♫</span><div style="min-width:0;"><div style="font-weight:600;font-size:14px;">${esc(p.title)}</div><div class="muted" style="font-size:13px;line-height:1.4;">${esc(p.todo)}</div></div></div>`).join('');}
@@ -254,14 +269,14 @@ function startSheet(){
   openSheet(`<h3>Nouvelle séance</h3>
     <div class="field"><label>Mode</label>
       <div class="seg" id="ms"><button class="on" onclick="pickMode('chrono',this)">Chrono ↑</button><button onclick="pickMode('minuteur',this)">Minuteur ↓</button></div></div>
-    <div class="field"><div class="between"><span>Practice en intervalles (25/5)</span><div class="toggle" id="iv-tog" onclick="toggleInterval(this)"></div></div>
+    <div class="field"><div class="between"><span>Pratique fractionnée (25/5)</span><div class="toggle" id="iv-tog" onclick="toggleInterval(this)"></div></div>
       <p class="muted" style="font-size:12px;margin-top:6px;">Blocs de 25 min entrecoupés de pauses « repose tes mains ».</p></div>
     <div class="field" id="mf" style="display:none;"><label>Durée visée</label>
       <div class="stepper" style="margin:4px 0;"><button onclick="mStep(-5)">–</button><div class="v" id="mv">25 min</div><button onclick="mStep(5)">+</button></div></div>
     <div class="field"><label>Premier morceau</label>
-      ${recentPieces(4).length?`<div class="muted" style="font-size:12px;margin-bottom:6px;">Récents</div><div class="chips" id="sc-rec" style="margin-bottom:10px;">${recentPieces(4).map(id=>`<button class="chip" onclick="pickPiece('${id}',this)">${esc(pieceName(id))}</button>`).join('')}</div>`:''}
+      ${recentPieces(4).length?`<div class="muted" style="font-size:12px;margin-bottom:6px;">Récents</div><div class="chips" id="sc-rec" style="margin-bottom:10px;">${recentPieces(4).map(id=>`<button class="chip" onclick="pickPiece('${id}',this)">${esc(chipLabel(pieceById(id)))}</button>`).join('')}</div>`:''}
       <input id="sc-q" placeholder="Rechercher dans ton répertoire…" oninput="filterStartPieces(this.value)" autocomplete="off" style="margin-bottom:10px;">
-      <div class="chips" id="sc">${pieceChips(null,'pickPiece')}</div>
+      <div class="chips" id="sc">${pieceChips(null,'pickPiece',new Set(recentPieces(4)))}</div>
       <div id="sc-hint"></div>
       ${activePieces().length?'':'<p class="muted" style="font-size:13px;margin-top:8px;">Ajoute des morceaux au répertoire, ou joue en improvisation.</p>'}</div>
     <button class="btn primary" onclick="beginSession()">Commencer</button>
@@ -311,7 +326,7 @@ function renderSession(){
       <button id="ss-pause" onclick="togglePause()" style="width:76px;height:76px;border-radius:50%;background:var(--acc);color:#191A1B;font-size:28px;">❚❚</button>
       <button onclick="stopSession()" style="width:76px;height:76px;border-radius:50%;border:1px solid var(--border);font-size:24px;">■</button>
     </div>
-    <p class="muted" style="text-align:center;font-size:13px;margin-top:18px;">En pause, tu peux changer de morceau pour la reprise.</p>
+    <p class="muted" id="ss-pausehint" style="text-align:center;font-size:13px;margin-top:18px;display:none;">En pause, tu peux changer de morceau pour la reprise.</p>
     <h2>Répartition de la séance</h2>
     <div id="ss-blocks"></div>`;
   paintSession();
@@ -331,6 +346,7 @@ function paintSession(){
   if(timer.plan&&md)md.textContent='Plan guidé';
   const iv=timer.interval;if(iv&&iv.phase==='break'){if(t)t.textContent=big(Math.max(0,iv.brk-iv.phaseSec));if(md)md.textContent='Pause · repose tes mains 🖐';}
   const pb=document.getElementById('ss-pause');if(pb){pb.textContent=timer.running?'❚❚':'▶';}
+  const ph=document.getElementById('ss-pausehint');if(ph)ph.style.display=timer.running?'none':'block';
   const agg={};timer.blocks.forEach(b=>agg[b.piece]=(agg[b.piece]||0)+b.sec);
   const el=document.getElementById('ss-blocks');
   if(el)el.innerHTML=Object.keys(agg).map(id=>`<div class="item"><div class="title" style="${id===IMPROV?'font-style:italic;color:var(--tc);':''}">${esc(pieceName(id))}</div><div class="r num">${big(agg[id])}</div></div>`).join('')||'<p class="empty">—</p>';
@@ -368,9 +384,17 @@ function carnetSheet(total){
       </div>`;}).join('')}
     <div class="field"><label>Ressenti global</label><div class="dyn" id="c-f">${FEEL_ORDER.map(f=>`<button data-f="${f}" onclick="pickFeel('${f}',this)">${f}</button>`).join('')}</div>
       <div class="muted" id="c-fl" style="font-size:13px;margin-top:7px;text-align:center;">—</div></div>
+    <div class="field" style="margin-top:4px;">
+      <button type="button" class="btn ghost sm" id="c-mood-btn" style="width:100%;" onclick="toggleMoodEnergy()">Humeur &amp; énergie (facultatif) ⌄</button>
+      <div id="c-mood-body" style="display:none;margin-top:12px;">
+        ${dynScale('Humeur',(S.journal[dkey()]||{}).mood,'mood')}${dynScale('Énergie',(S.journal[dkey()]||{}).energy,'energy')}
+      </div>
+    </div>
     <button class="btn primary" onclick="commitSession(${total})">Enregistrer la séance</button>`);
   _feel='';
 }
+function toggleMoodEnergy(){const b=document.getElementById('c-mood-body'),btn=document.getElementById('c-mood-btn');if(!b)return;
+  const open=b.style.display!=='none';b.style.display=open?'none':'block';if(btn)btn.textContent=open?'Humeur & énergie (facultatif) ⌄':'Humeur & énergie (facultatif) ⌃';}
 function copyTodoToWorked(i){const cn=document.getElementById('cn-'+i),cw=document.getElementById('cw-'+i);if(!cn||!cw)return;cw.value=cw.value?cw.value+'\n'+cn.value:cn.value;}
 function pickMastery(i,val,el){_mastery[i]=val;const seg=document.getElementById('cm-'+i);if(seg)seg.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b===el));}
 let _feel='',_carnetPieces=[],_mastery={};
@@ -424,71 +448,33 @@ function deleteSession(id){if(!confirm('Supprimer cette séance ?'))return;S.ses
 /* ==========================================================================
    CARNET
    ========================================================================== */
-let carnetTab='seances';
 function renderCarnet(){
   document.getElementById('s-carnet').innerHTML=`
     <h1>Carnet</h1><p class="eyebrow">Mon journal de travail.</p>
-    <div class="seg" style="margin:16px 0;">
-      <button class="${carnetTab==='seances'?'on':''}" onclick="setCarnet('seances')">Séances</button>
-      <button class="${carnetTab==='pieces'?'on':''}" onclick="setCarnet('pieces')">Pièces</button>
-      <button class="${carnetTab==='journal'?'on':''}" onclick="setCarnet('journal')">Journal</button>
-    </div>
     <div id="carnet-body"></div>`;
   renderCarnetBody();
 }
-function setCarnet(t){carnetTab=t;renderCarnet();}
 function renderCarnetBody(){
   const el=document.getElementById('carnet-body');
   if(!el)return;
-  if(carnetTab==='seances'){
-    const list=[...S.sessions].reverse();
-    el.innerHTML=`<button class="btn ghost sm" style="width:100%;margin-bottom:14px;" onclick="aposterioriSheet()">+ Ajouter une séance oubliée</button>`+
-      (list.length?list.slice(0,60).map(s=>{
-        const names=[...new Set(s.blocks.map(b=>pieceName(b.piece)))].join(' · ');
-        return `<div class="item" onclick='aposterioriSheet(${JSON.stringify(s).replace(/'/g,"&#39;")})'>
-          <div style="min-width:0;"><div class="title">${esc(names)}</div>
-          <div class="meta">${frShort(s.date)} · ${dur(sessionSeconds(s))}${s.feeling?' · '+s.feeling:''}${sessPreview(s)?' · '+esc(sessPreview(s).slice(0,32)):''}</div></div>
-          <div class="r muted">›</div></div>`;
-      }).join(''):'<div class="empty">Aucune séance.<br>Lance-toi, ou ajoute une séance oubliée.</div>');
-  }
-  else if(carnetTab==='pieces'){
-    const all=S.pieces.filter(p=>!p.isEnsemble);
-    if(!all.length){el.innerHTML='<div class="empty">Ajoute des morceaux au répertoire pour tenir leur fil de progression.</div>';return;}
-    if(!_carnetPiece||!pieceById(_carnetPiece))_carnetPiece=all.slice().sort(pieceSort)[0].id;
-    el.innerHTML=`
-      <div class="field"><input id="pq" placeholder="Filtrer : compositeur, titre…" value="${esc(_pieceQ||'')}" oninput="filterPieces(this.value)" autocomplete="off"></div>
-      <div id="plist" style="max-height:210px;overflow:auto;margin-bottom:14px;"></div>
-      <div id="pdetail"></div>`;
-    renderPieceList();renderPieceDetail();
-  }
-  else{
-    const k=dkey(),j=S.journal[k]||{mood:'',energy:''};
-    el.innerHTML=`<div class="card"><div class="between" style="margin-bottom:14px;"><span style="font-weight:600;">Aujourd'hui</span><span class="muted" style="font-size:13px;">${cap(frDate(new Date()))}</span></div>
-      ${dynScale('Humeur',j.mood,'mood')}${dynScale('Énergie',j.energy,'energy')}</div>
-      <h2>À apprendre</h2>
-      <button class="btn ghost sm" style="width:100%;margin-bottom:12px;" onclick="wishSheet()">+ Ajouter un morceau à apprendre</button>
-      ${(()=>{const wl=S.pieces.filter(p=>p.status==='wishlist');return wl.length?wl.map(w=>`<div class="item" onclick="pieceDetail('${w.id}')"><div style="min-width:0;"><div class="title">${esc(w.title)}</div><div class="meta">${esc(w.composer||'')}</div></div><div class="r"><button class="btn primary sm" onclick="event.stopPropagation();startLearning('${w.id}')">Commencer</button></div></div>`).join(''):'<div class="empty">Rien pour l\'instant.</div>';})()}`;
-  }
-}
-let _carnetPiece=null,_pieceQ='';
-function pieceSort(a,b){return (a.composer||'~').localeCompare(b.composer||'~')||a.title.localeCompare(b.title);}
-function filterPieces(q){_pieceQ=q;renderPieceList();}
-function renderPieceList(){
-  const box=document.getElementById('plist');if(!box)return;const q=(_pieceQ||'').toLowerCase();
-  const list=S.pieces.filter(p=>!p.isEnsemble).filter(p=>!q||(p.composer||'').toLowerCase().includes(q)||p.title.toLowerCase().includes(q)).sort(pieceSort);
-  box.innerHTML=list.slice(0,50).map(x=>`<div class="item" style="padding:11px 14px;margin-bottom:8px;${x.id===_carnetPiece?'box-shadow:inset 0 0 0 1px var(--acc);':''}" onclick="selectPiece('${x.id}')"><div style="min-width:0;"><div class="title" style="font-size:14px;">${esc(x.composer||'—')} — ${esc(x.title)}</div>${x.diff?`<div class="meta">Henle ${x.diff}</div>`:''}</div></div>`).join('')||'<div class="empty">Aucun morceau ne correspond.</div>';
-}
-function selectPiece(id){_carnetPiece=id;renderPieceList();renderPieceDetail();}
-function renderPieceDetail(){
-  const box=document.getElementById('pdetail');if(!box)return;const p=pieceById(_carnetPiece);if(!p){box.innerHTML='';return;}
-  box.innerHTML=`<div class="between" style="margin:4px 0 12px;"><span style="font-weight:600;">${esc(p.composer||'')} — ${esc(p.title)}</span><div class="row" style="gap:8px;"><button class="btn ghost sm" onclick="pieceDetail('${p.id}')">Fiche</button><button class="btn primary sm" onclick="noteSheet('${p.id}')">+ Note</button></div></div>
-    ${(p.notes&&p.notes.length)?'<div class="tl">'+[...p.notes].reverse().map(n=>`<div class="n"><div class="between"><span class="muted" style="font-size:12px;">${frShort(n.date)}</span>${n.section?`<span class="tag" style="padding:3px 9px;">${esc(n.section)}</span>`:''}</div><div style="margin-top:5px;line-height:1.5;color:var(--tc);">${esc(n.text)}</div></div>`).join('')+'</div>':'<div class="empty">Aucune note pour cette pièce.</div>'}`;
+  const list=[...S.sessions].reverse();
+  el.innerHTML=`<button class="btn ghost sm" style="width:100%;margin:16px 0 14px;" onclick="aposterioriSheet()">+ Ajouter une séance oubliée</button>`+
+    (list.length?list.slice(0,60).map(s=>{
+      const names=[...new Set(s.blocks.map(b=>pieceName(b.piece)))].join(' · ');
+      return `<div class="item" onclick='aposterioriSheet(${JSON.stringify(s).replace(/'/g,"&#39;")})'>
+        <div style="min-width:0;"><div class="title">${esc(names)}</div>
+        <div class="meta">${frShort(s.date)} · ${dur(sessionSeconds(s))}${s.feeling?' · '+esc(feelLabel(s.feeling)):''}${sessPreview(s)?' · '+esc(sessPreview(s).slice(0,32)):''}</div></div>
+        <div class="r muted">›</div></div>`;
+    }).join(''):'<div class="empty">Aucune séance.<br>Lance-toi, ou ajoute une séance oubliée.</div>');
 }
 function dynScale(label,val,field){const idx=FEEL_ORDER.indexOf(val);
-  return `<div style="margin-bottom:12px;"><div class="sub" style="margin-bottom:6px;"><span>${label}</span><span>${val||'—'}</span></div>
+  return `<div style="margin-bottom:12px;"><div class="sub" style="margin-bottom:6px;"><span>${label}</span><span>${val?esc(feelLabel(val)):'—'}</span></div>
     <div class="dyn">${FEEL_ORDER.map((f,i)=>`<button class="${val&&i<=idx?'on':''}" onclick="setJournal('${field}','${f}')">${f}</button>`).join('')}</div></div>`;
 }
-function setJournal(field,v){const k=dkey();S.journal[k]=S.journal[k]||{mood:'',energy:''};S.journal[k][field]=v;save();renderCarnetBody();}
+function setJournal(field,v){const k=dkey();S.journal[k]=S.journal[k]||{mood:'',energy:''};S.journal[k][field]=v;save();
+  const mb=document.getElementById('c-mood-body');
+  if(mb){const j=S.journal[k];mb.innerHTML=dynScale('Humeur',j.mood,'mood')+dynScale('Énergie',j.energy,'energy');}
+  else renderCarnetBody();}
 function noteSheet(pid){openSheet(`<h3>Nouvelle note</h3>
   <div class="field"><label>Mesures / section (optionnel)</label><input id="n-s" placeholder="mes. 12–20, lecture, par cœur…"></div>
   <div class="field"><label>Note</label><textarea id="n-t" placeholder="Le legato tient mieux, main droite plus fluide…"></textarea></div>
@@ -524,15 +510,17 @@ function renderRep(){
     <div class="field" style="margin-top:16px;position:relative;">
       <input id="rep-q" placeholder="Rechercher un compositeur ou une œuvre…" oninput="repSearch(this.value)" autocomplete="off">
       <div id="rep-sug"></div></div>
-    <div style="text-align:center;margin:-2px 0 12px;"><button id="sync-btn" class="btn ghost sm" onclick="syncOpus(true)">↻ Enrichir la base (Open Opus)</button>
-      <div class="muted" style="font-size:11px;margin-top:6px;">${Object.values(S.opusCache||{}).reduce((a,x)=>a+x.length,0)?Object.values(S.opusCache).reduce((a,x)=>a+x.length,0)+' œuvres en base':'connecte-toi une fois pour tout charger'}</div></div>
-    <div class="seg" style="margin:6px 0 12px;">
-      <button class="${repFilter==='wishlist'?'on':''}" onclick="setRep('wishlist')" style="font-size:12px;">À apprendre</button>
+    <div class="row" style="gap:10px;margin:-2px 0 12px;align-items:center;justify-content:center;">
+      <button id="sync-btn" class="btn ghost sm" style="flex:0 0 auto;" onclick="syncOpus(true)">↻ Enrichir la base</button>
+      <span class="muted" style="font-size:11px;">${Object.values(S.opusCache||{}).reduce((a,x)=>a+x.length,0)?Object.values(S.opusCache).reduce((a,x)=>a+x.length,0)+' œuvres':'hors-ligne'}</span>
+    </div>
+    <div class="seg" style="margin:6px 0 10px;">
+      <button class="${repFilter==='wishlist'?'on':''}" onclick="setRep('wishlist')" style="font-size:12px;">Apprendre</button>
       <button class="${repFilter==='active'?'on':''}" onclick="setRep('active')" style="font-size:12px;">En cours</button>
       <button class="${repFilter==='mastered'?'on':''}" onclick="setRep('mastered')" style="font-size:12px;">Maîtrisés</button>
       <button class="${repFilter==='archived'?'on':''}" onclick="setRep('archived')" style="font-size:12px;">Archivés</button>
     </div>
-    <div class="row" style="gap:8px;margin-bottom:14px;">
+    <div class="row" style="gap:8px;margin-bottom:12px;">
       <button class="btn ghost sm" style="flex:1;" onclick="repSortSheet()">Trier : ${SORT_LABELS[repSort]}</button>
       <button class="btn ghost sm" style="flex:1;${activeFilterCount()?'color:var(--acc);border-color:var(--acc);':''}" onclick="repFilterSheet()">Filtres${activeFilterCount()?' · '+activeFilterCount():''}</button>
     </div>
@@ -584,7 +572,8 @@ function renderRepList(){
   } else {
     html+=items.map(p=>repRow(p,false)).join('');
   }
-  el.innerHTML=html||'<div class="empty">Aucun morceau ne correspond.<br>Ajuste les filtres, ou ajoute une œuvre.</div>';
+  const addWishBtn=repFilter==='wishlist'?'<button class="btn ghost sm" style="width:100%;margin-bottom:12px;" onclick="wishSheet()">+ Ajouter un morceau à apprendre</button>':'';
+  el.innerHTML=addWishBtn+(html||'<div class="empty">Aucun morceau ne correspond.<br>'+(repFilter==='wishlist'?'Rien pour l\'instant.':'Ajuste les filtres, ou ajoute une œuvre.')+'</div>');
 }
 function toggleGrp(k){k=decodeURIComponent(k);_grpOpen[k]=_grpOpen[k]===false?true:false;renderRepList();}
 function repSortSheet(){
@@ -818,23 +807,25 @@ function renderVoyageBody(){
   if(voyageTab==='jardin'){renderJardin(el);return;}
   if(voyageTab==='cartes'){renderCartes(el);return;}
   const hours=totalSeconds()/3600, cur=currentStone(), next=nextStone();
+  const hoursDisp=hours<10?hours.toFixed(1):Math.round(hours);
   const prevH=cur?cur.h:0, span=next?(next.h-prevH):1, prog=next?Math.min(1,(hours-prevH)/span):1;
   el.innerHTML=`
     <div class="card hi" style="box-shadow:inset 0 0 0 1px rgba(228,197,138,.25);">
       <div class="between"><div class="row" style="gap:12px;">${noteIcon(cur?cur.c:'#888',32,cur?rankGlyph(cur):'♪')}
         <div><div class="muted" style="font-size:12px;">Rang actuel</div><div class="serif" style="font-size:22px;color:var(--gold);">${cur?cur.n:'En route'}</div></div></div>
-        <div style="text-align:right;"><div class="num" style="font-size:34px;font-weight:600;">${hours<10?hours.toFixed(1):Math.round(hours)}</div><div class="muted" style="font-size:12px;">heures jouées</div></div></div>
-      ${next?`<div class="sub" style="margin:16px 0 6px;"><span>Prochain · ${next.n}</span><span>${Math.round(hours)} / ${next.h} h</span></div>
+        <div style="text-align:right;"><div class="num" style="font-size:34px;font-weight:600;">${hoursDisp}</div><div class="muted" style="font-size:12px;">heures jouées</div></div></div>
+      ${next?`<div class="sub" style="margin:16px 0 6px;"><span>Prochain · ${next.n}</span><span>${hoursDisp} / ${next.h} h</span></div>
       <div class="bar"><i style="width:${Math.round(prog*100)}%;background:linear-gradient(90deg,var(--acc),var(--gold));"></i></div>
       <div class="muted" style="font-size:12px;margin-top:8px;">Encore ${Math.max(0,Math.round(next.h-hours))} h avant ${next.n}</div>`:'<div class="muted" style="margin-top:14px;">Voyage accompli — Maestro Assoluto atteint. ♫</div>'}
     </div>
     <div class="muted" style="font-size:12px;margin:20px 0 10px;">18 rangs · d'Apprenti à Maestro Assoluto</div>
     <div class="path">${[...STONES].reverse().map((s,ri)=>{
       const idx=STONES.length-1-ri;const reached=hours>=s.h,isNext=next&&s.n===next.n;
-      return `<div class="rank" style="${reached?'':'opacity:.42;'}">
+      return `<div class="rank" id="${isNext?'voyage-current':(!next&&cur&&s.n===cur.n?'voyage-current':'')}" style="${reached?'':'opacity:.42;'}">
         <div class="dot">${noteIcon(reached?s.c:'#6A6A78',reached?24:19,glyphFor(idx))}</div>
         <div class="between" style="flex:1;min-width:0;"><span style="font-weight:600;color:${reached?'var(--gold)':'var(--tc)'};">${s.n}${isNext?' <span class="tag acc" style="padding:2px 8px;">en cours</span>':''}</span>
         <span class="num muted">${s.h.toLocaleString('fr-FR')} h</span></div></div>`;}).join('')}</div>`;
+  try{(window.requestAnimationFrame||window.setTimeout)(()=>{try{const c=document.getElementById('voyage-current');if(c)c.scrollIntoView({block:'center'});}catch(e){}},0);}catch(e){}
 }
 
 /* ==========================================================================
@@ -909,7 +900,7 @@ function splitView(){
 }
 function history(){const h=[...S.sessions].reverse().slice(0,30);if(!h.length)return '<div class="empty">Aucune séance.</div>';
   return h.map(s=>{const names=[...new Set(s.blocks.map(b=>pieceName(b.piece)))].join(', ');
-    return `<div class="item"><div style="min-width:0;"><div class="title">${esc(names)}</div><div class="meta">${frShort(s.date)} · ${dur(sessionSeconds(s))}${s.feeling?' · '+s.feeling:''}</div></div></div>`;}).join('');}
+    return `<div class="item"><div style="min-width:0;"><div class="title">${esc(names)}</div><div class="meta">${frShort(s.date)} · ${dur(sessionSeconds(s))}${s.feeling?' · '+esc(feelLabel(s.feeling)):''}</div></div></div>`;}).join('');}
 
 /* ==========================================================================
    RÉGLAGES
