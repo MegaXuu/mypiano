@@ -28,13 +28,13 @@ let S = load();
 function load(){
   try{const r=JSON.parse(localStorage.getItem(KEY));if(r)return migrate(r);}catch(e){}
   return {pieces:[],sessions:[],wishlist:[],journal:{},opusCache:{},challenges:{week:null,month:null,log:[]},
-    settings:{tolerance:1,dailyGoal:30,weeklyTime:210,weeklyDays:5,monthly:900,
-      notif:{daily:true,dailyTime:'17:00',streak:true,weekly:true,palier:true},theme:'dark',nas:{enabled:false,ip:'',last:''}}};
+    settings:{tolerance:1,dailyGoal:30,weeklyTime:null,weeklyDays:5,monthly:null,
+      notif:{daily:true,dailyTime:'17:00',streak:true,weekly:true,palier:true,monthly:true},theme:'dark',nas:{enabled:false,ip:'',last:''}}};
 }
 function migrate(r){r.pieces=r.pieces||[];r.sessions=r.sessions||[];r.wishlist=r.wishlist||[];r.journal=r.journal||{};
   r.opusCache=r.opusCache||{};r.challenges=r.challenges||{week:null,month:null,log:[]};r.challenges.log=r.challenges.log||[];
-  r.settings=Object.assign({tolerance:1,dailyGoal:30,weeklyTime:210,weeklyDays:5,monthly:900,
-    notif:{daily:true,dailyTime:'17:00',streak:true,weekly:true,palier:true},theme:'dark',nas:{enabled:false,ip:'',last:''}},r.settings||{});return r;}
+  r.settings=Object.assign({tolerance:1,dailyGoal:30,weeklyTime:null,weeklyDays:5,monthly:null,
+    notif:{daily:true,dailyTime:'17:00',streak:true,weekly:true,palier:true,monthly:true},theme:'dark',nas:{enabled:false,ip:'',last:''}},r.settings||{});return r;}
 function save(){localStorage.setItem(KEY,JSON.stringify(S));}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
@@ -73,6 +73,7 @@ function bestStreak(){const set=practiceDays();const arr=[...set].sort();if(!arr
 function weekSeconds(){let t=0;for(let i=0;i<7;i++)t+=secondsOnDay(dkey(addDays(new Date(),-i)));return t;}
 function weekDays(){let n=0;for(let i=0;i<7;i++)if(secondsOnDay(dkey(addDays(new Date(),-i)))>0)n++;return n;}
 function todayGoal(){return S.settings.dailyGoal||30;}
+function goalsUnset(){return S.settings.weeklyTime==null||S.settings.monthly==null;}
 function ensembleCompleted(e){const subs=S.pieces.filter(p=>p.parentId===e.id);return subs.length&&subs.every(s=>s.status==='mastered');}
 function baseNotes(){let n=Math.round(totalSeconds()/60)+200*masteredCount();
   S.pieces.filter(p=>p.isEnsemble).forEach(e=>{if(ensembleCompleted(e))n+=500;});
@@ -146,7 +147,9 @@ function renderHome(){
     </div>
     ${st?`<div class="tag" style="margin-top:6px;background:var(--surface);">${noteIcon(st.c,17,rankGlyph(st))}<span style="color:var(--gold);">${st.n}</span><span class="muted">· ${Math.floor(totalSeconds()/3600)} h</span></div>`:`<div class="tag" style="margin-top:6px;">Début du voyage</div>`}
     ${reportReady()?`<div class="card" style="margin-top:10px;padding:12px 14px;cursor:pointer;" onclick="reportSheet()"><div class="between"><span style="font-weight:600;font-size:14px;">Ton rapport de la semaine est prêt</span><span style="color:var(--acc);">Voir ›</span></div></div>`:''}
+    ${monthReportReady()?`<div class="card" style="margin-top:10px;padding:12px 14px;cursor:pointer;" onclick="monthReportSheet()"><div class="between"><span style="font-weight:600;font-size:14px;">Ton rapport du mois est prêt</span><span style="color:var(--acc);">Voir ›</span></div></div>`:''}
     ${backupDue()?`<div class="card" style="margin-top:10px;padding:12px 14px;cursor:pointer;box-shadow:inset 0 0 0 1px rgba(228,197,138,.35);" onclick="exportJSON()"><div class="between"><span style="font-weight:600;font-size:14px;">Pense à sauvegarder tes données</span><span style="color:var(--gold);">Exporter ›</span></div></div>`:''}
+    ${goalsUnset()?`<div class="card" style="margin-top:10px;padding:12px 14px;cursor:pointer;" onclick="go('settings')"><div class="between"><span style="font-weight:600;font-size:14px;">Tu n'as pas encore choisi d'objectif hebdo ou mensuel</span><span style="color:var(--acc);">Régler ›</span></div></div>`:''}
     <h1 style="margin-top:12px;">Bonjour Florian</h1>
     <p class="serif" style="font-style:italic;color:var(--t2);font-size:16px;margin:6px 0 2px;">« ${q[0]} » — ${q[1]}</p>
 
@@ -249,7 +252,7 @@ function startSheet(){
 function pickMode(m,el){_mode=m;document.querySelectorAll('#ms button').forEach(b=>b.classList.remove('on'));el.classList.add('on');document.getElementById('mf').style.display=m==='minuteur'?'block':'none';}
 function mStep(n){_min=Math.max(5,_min+n);document.getElementById('mv').textContent=fmtMinLong(_min);}
 function pickPiece(id,el){_piece=id;document.querySelectorAll('#sheet .chip').forEach(c=>c.classList.remove('on'));if(el)el.classList.add('on');
-  const hint=document.getElementById('sc-hint');if(hint){const p=id!==IMPROV?pieceById(id):null;hint.innerHTML=p&&p.todo?`<div class="tag acc" style="margin-top:10px;white-space:normal;height:auto;">À faire : ${esc(p.todo)}</div>`:'';}}
+  const hint=document.getElementById('sc-hint');if(hint){const p=id!==IMPROV?pieceById(id):null;hint.innerHTML=p&&p.todo?`<div class="card" style="margin-top:10px;padding:12px 14px;border-left:2px solid var(--acc);border-radius:0 12px 12px 0;"><span class="muted" style="font-size:12px;">À faire</span><div style="font-size:14px;margin-top:3px;">${esc(p.todo)}</div></div>`:'';}}
 function beginSession(){
   if(!_piece){toast('Choisis un morceau');return;}
   timer={mode:_mode,target:_min*60,total:0,running:true,last:Date.now(),blocks:[{piece:_piece,sec:0}],goal:todayGoal(),interval:_interval?{work:1500,brk:300,phase:'work',phaseSec:0}:null};
@@ -283,7 +286,7 @@ function renderSession(){
     </div>
     <div id="ss-todo" style="margin-bottom:14px;"></div>
     <div style="text-align:center;padding:30px 0 10px;">
-      <div class="num" id="ss-time" style="font-size:64px;font-weight:600;letter-spacing:.01em;">00 : 00</div>
+      <div class="num" id="ss-time" style="font-size:64px;font-weight:600;letter-spacing:.01em;">0′ 00″</div>
       <div class="muted" id="ss-mode" style="margin-top:8px;">chrono</div>
     </div>
     <div class="row" style="justify-content:center;gap:16px;margin-top:14px;">
@@ -299,7 +302,7 @@ function paintSession(){
   if(!timer)return;
   const cur=timer.blocks[timer.blocks.length-1].piece;
   const disp=timer.mode==='minuteur'?Math.max(0,timer.target-timer.total):timer.total;
-  const t=document.getElementById('ss-time');if(t)t.textContent=clock(disp);
+  const t=document.getElementById('ss-time');if(t)t.textContent=big(disp);
   const pe=document.getElementById('ss-piece');if(pe)pe.innerHTML=`<span style="width:7px;height:7px;border-radius:50%;background:var(--acc);"></span> ${esc(pieceName(cur))}`;
   const md=document.getElementById('ss-mode');if(md)md.textContent=timer.mode==='minuteur'?('Minuteur · '+Math.round(timer.target/60)+' min'):'Chrono';
   const td=document.getElementById('ss-todo');
@@ -308,11 +311,11 @@ function paintSession(){
     else{const p=cur!==IMPROV?pieceById(cur):null;td.innerHTML=(p&&p.todo)?`<div class="card" style="padding:12px 14px;border-left:2px solid var(--acc);border-radius:0 12px 12px 0;"><span class="muted" style="font-size:12px;">Rappel · à faire</span><div style="font-size:14px;margin-top:3px;">${esc(p.todo)}</div></div>`:'';}
   }
   if(timer.plan&&md)md.textContent='Plan guidé';
-  const iv=timer.interval;if(iv&&iv.phase==='break'){if(t)t.textContent=clock(Math.max(0,iv.brk-iv.phaseSec));if(md)md.textContent='Pause · repose tes mains 🖐';}
+  const iv=timer.interval;if(iv&&iv.phase==='break'){if(t)t.textContent=big(Math.max(0,iv.brk-iv.phaseSec));if(md)md.textContent='Pause · repose tes mains 🖐';}
   const pb=document.getElementById('ss-pause');if(pb){pb.textContent=timer.running?'❚❚':'▶';}
   const agg={};timer.blocks.forEach(b=>agg[b.piece]=(agg[b.piece]||0)+b.sec);
   const el=document.getElementById('ss-blocks');
-  if(el)el.innerHTML=Object.keys(agg).map(id=>`<div class="item"><div class="title" style="${id===IMPROV?'font-style:italic;color:var(--tc);':''}">${esc(pieceName(id))}</div><div class="r num">${clock(agg[id])}</div></div>`).join('')||'<p class="empty">—</p>';
+  if(el)el.innerHTML=Object.keys(agg).map(id=>`<div class="item"><div class="title" style="${id===IMPROV?'font-style:italic;color:var(--tc);':''}">${esc(pieceName(id))}</div><div class="r num">${big(agg[id])}</div></div>`).join('')||'<p class="empty">—</p>';
 }
 function togglePause(){
   if(!timer)return;
@@ -334,20 +337,25 @@ function stopSession(){timer.running=false;clearInterval(tickInt);const total=Ma
 function quickCarnet(){toast('Le carnet se remplit en fin de séance');}
 function carnetSheet(total){
   const seen={},pieces=[];timer.blocks.forEach(b=>{if(!seen[b.piece]){seen[b.piece]=1;pieces.push(b.piece);}});
-  _carnetPieces=pieces;
+  _carnetPieces=pieces;_mastery={};
   openSheet(`<h3>Carnet de pratique</h3><p class="muted" style="font-size:14px;margin-top:-6px;">${dur(total)} de jeu. Note morceau par morceau.</p>
     ${pieces.map((pid,i)=>{const p=pid!==IMPROV?pieceById(pid):null;const todo=p&&p.todo?esc(p.todo):'';
+      if(p&&p.status==='mastered')_mastery[i]='mastered';
       return `<div class="card" style="margin-bottom:12px;padding:15px 16px;">
         <div style="font-weight:600;margin-bottom:12px;${pid===IMPROV?'font-style:italic;color:var(--tc);':''}">${esc(pieceName(pid))}</div>
-        <div class="field" style="margin-bottom:10px;"><label>Ce que j'ai travaillé</label><textarea id="cw-${i}" placeholder="Main gauche mes. 12–20, tempo lent…"></textarea></div>
+        <div class="field" style="margin-bottom:10px;"><div class="between"><label>Ce que j'ai travaillé</label>${todo?`<button type="button" class="btn ghost sm" style="padding:2px 10px;height:auto;" onclick="copyTodoToWorked(${i})">Copier l'à faire</button>`:''}</div><textarea id="cw-${i}" placeholder="Main gauche mes. 12–20, tempo lent…"></textarea></div>
         <div class="field" style="margin-bottom:0;"><label>À faire la prochaine fois</label><textarea id="cn-${i}" placeholder="Accélérer, revoir la pédale…">${todo}</textarea></div>
+        ${p&&p.status==='mastered'?`<div class="field" style="margin-top:10px;margin-bottom:0;"><label>Cette pièce maîtrisée</label>
+          <div class="seg" id="cm-${i}"><button class="on" onclick="pickMastery(${i},'mastered',this)">Toujours maîtrisée</button><button onclick="pickMastery(${i},'active',this)">À retravailler</button></div></div>`:''}
       </div>`;}).join('')}
     <div class="field"><label>Ressenti global</label><div class="dyn" id="c-f">${FEEL_ORDER.map(f=>`<button data-f="${f}" onclick="pickFeel('${f}',this)">${f}</button>`).join('')}</div>
       <div class="muted" id="c-fl" style="font-size:13px;margin-top:7px;text-align:center;">—</div></div>
     <button class="btn primary" onclick="commitSession(${total})">Enregistrer la séance</button>`);
   _feel='';
 }
-let _feel='',_carnetPieces=[];
+function copyTodoToWorked(i){const cn=document.getElementById('cn-'+i),cw=document.getElementById('cw-'+i);if(!cn||!cw)return;cw.value=cw.value?cw.value+'\n'+cn.value:cn.value;}
+function pickMastery(i,val,el){_mastery[i]=val;const seg=document.getElementById('cm-'+i);if(seg)seg.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b===el));}
+let _feel='',_carnetPieces=[],_mastery={};
 function pickFeel(f,el){_feel=f;const idx=FEEL_ORDER.indexOf(f);document.querySelectorAll('#c-f button').forEach((b,i)=>b.classList.toggle('on',i<=idx));document.getElementById('c-fl').textContent=FEEL[f];}
 function commitSession(total){
   const blocks=timer.blocks.filter(b=>b.sec>=1).map(b=>({piece:b.piece,sec:Math.round(b.sec)}));
@@ -355,9 +363,10 @@ function commitSession(total){
   const before=currentStone();
   const val=id=>{const e=document.getElementById(id);return e?e.value.trim():'';};
   const entries=_carnetPieces.map((pid,i)=>({piece:pid,worked:val('cw-'+i),next:val('cn-'+i)}));
-  entries.forEach(e=>{if(e.piece===IMPROV)return;const p=pieceById(e.piece);if(!p)return;
+  entries.forEach((e,i)=>{if(e.piece===IMPROV)return;const p=pieceById(e.piece);if(!p)return;
     if(e.worked||e.next){p.notes=p.notes||[];p.notes.push({id:uid(),date:dkey(),section:'',text:(e.worked||'')+(e.next?((e.worked?' · ':'')+'À faire : '+e.next):'')});}
-    p.todo=e.next||'';});
+    p.todo=e.next||'';
+    if(_mastery[i]==='active'&&p.status==='mastered'){p.status='active';p.masteredAt=null;}});
   S.sessions.push({id:uid(),date:dkey(),mode:timer.mode,goal:timer.goal,feeling:_feel,blocks,entries,ts:Date.now()});
   save();checkChallenges();timer=null;closeSheet();
   const after=currentStone();
@@ -490,7 +499,7 @@ function distinctVals(key){const s=new Set();S.pieces.forEach(p=>{if(!p.isEnsemb
 function distinctTags(){const s=new Set();S.pieces.forEach(p=>(p.tags||[]).forEach(t=>s.add(t)));return [...s].sort((a,b)=>a.localeCompare(b));}
 function renderRep(){
   document.getElementById('s-rep').innerHTML=`
-    <div class="between"><h1>Répertoire</h1><button class="btn primary sm" onclick="addPieceSheet()">+ Ajouter</button></div>
+    <div class="between"><h1>Répertoire</h1><div class="row" style="gap:8px;"><button class="btn ghost sm" onclick="workSheet()">+ Œuvre</button><button class="btn primary sm" onclick="addPieceSheet()">+ Ajouter</button></div></div>
     <div class="field" style="margin-top:16px;position:relative;">
       <input id="rep-q" placeholder="Rechercher un compositeur ou une œuvre…" oninput="repSearch(this.value)" autocomplete="off">
       <div id="rep-sug"></div></div>
@@ -682,6 +691,37 @@ function savePiece(id){const title=document.getElementById('p-t').value.trim();i
   if(newlyMastered)celebrate('Morceau maîtrisé !',title);else toast('Enregistré');}
 function setPieceStatus(id,st){pieceById(id).status=st;save();closeSheet();renderRep();toast(st==='archived'?'Archivé':'Abandonné');}
 
+/* ---------- Œuvre / recueil à plusieurs mouvements ---------- */
+let _workMovs=[];
+function workSheet(){
+  _workMovs=['',''];
+  openSheet(`<h3>Nouvelle œuvre / recueil</h3>
+    <p class="muted" style="font-size:14px;margin-top:-6px;">Un morceau composé de plusieurs mouvements (sonate, recueil…) — chaque mouvement devient une pièce à part entière du répertoire.</p>
+    <div class="field"><label>Titre de l'œuvre</label><input id="w-t" placeholder="Sonate no 14 « Clair de lune »"></div>
+    <div class="field"><label>Compositeur</label><input id="w-c" list="dl-comp-w" placeholder="Beethoven" autocomplete="off"><datalist id="dl-comp-w">${OPUS.ALL.map(c=>`<option value="${c.name}"></option>`).join('')}</datalist></div>
+    <div class="field"><label>Époque</label><input id="w-e" placeholder="Classique"></div>
+    <div class="field"><label>Mouvements</label><div id="w-rows"></div>
+      <button class="btn ghost sm" style="width:100%;margin-top:8px;" onclick="addWorkRow()">+ Ajouter un mouvement</button></div>
+    <button class="btn primary" onclick="saveWork()">Créer</button>`);
+  paintWorkRows();
+}
+function paintWorkRows(){const box=document.getElementById('w-rows');if(!box)return;
+  box.innerHTML=_workMovs.map((v,i)=>`<div class="row" style="gap:8px;margin-bottom:8px;"><input value="${esc(v)}" placeholder="Mouvement ${i+1}" style="flex:1;" oninput="_workMovs[${i}]=this.value">${_workMovs.length>1?`<button class="btn ghost sm" style="width:auto;padding:0 12px;" onclick="removeWorkRow(${i})">✕</button>`:''}</div>`).join('');}
+function addWorkRow(){_workMovs.push('');paintWorkRows();}
+function removeWorkRow(i){_workMovs.splice(i,1);paintWorkRows();}
+function saveWork(){
+  const title=document.getElementById('w-t').value.trim();
+  const composer=document.getElementById('w-c').value.trim();
+  const epoch=document.getElementById('w-e').value.trim();
+  if(!title){toast("Donne un titre à l'œuvre");return;}
+  const movs=_workMovs.map(m=>m.trim()).filter(Boolean);
+  if(!movs.length){toast('Ajoute au moins un mouvement');return;}
+  const parent={id:uid(),title,composer,epoch,opus:'',genre:'',key:'',diff:0,bpm:'',status:'active',progress:0,tags:[],notes:[],todo:'',createdAt:Date.now(),isEnsemble:true};
+  S.pieces.push(parent);
+  movs.forEach(m=>{S.pieces.push({id:uid(),title:m,composer,epoch,opus:'',genre:'',key:'',diff:0,bpm:'',status:'active',progress:0,tags:[],notes:[],todo:'',createdAt:Date.now(),parentId:parent.id});});
+  save();closeSheet();renderRep();toast('Œuvre créée · '+movs.length+' mouvement'+(movs.length>1?'s':''));
+}
+
 /* ==========================================================================
    VOYAGE
    ========================================================================== */
@@ -808,9 +848,9 @@ function renderSettings(){
     <h1>Réglages</h1>
     <h2>Objectifs</h2><div class="card" style="padding:6px 16px;">
       ${setLine('Objectif du jour',S.settings.dailyGoal+' min',"editNum('dailyGoal','Objectif du jour (min)')")}
-      ${setLine('Hebdo · temps',Math.round(S.settings.weeklyTime/60*10)/10+' h',"editNum('weeklyTime','Objectif hebdo (min)')")}
+      ${setLine('Hebdo · temps',S.settings.weeklyTime==null?'Non défini':Math.round(S.settings.weeklyTime/60*10)/10+' h',"editNum('weeklyTime','Objectif hebdo (min)',true)")}
       ${setLine('Hebdo · jours',S.settings.weeklyDays+' jours',"editNum('weeklyDays','Jours par semaine')")}
-      ${setLine('Mensuel · temps',Math.round(S.settings.monthly/60)+' h',"editNum('monthly','Objectif mensuel (min)')",true)}
+      ${setLine('Mensuel · temps',S.settings.monthly==null?'Non défini':Math.round(S.settings.monthly/60)+' h',"editNum('monthly','Objectif mensuel (min)',true)",true)}
     </div>
     <h2>Série</h2><div class="card">
       <div class="seg"><button class="${S.settings.tolerance===0?'on':''}" onclick="setTol(0)">Aucun</button><button class="${S.settings.tolerance===1?'on':''}" onclick="setTol(1)">1 jour</button><button class="${S.settings.tolerance===2?'on':''}" onclick="setTol(2)">2 jours</button></div>
@@ -823,6 +863,7 @@ function renderSettings(){
       ${togLine('Rappel quotidien',n.daily,'daily')}
       ${togLine('Alerte série',n.streak,'streak')}
       ${togLine('Rappel objectif hebdo',n.weekly,'weekly')}
+      ${togLine('Rapport du mois',n.monthly,'monthly')}
       ${togLine('Félicitations de palier',n.palier,'palier')}
       ${setLine('Activer les notifications','','enableNotifs()',true)}
     </div>
@@ -842,8 +883,9 @@ function setLine(l,v,fn,last){return `<div class="between" style="padding:13px 0
 function togLine(l,on,key,last){return `<div class="between" style="padding:12px 0;${last?'':'border-bottom:1px solid rgba(255,255,255,.05);'}"><span>${l}</span><div class="toggle ${key==='palier'?'gold ':''}${on?'on':''}" onclick="togNotif('${key}',this)"></div></div>`;}
 function togNotif(k,el){S.settings.notif[k]=!S.settings.notif[k];el.classList.toggle('on');save();}
 function setTol(t){S.settings.tolerance=t;save();renderSettings();toast('Tolérance : '+t+' jour(s)');}
-function editNum(field,label){openSheet(`<h3>${label}</h3><div class="field"><input id="en" type="number" inputmode="numeric" value="${S.settings[field]}"></div><button class="btn primary" onclick="saveNum('${field}')">Valider</button>`);}
+function editNum(field,label,clearable){openSheet(`<h3>${label}</h3><div class="field"><input id="en" type="number" inputmode="numeric" value="${S.settings[field]==null?'':S.settings[field]}"></div><button class="btn primary" onclick="saveNum('${field}')">Valider</button>${clearable?`<button class="btn ghost sm" style="width:100%;margin-top:10px;" onclick="clearNum('${field}')">Non défini</button>`:''}`);}
 function saveNum(field){const v=parseInt(document.getElementById('en').value);if(v>0){S.settings[field]=v;save();}closeSheet();renderSettings();}
+function clearNum(field){S.settings[field]=null;save();closeSheet();renderSettings();}
 function toggleNas(){S.settings.nas.enabled=!S.settings.nas.enabled;save();renderSettings();}
 function togEstimates(el){S.settings.estimates=S.settings.estimates===false?true:false;el.classList.toggle('on');save();}
 
@@ -1147,8 +1189,29 @@ function maybeNotifyReport(){if(reportReady()&&S.settings.notif.weekly&&typeof N
 function enableNotifs(){if(typeof Notification==='undefined'){toast('Notifications non supportées');return;}
   Notification.requestPermission().then(p=>toast(p==='granted'?'Notifications activées':'Notifications refusées'));}
 
+// Rapport mensuel
+function prevMonthDate(){const d=new Date();d.setDate(1);d.setMonth(d.getMonth()-1);return d;}
+function lastMonthReport(){
+  const md=prevMonthDate(),mk=monthKey(md);
+  const sessions=S.sessions.filter(s=>monthKey(new Date(s.date+'T00:00'))===mk);
+  let sec=0;const days=new Set(),pieceMap={};
+  sessions.forEach(s=>{sec+=sessionSeconds(s);days.add(s.date);s.blocks.forEach(b=>{if(b.piece!==IMPROV)pieceMap[b.piece]=(pieceMap[b.piece]||0)+b.sec;});});
+  return {mk,md,sec,days:days.size,sessions:sessions.length,top:Object.entries(pieceMap).sort((a,b)=>b[1]-a[1]).slice(0,3)};
+}
+function monthReportReady(){return S.sessions.length&&S.lastMonthSeen!==monthKey(prevMonthDate());}
+function monthReportSheet(){const r=lastMonthReport();S.lastMonthSeen=r.mk;save();
+  const topHtml=r.top.length?('<div class="muted" style="font-size:13px;margin:4px 0 8px;">Le plus travaillé</div>'+r.top.map(function(e){return '<div class="between" style="padding:6px 0;"><span>'+esc(pieceName(e[0]))+'</span><span class="muted">'+dur(e[1])+'</span></div>';}).join('')):'<p class="muted" style="font-size:13px;">Mois calme — rien enregistré.</p>';
+  openSheet(`<h3>Rapport du mois</h3><p class="muted" style="font-size:13px;margin-top:-6px;">${cap(r.md.toLocaleDateString('fr-FR',{month:'long',year:'numeric'}))}</p>
+    <div class="grid2" style="margin:12px 0;"><div class="metric"><div class="v">${dur(r.sec)}</div><div class="l">temps joué</div></div><div class="metric"><div class="v">${r.days}</div><div class="l">jours actifs</div></div></div>
+    <div class="metric" style="margin-bottom:12px;"><div class="v">${r.sessions}</div><div class="l">séances</div></div>
+    ${topHtml}
+    <button class="btn primary" style="margin-top:14px;" onclick="closeSheet()">Fermer</button>`);
+}
+function maybeNotifyMonth(){if(monthReportReady()&&S.settings.notif.monthly&&typeof Notification!=='undefined'&&Notification.permission==='granted'){try{new Notification('Piano — rapport du mois',{body:'Ton bilan du mois est prêt.'});}catch(e){}}}
+
 /* ---------- Boot ---------- */
 try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();}catch(e){}
 renderHome();
 try{maybeNotifyReport();}catch(e){}
+try{maybeNotifyMonth();}catch(e){}
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));}
