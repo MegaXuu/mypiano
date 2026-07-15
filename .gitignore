@@ -5,6 +5,9 @@ Thumbs.db
 # Dépendances / outils
 node_modules/
 
+# Réglages Claude Code locaux (machine-spécifiques, non partagés)
+.claude/settings.local.json
+
 # Fichiers temporaires de test / conversion
 *.pdf
 page-*.jpg

@@ -1,0 +1,15 @@
+{
+  "name": "piano-app-v2",
+  "version": "0.0.0",
+  "private": true,
+  "description": "App perso de pratique du piano (PWA hors-ligne, JS pur, sans build).",
+  "type": "module",
+  "scripts": {
+    "check": "node --check app.js && node --check opus.js && node --check sw.js",
+    "test": "node test.mjs",
+    "serve": "python3 -m http.server 8137"
+  },
+  "devDependencies": {
+    "jsdom": "^24.0.0"
+  }
+}
