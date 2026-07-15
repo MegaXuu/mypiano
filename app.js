@@ -5,7 +5,7 @@
 
 const KEY = 'pianoV2';
 const IMPROV = '__improv__';
-const APP_VERSION = 'Bêta 3.5'; // à synchroniser avec CACHE dans sw.js à chaque release
+const APP_VERSION = 'Bêta 3.6'; // à synchroniser avec CACHE dans sw.js à chaque release
 
 const STONES = [
   {n:'Apprenti',h:10,c:'#E0A83B'},{n:'Élève',h:20,c:'#C9CDDA'},{n:'Musicien',h:30,c:'#9BA0AE'},
@@ -263,6 +263,10 @@ function computeStreak(){const days=practiceDays();const tol=S.settings.toleranc
   for(let i=0;i<800;i++){const k=dkey(d);if(days.has(k)){st++;miss=0;}else if(i>0){miss++;if(miss>tol)break;}d=addDays(d,-1);}return st;}
 function bestStreak(){const set=practiceDays();const arr=[...set].sort();if(!arr.length)return 0;const tol=S.settings.tolerance||0;
   let best=0,cur=0,miss=0,d=new Date(arr[0]),end=new Date();
+  while(d<=end){if(set.has(dkey(d))){cur++;miss=0;best=Math.max(best,cur);}else{miss++;if(miss>tol){cur=0;miss=0;}}d=addDays(d,1);}return best;}
+function bestStreakInYear(y){const set=new Set([...practiceDays()].filter(k=>k.slice(0,4)===String(y)));
+  if(!set.size)return 0;const tol=S.settings.tolerance||0;const arr=[...set].sort();
+  let best=0,cur=0,miss=0,d=new Date(arr[0]),end=new Date(y,11,31),today=new Date();if(end>today)end=today;
   while(d<=end){if(set.has(dkey(d))){cur++;miss=0;best=Math.max(best,cur);}else{miss++;if(miss>tol){cur=0;miss=0;}}d=addDays(d,1);}return best;}
 function weekSeconds(){let t=0;for(let i=0;i<7;i++)t+=secondsOnDay(dkey(addDays(new Date(),-i)));return t;}
 function weekDays(){let n=0;for(let i=0;i<7;i++)if(secondsOnDay(dkey(addDays(new Date(),-i)))>0)n++;return n;}
@@ -681,7 +685,7 @@ function commitSession(total){
     if(hasDerivedProgress(p))recordHist(p);
     if(_mastery[i]==='active'&&p.status==='mastered'){p.status='active';p.masteredAt=null;p.revInterval=S.settings.revisionDays||18;}
     else if(_mastery[i]==='mastered'&&p.status==='mastered'){p.revInterval=Math.min(120,Math.round((p.revInterval||S.settings.revisionDays||18)*1.6));}});
-  S.sessions.push({id:uid(),date:dkey(),mode:timer.mode,goal:timer.goal,feeling:_feel,blocks,entries,ts:Date.now()});
+  S.sessions.push({id:uid(),date:dkey(),mode:timer.mode,goal:timer.goal,feeling:_feel,blocks,entries,ts:Date.now(),interval:!!timer.interval});
   save();checkChallenges();timer=null;closeSheet();
   const after=currentStone();
   go('home');
@@ -1395,6 +1399,7 @@ function renderStats(){
       <div class="metric"><div class="v">${durH(totalSeconds())}</div><div class="l">temps total joué</div></div>
       <div class="metric"><div class="v">${S.sessions.length}</div><div class="l">séances au total</div></div>
     </div>
+    <h2>Aperçus</h2>${renderInsights()}
     <div class="card" style="margin-top:14px;">
       <div class="between" style="margin-bottom:6px;"><span style="font-weight:600;">7 derniers jours</span><span class="muted" style="font-size:13px;">${dur(weekSeconds())} cette sem.</span></div>
       <div class="bars">${bars.map((x,i)=>{const h=x.s?Math.max(6,Math.round(x.s/max*100)):2;const lb=x.d.toLocaleDateString('fr-FR',{weekday:'short'}).slice(0,3);
@@ -1414,6 +1419,7 @@ function renderStats(){
       ${rec('Plus longue séance',dur(longest))}${rec('Meilleure journée',dur(bestDay))}
       ${rec('Meilleure semaine',dur(bestWk))}${rec('Meilleure série',bestStreak()+' j')}
     </div>
+    ${retroYears().length?`<h2>Rétrospective</h2><div class="chips">${retroYears().map(y=>`<button class="chip" onclick="yearRetroSheet(${y})">${y}</button>`).join('')}</div>`:''}
     <h2>Historique</h2>${history()}`;
 }
 function setSplit(s){statSplit=s;renderStats();}
@@ -1453,6 +1459,81 @@ function splitView(){
 function history(){const h=[...S.sessions].reverse().slice(0,30);if(!h.length)return '<div class="empty">Aucune séance.</div>';
   return h.map(s=>{const names=[...new Set(s.blocks.map(b=>pieceName(b.piece)))].join(', ');
     return `<div class="item"><div style="min-width:0;"><div class="title">${esc(names)}</div><div class="meta">${frShort(s.date)} · ${dur(sessionSeconds(s))}${s.feeling?' · '+esc(feelLabel(s.feeling)):''}</div></div></div>`;}).join('');}
+
+/* ---------- Aperçus (V3 étape 5) : croisements sobres, pas de sur-analyse ---------- */
+const MOMENTS={matin:'le matin',apresmidi:"l'après-midi",soir:'le soir',nuit:'la nuit'};
+function momentBucket(h){if(h<6)return 'nuit';if(h<12)return 'matin';if(h<18)return 'apresmidi';return 'soir';}
+function feelIdx(f){return FEEL_ORDER.indexOf(f);}
+function momentInsight(){
+  const buckets={};
+  S.sessions.forEach(s=>{if(!s.feeling)return;const idx=feelIdx(s.feeling);if(idx<0)return;
+    const t=s.ts||Date.parse(s.date+'T12:00'),b=momentBucket(new Date(t).getHours());
+    (buckets[b]=buckets[b]||[]).push(idx);});
+  const stats=Object.entries(buckets).filter(([,arr])=>arr.length>=3).map(([k,arr])=>[k,arr.reduce((a,b)=>a+b,0)/arr.length]);
+  if(stats.length<2)return '';
+  stats.sort((a,b)=>b[1]-a[1]);
+  const best=stats[0],worst=stats[stats.length-1];
+  if(best[1]-worst[1]<0.6)return '';
+  return `Ton ressenti est meilleur ${MOMENTS[best[0]]} que ${MOMENTS[worst[0]]}.`;
+}
+function stagnantPieces(){
+  const cutoff=Date.now()-21*86400000;
+  return S.pieces.filter(p=>{
+    if(p.isEnsemble||p.status!=='active'||!hasDerivedProgress(p))return false;
+    const h=p.hist||[];if(h.length<2)return false;
+    let old=null;for(const pt of h){if(new Date(pt.d+'T00:00').getTime()<=cutoff)old=pt;else break;}
+    if(!old)return false;
+    const recent=h[h.length-1],lp=pieceLastPlayed(p.id);
+    const playedSince=lp&&new Date(lp+'T00:00').getTime()>=cutoff;
+    return playedSince&&recent.m<=old.m;
+  });
+}
+function stagnationInsight(){
+  const list=stagnantPieces().slice(0,2);if(!list.length)return '';
+  return list.map(p=>`« ${esc(p.title)} » n'a pas avancé depuis trois semaines malgré tes séances.`).join('<br>');
+}
+function fractionedInsight(){
+  const withF=S.sessions.filter(s=>s.feeling&&(s.mode==='chrono'||s.mode==='minuteur'));
+  const frac=withF.filter(s=>s.interval).map(s=>feelIdx(s.feeling)).filter(i=>i>=0);
+  const cont=withF.filter(s=>!s.interval).map(s=>feelIdx(s.feeling)).filter(i=>i>=0);
+  if(frac.length<3||cont.length<3)return '';
+  const avg=a=>a.reduce((x,y)=>x+y,0)/a.length,af=avg(frac),ac=avg(cont);
+  if(Math.abs(af-ac)<0.5)return '';
+  return af>ac?'Tes séances en pratique fractionnée (25/5) donnent en moyenne un ressenti plus satisfaisant.'
+    :'Tes séances continues donnent en moyenne un ressenti plus satisfaisant que le fractionné.';
+}
+function renderInsights(){
+  const lines=[momentInsight(),stagnationInsight(),fractionedInsight()].filter(Boolean);
+  if(!lines.length)return '<div class="empty">Pas encore assez de données pour un aperçu fiable.</div>';
+  return `<div class="card" style="padding:14px 16px;">${lines.map(l=>`<p style="margin:0 0 10px;line-height:1.55;font-size:14px;">${l}</p>`).join('')}</div>`;
+}
+
+/* ---------- Rétrospective annuelle (V3 étape 5) ---------- */
+function retroYears(){return [...new Set(S.sessions.map(s=>s.date.slice(0,4)))].sort((a,b)=>b-a);}
+function yearRetroSheet(year){
+  const sessions=S.sessions.filter(s=>s.date.slice(0,4)===String(year));
+  if(!sessions.length){toast('Aucune séance en '+year);return;}
+  const totalSec=sessions.reduce((a,s)=>a+sessionSeconds(s),0);
+  const pieceMap={},composerMap={};
+  sessions.forEach(s=>s.blocks.forEach(b=>{
+    if(b.piece===IMPROV)return;
+    pieceMap[b.piece]=(pieceMap[b.piece]||0)+b.sec;
+    const p=pieceById(b.piece);if(p&&p.composer)composerMap[p.composer]=(composerMap[p.composer]||0)+b.sec;
+  }));
+  const topPieceEntry=Object.entries(pieceMap).sort((a,b)=>b[1]-a[1])[0];
+  const topPiece=topPieceEntry?pieceById(topPieceEntry[0]):null;
+  const topComposer=Object.entries(composerMap).sort((a,b)=>b[1]-a[1])[0];
+  openSheet(`<h3>Rétrospective ${year}</h3>
+    <p class="muted" style="font-size:14px;margin-top:-6px;">Une année de piano, en quelques chiffres.</p>
+    <div class="grid2" style="margin:16px 0 10px;">
+      ${rec('Temps joué',durH(totalSec))}${rec('Séances',sessions.length)}
+    </div>
+    <div class="grid2" style="margin-bottom:12px;">
+      ${rec('Plus longue série',bestStreakInYear(year)+' j')}${rec('Compositeur dominant',topComposer?esc(topComposer[0]):'—')}
+    </div>
+    ${topPiece?`<div class="card" style="padding:14px;"><span class="muted" style="font-size:12px;">Pièce de l'année</span><div style="font-weight:600;margin-top:4px;">${esc(topPiece.title)}</div><div class="muted" style="font-size:12px;margin-top:2px;">${dur(topPieceEntry[1])} joués</div></div>`:''}
+    <button class="btn primary" style="width:100%;margin-top:16px;" onclick="closeSheet()">Fermer</button>`);
+}
 
 /* ==========================================================================
    RÉGLAGES
@@ -1808,7 +1889,15 @@ function reportSheet(){const r=lastWeekReport();S.lastReportSeen=weekKey(addDays
     ${topHtml}
     <button class="btn primary" style="margin-top:14px;" onclick="closeSheet()">Fermer</button>`);
 }
-function maybeNotifyReport(){if(reportReady()&&S.settings.notif.weekly&&typeof Notification!=='undefined'&&Notification.permission==='granted'){try{new Notification('Piano — rapport de la semaine',{body:'Ton bilan hebdo est prêt.'});}catch(e){}}}
+// Notifications locales (pas de push serveur — voir CLAUDE.md pour l'option VAPID écartée).
+function localNotify(title,body,tag){
+  if(typeof Notification==='undefined'||Notification.permission!=='granted')return;
+  try{
+    const n=new Notification(title,{body,tag,icon:'icon-192.png',badge:'icon-192.png'});
+    n.onclick=()=>{try{window.focus();}catch(e){}n.close();};
+  }catch(e){}
+}
+function maybeNotifyReport(){if(reportReady()&&S.settings.notif.weekly)localNotify('Piano — rapport de la semaine','Ton bilan hebdo est prêt.','rapport-semaine');}
 function enableNotifs(){if(typeof Notification==='undefined'){toast('Notifications non supportées');return;}
   Notification.requestPermission().then(p=>toast(p==='granted'?'Notifications activées':'Notifications refusées'));}
 
@@ -1830,7 +1919,7 @@ function monthReportSheet(){const r=lastMonthReport();S.lastMonthSeen=r.mk;save(
     ${topHtml}
     <button class="btn primary" style="margin-top:14px;" onclick="closeSheet()">Fermer</button>`);
 }
-function maybeNotifyMonth(){if(monthReportReady()&&S.settings.notif.monthly&&typeof Notification!=='undefined'&&Notification.permission==='granted'){try{new Notification('Piano — rapport du mois',{body:'Ton bilan du mois est prêt.'});}catch(e){}}}
+function maybeNotifyMonth(){if(monthReportReady()&&S.settings.notif.monthly)localNotify('Piano — rapport du mois','Ton bilan du mois est prêt.','rapport-mois');}
 
 /* ---------- Boot ---------- */
 async function boot(){

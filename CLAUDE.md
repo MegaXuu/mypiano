@@ -33,7 +33,7 @@ carnet de travail, et se motiver par la gamification. Cible : iPhone (PWA instal
   `startSheet`/`beginSession`/`commitSession`, `renderRep`, etc.), vérifie la migration
   localStorage → IndexedDB et `aucune erreur runtime`.
 - **À chaque release** : incrémenter `CACHE` dans `sw.js` **et** `APP_VERSION` dans `app.js` (même
-  numéro, ex. `piano-b3-5` / `'Bêta 3.5'`), sinon l'app installée garde l'ancienne version.
+  numéro, ex. `piano-b3-6` / `'Bêta 3.6'`), sinon l'app installée garde l'ancienne version.
 
 ## Architecture (conventions)
 - État global unique `S` (objet) → IndexedDB. `save()` après chaque mutation (signature inchangée,
@@ -82,7 +82,10 @@ carnet de travail, et se motiver par la gamification. Cible : iPhone (PWA instal
     entrelacée des 3 pièces les plus en retard (`startRevision`, réutilise `timer.plan/planIdx`).
   - **Fiche unifiée** `pieceDetail(id)` (feuille) = point d'entrée depuis le répertoire : stats, avancement (dérivé si sections, sinon ±10 manuel), notes, transitions de statut. Formulaire `pieceSheet` allégé (champs primaires + dépliant « Détails »). **Phase** dérivée `piecePhase(p)` (À apprendre / Déchiffrage / Consolidation / Polissage / Maîtrisé / À entretenir…). Anti-doublon `findDuplicate` (normalisé).
   - **Sections & mesures (V3 étape 2)** : `bars` (nb de mesures, facultatif) + `sections[] = {id,name,from,to,todo,status(new|wip|poli|ok),bpm:[{d,v}]}`, **entièrement facultatif** — une pièce sans section se comporte comme avant (avancement manuel ±10). Dès que `bars` et au moins une section existent, `hasDerivedProgress(p)` devient vrai et `pieceProgress(p)` **remplace** `p.progress` partout (phase, estimation, tri du plan guidé) : seules les mesures des sections `ok` comptent (`barsOk`, union par rang pour éviter les doubles comptages en cas de chevauchement — `sectionRankArr`). `hist[] = {d,m}` journalise les mesures au point (un point par jour joué ou modifié, `recordHist`) → mini-courbe (`renderHistCurve`, pas de courbe de tempo). Carte visuelle de couverture (`renderMap`/`mapSegments`, trous = `coverageGaps`). Tempo = **saisie manuelle uniquement**, stocké par section (`sec.bpm[]`), jamais de métronome. Découpage assisté = `cutSheet`/`applyCut` (mesures régulières ou « à la main »). Suggestion « à travailler aujourd'hui » = section non `ok` la moins récemment travaillée (`pickTodaySection`, dérivé de `sessions[].entries[].sections`). Rappel en séance = ligne « Pas au point : … » (`sectionsReminderLine`). Carnet de fin de séance = bloc replié « Sections travaillées » (chips + avancer d'un cran + bpm optionnel).
-- `sessions[]` : `{id,date,mode(chrono|minuteur|guided|concert),goal,feeling(pp|p|mf|f|ff),blocks[{piece|'__improv__',sec}],entries[{piece,worked,next}],ts,concert?}`
+- `sessions[]` : `{id,date,mode(chrono|minuteur|guided|concert),goal,feeling(pp|p|mf|f|ff),blocks[{piece|'__improv__',sec}],entries[{piece,worked,next}],ts,concert?,interval?}`
+  — `interval` (bool, facultatif) : vrai si la séance était en pratique fractionnée 25/5 ; sert à
+  `fractionedInsight()` (étape 5). Absent sur les séances antérieures et les séances a posteriori
+  (traité comme faux).
 - `journal{date:{mood,energy}}` — capturé en **fin de séance** (`carnetSheet`, bloc repliable « facultatif » sous le ressenti), pas d'écran dédié. `opusCache{composer:[works]}`.
   (`wishlist[]` **fusionnée** dans `pieces` via `status:'wishlist'` — migration auto dans `migrate()`, tableau conservé vide. Accessible uniquement via le filtre « Apprendre » du Répertoire.)
 - `challenges{week,month,log[]}`, `settings{tolerance,dailyGoal,weeklyTime,weeklyDays,monthly,revisionDays,estimates,notif{…,monthly},theme,nas{}}`. `weeklyTime`/`monthly` peuvent être `null` (« non défini » → alerte accueil).
@@ -144,9 +147,17 @@ Polices : titres **Playfair Display**, interface **DM Sans**, chiffres **EB Gara
      réécoute paresseuse + suppression + taille affichée dans `pieceDetail`, auto-éval pp–ff à la fin
      de l'enregistrement. **Format à valider sur iPhone réel** (mp4/aac attendu côté Safari — non
      testé en conditions réelles, seulement le repli permission/API refusée).
-  5. **Bilans & insights** : croisements (ressenti × moment, stagnation), rétrospective annuelle
-     sobre ; **push iOS réel** = nécessite serveur VAPID → à valider séparément (sinon rester en
-     notifications locales).
+  5. ✅ **Bilans & insights** (Stats, section « Aperçus ») : trois croisements sobres, chacun affiché
+     seulement si le seuil de confiance est atteint (sinon rien plutôt qu'une phrase creuse) —
+     ressenti moyen par moment de la journée (`momentInsight`, ≥3 séances par créneau, écart ≥0.6 sur
+     l'échelle pp–ff), stagnation (`stagnantPieces`/`stagnationInsight`, mesures « au point » figées
+     depuis ≥3 semaines malgré des séances récentes), fractionné vs continu (`fractionedInsight`,
+     ≥3 séances de chaque, écart ≥0.5). **Rétrospective annuelle** (`yearRetroSheet`, chips par année
+     sous « Rétrospective ») : temps joué, séances, plus longue série de l'année (`bestStreakInYear`),
+     compositeur dominant, pièce de l'année. Notifications locales améliorées (`localNotify` : icône,
+     `tag` anti-doublon, clic → focus fenêtre) — **push iOS réel toujours écarté**, nécessite un
+     serveur VAPID (backend + coût d'hébergement/maintenance) ; à retrancher séparément si voulu un
+     jour, sinon on reste sur les notifications locales existantes.
 
 - **Reporté en V4** : **sauvegarde auto vers NAS Synology** (on reste sur GitHub Pages quelques
   mois) ; synchro multi-appareils ; éventuelle migration React+TS+Vite ou app SwiftUI native.
