@@ -79,9 +79,9 @@ function seedFor(period){const key=period==='week'?weekKey():monthKey();return k
 function pickChallengeSheet(period){
   const opts=pick3(poolFor(period),seedFor(period));
   openSheet(`<h3>Défi ${period==='week'?'de la semaine':'du mois'}</h3>
-    <p class="muted" style="font-size:14px;margin-top:-6px;">Choisis-en un, ou crée le tien.</p>
-    ${opts.map((o,i)=>`<div class="item" onclick="chooseChallenge('${period}',${i})"><div style="min-width:0;"><div class="title" style="font-size:14px;">${o.label}</div><div class="meta">récompense +${o.reward} ♪</div></div><div class="r" style="color:var(--gold);">›</div></div>`).join('')}
-    <button class="btn ghost sm" style="width:100%;margin-top:6px;" onclick="freeChallengeSheet('${period}')">Créer un défi libre</button>`);
+    <p class="muted sheet-sub">Choisis-en un, ou crée le tien.</p>
+    ${opts.map((o,i)=>`<div class="item" onclick="chooseChallenge('${period}',${i})"><div class="challenge-opt-info"><div class="title challenge-opt-title">${o.label}</div><div class="meta">récompense +${o.reward} ♪</div></div><div class="r challenge-opt-arrow">›</div></div>`).join('')}
+    <button class="btn ghost sm challenge-create-btn" onclick="freeChallengeSheet('${period}')">Créer un défi libre</button>`);
 }
 function chooseChallenge(period,idx){const opts=pick3(poolFor(period),seedFor(period));const key=period==='week'?weekKey():monthKey();
   S.challenges[period]=Object.assign({key},opts[idx]);save();closeSheet();renderVoyage();}
@@ -99,28 +99,28 @@ function renderSucces(el){
   const wk=S.challenges.week&&S.challenges.week.key===weekKey()?S.challenges.week:null;
   const mo=S.challenges.month&&S.challenges.month.key===monthKey()?S.challenges.month:null;
   const card=(ch,period,lab)=>{
-    if(!ch)return `<div class="card" style="margin-bottom:12px;"><div class="between"><span style="font-weight:600;">Défi ${lab}</span><button class="btn primary sm" onclick="pickChallengeSheet('${period}')">Choisir</button></div><p class="muted" style="font-size:13px;margin:8px 0 0;">Choisis un défi parmi 3, ou crée le tien.</p></div>`;
+    if(!ch)return `<div class="card voy-defi-card"><div class="between voy-defi-head"><span class="voy-succes-title">Défi ${lab}</span><button class="btn primary sm" onclick="pickChallengeSheet('${period}')">Choisir</button></div><p class="muted voy-defi-empty-sub">Choisis un défi parmi 3, ou crée le tien.</p></div>`;
     const p=challengeProgress(ch),done=p>=ch.target,pct=Math.min(100,Math.round(p/ch.target*100));
-    return `<div class="card" style="margin-bottom:12px;">
-      <div class="between" style="margin-bottom:8px;"><span class="tag ${period==='week'?'acc':'gold'}" style="padding:3px 10px;">${lab}</span><span style="color:var(--gold);font-weight:600;">+${ch.reward} ♪</span></div>
-      <div style="font-weight:600;margin-bottom:10px;">${esc(ch.label)}</div>
-      <div class="bar"><i style="width:${pct}%;${done?'background:var(--gold);':''}"></i></div>
-      <div class="between" style="margin-top:8px;"><span class="muted" style="font-size:12px;">${done?'Réussi ✓':progressText(ch)}</span>
+    return `<div class="card voy-defi-card ${done?'done':''}">
+      <div class="between voy-defi-head"><span class="tag ${period==='week'?'acc':'gold'} voy-defi-period-tag">${lab}</span><span class="voy-defi-reward">+${ch.reward} ♪</span></div>
+      <div class="voy-defi-label">${esc(ch.label)}</div>
+      <div class="bar voy-defi-bar ${done?'done':''}"><i style="width:${pct}%;"></i></div>
+      <div class="between voy-defi-foot"><span class="muted voy-defi-status">${done?'Réussi ✓':progressText(ch)}</span>
       ${ch.type==='free'&&!ch.doneManual?`<button class="btn ghost sm" onclick="completeFree('${period}')">Marquer réussi</button>`:`<button class="btn ghost sm" onclick="pickChallengeSheet('${period}')">Changer</button>`}</div></div>`;
   };
   const ach=achievements(),unlocked=ach.filter(a=>a.on).length;
   const fams=['Régularité','Volume','Maîtrise','Exploration','Carnet','Défis','Notes'];
   el.innerHTML=`
-    <div style="font-weight:600;margin-bottom:10px;">Défis en cours</div>
+    <div class="voy-succes-title mb10">Défis en cours</div>
     ${card(wk,'week','semaine')}${card(mo,'month','mois')}
-    <div class="between" style="margin:20px 0 10px;"><span style="font-weight:600;">Succès</span><span class="muted">${unlocked} / ${ach.length}</span></div>
+    <div class="between voy-succes-head"><span class="voy-succes-title">Succès</span><span class="muted">${unlocked} / ${ach.length}</span></div>
     ${fams.map(f=>{const list=ach.filter(a=>a.fam===f);if(!list.length)return '';
-      return `<div class="muted" style="font-size:12px;margin:14px 0 8px;">${f}</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">${list.map(a=>`
-        <div class="card" style="padding:12px 8px;text-align:center;${a.on?'':'opacity:.42;'}">
-          <div style="font-size:22px;color:${a.on?'var(--gold)':'var(--t2)'};line-height:1;">${a.on?'♫':'○'}</div>
-          <div style="font-size:12px;font-weight:600;margin-top:7px;line-height:1.2;">${a.label}</div>
-          <div class="muted" style="font-size:10px;margin-top:3px;">${a.on?'+'+a.reward+' ♪':esc(a.desc)}</div></div>`).join('')}</div>`;}).join('')}`;
+      return `<div class="muted voy-fam-label">${f}</div>
+      <div class="voy-ach-grid">${list.map(a=>`
+        <div class="card voy-ach-card ${a.on?'':'off'}">
+          <div class="voy-ach-glyph ${a.on?'on':'off'}">${a.on?'♫':'○'}</div>
+          <div class="voy-ach-label">${a.label}</div>
+          <div class="muted voy-ach-reward">${a.on?'+'+a.reward+' ♪':esc(a.desc)}</div></div>`).join('')}</div>`;}).join('')}`;
 }
 
 /* ==========================================================================
@@ -141,29 +141,29 @@ function composerSheet(name){
   const c=OPUS.composerByName(name);const dates=c.b?(c.b+(c.d?'–'+c.d:'– …')):'';
   const total=S.pieces.filter(p=>!p.isEnsemble&&(p.composer||'').toLowerCase()===name.toLowerCase()).length;
   openSheet(`<h3>${esc(name)}</h3>
-    <div id="comp-portrait" style="text-align:center;margin:4px 0 14px;"></div>
-    <div class="between" style="padding:11px 2px;border-bottom:1px solid rgba(255,255,255,.05);"><span class="muted">Époque</span><span>${esc(c.epoch||'—')}</span></div>
-    <div class="between" style="padding:11px 2px;border-bottom:1px solid rgba(255,255,255,.05);"><span class="muted">Dates</span><span>${dates||'—'}</span></div>
-    <div class="between" style="padding:11px 2px;"><span class="muted">Tes morceaux</span><span>${total} · ${masteredByComposer(name)} maîtrisés</span></div>
-    <button class="btn ghost" style="margin-top:14px;" onclick="closeSheet()">Fermer</button>`);
-  OPUS.onlineComposer(name).then(cs=>{const el=document.getElementById('comp-portrait');if(el&&cs&&cs[0]&&cs[0].portrait)el.innerHTML=`<img src="${cs[0].portrait}" alt="" style="width:108px;height:108px;border-radius:16px;object-fit:cover;">`;}).catch(()=>{});
+    <div id="comp-portrait" class="composer-portrait"></div>
+    <div class="between composer-row"><span class="muted">Époque</span><span>${esc(c.epoch||'—')}</span></div>
+    <div class="between composer-row"><span class="muted">Dates</span><span>${dates||'—'}</span></div>
+    <div class="between composer-row last"><span class="muted">Tes morceaux</span><span>${total} · ${masteredByComposer(name)} maîtrisés</span></div>
+    <button class="btn ghost composer-close" onclick="closeSheet()">Fermer</button>`);
+  OPUS.onlineComposer(name).then(cs=>{const el=document.getElementById('comp-portrait');if(el&&cs&&cs[0]&&cs[0].portrait)el.innerHTML=`<img src="${cs[0].portrait}" alt="" class="composer-portrait-img">`;}).catch(()=>{});
 }
 function renderCartes(el){
   const comps=ownedComposers();
   if(!comps.length){el.innerHTML='<div class="empty">Joue des morceaux pour collectionner des cartes de compositeurs.</div>';return;}
-  el.innerHTML=`<p class="muted" style="font-size:13px;margin:0 0 12px;">Niveaux : Bronze 2 · Argent 5 · Or 10 morceaux maîtrisés.</p>
-   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">${comps.map(name=>{
+  el.innerHTML=`<p class="muted voy-cartes-intro">Niveaux : Bronze 2 · Argent 5 · Or 10 morceaux maîtrisés.</p>
+   <div class="voy-card-grid">${comps.map(name=>{
      const m=masteredByComposer(name),lv=cardLevel(m),c=OPUS.composerByName(name),next=cardNext(m,lv),sec=composerSeconds(name);
-     return `<div class="card" style="padding:14px;${lv?'box-shadow:inset 0 0 0 1px '+lv.c+';':''}" onclick="composerSheet('${name.replace(/'/g,"\\'")}')">
-       <div class="between" style="align-items:flex-start;">
-         <div style="min-width:0;"><div class="serif" style="font-size:17px;">${esc(name)}</div>
-         <div class="muted" style="font-size:11px;margin-top:2px;">${esc(c.epoch||'')}</div></div>
-         ${lv?`<span class="tag" style="background:${lv.c}22;color:${lv.c};padding:3px 9px;font-size:11px;">${lv.n}</span>`:''}</div>
-       <div class="row" style="gap:8px;margin-top:14px;align-items:baseline;">
-         <span class="num" style="font-size:22px;font-weight:600;${lv?'color:'+lv.c+';':''}">${m}</span>
-         <span class="muted" style="font-size:11px;">${m>1?'maîtrisés':'maîtrisé'}</span></div>
-       <div class="bar" style="height:5px;margin-top:8px;"><i style="width:${next.pct}%;${lv?'background:'+lv.c+';':''}"></i></div>
-       <div class="muted" style="font-size:11px;margin-top:8px;">${sec?dur(sec)+' joués · ':''}${next.label}</div></div>`;}).join('')}</div>`;
+     return `<div class="card voy-card" ${lv?`style="box-shadow:inset 0 0 0 1px ${lv.c};"`:''} onclick="composerSheet('${name.replace(/'/g,"\\'")}')">
+       <div class="between voy-card-head">
+         <div class="voy-card-info"><div class="serif voy-card-name">${esc(name)}</div>
+         <div class="muted voy-card-epoch">${esc(c.epoch||'')}</div></div>
+         ${lv?`<span class="tag voy-card-lvl" style="background:${lv.c}22;color:${lv.c};">${lv.n}</span>`:''}</div>
+       <div class="row voy-card-count">
+         <span class="num voy-card-count-v" style="${lv?'color:'+lv.c+';':''}">${m}</span>
+         <span class="muted voy-card-count-l">${m>1?'maîtrisés':'maîtrisé'}</span></div>
+       <div class="bar voy-card-bar"><i style="width:${next.pct}%;${lv?'background:'+lv.c+';':''}"></i></div>
+       <div class="muted voy-card-foot">${sec?dur(sec)+' joués · ':''}${next.label}</div></div>`;}).join('')}</div>`;
 }
 function renderJardin(el){
   const hours=totalSeconds()/3600,streak=computeStreak(),mastered=S.pieces.filter(p=>!p.isEnsemble&&p.status==='mastered');
@@ -198,7 +198,7 @@ function renderJardin(el){
     flowers+=`<g><circle cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" r="9" fill="url(#gloB)"/><circle cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" r="2.6" fill="#F6EEDA"/></g>`;
   });
   const cur=currentStone();
-  el.innerHTML=`<div class="card" style="padding:0;overflow:hidden;">
+  el.innerHTML=`<div class="card voy-jardin-frame">
     <svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;">
       <defs><linearGradient id="skyB" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2A2440"/><stop offset="52%" stop-color="#221F32"/><stop offset="1" stop-color="#191A1B"/></linearGradient>
       <radialGradient id="gloB"><stop offset="0" stop-color="#F6EEDA" stop-opacity=".75"/><stop offset="1" stop-color="#E4C58A" stop-opacity="0"/></radialGradient>
@@ -212,10 +212,10 @@ function renderJardin(el){
       <rect x="0" y="248" width="${W}" height="92" fill="url(#mistB)"/>
       <path d="M0 ${groundY+4} H${W}" stroke="#E4C58A" stroke-opacity=".22" stroke-width="1"/>
     </svg>
-    <div style="padding:14px 16px 16px;text-align:center;"><div class="serif" style="font-size:19px;color:var(--gold);">${cur?cur.n:'La graine'}</div>
-      <div class="muted" style="font-size:13px;margin-top:5px;">${Math.round(hours)} h cultivées · ${streak} j de série · ${mastered.length} fleurs</div></div>
+    <div class="voy-jardin-foot"><div class="serif voy-jardin-title">${cur?cur.n:'La graine'}</div>
+      <div class="muted voy-jardin-sub">${Math.round(hours)} h cultivées · ${streak} j de série · ${mastered.length} fleurs</div></div>
   </div>
-    <p class="muted" style="font-size:12px;text-align:center;margin-top:10px;line-height:1.5;">Ton arbre grandit avec tes heures, se garnit selon ta série, et fleurit à chaque morceau maîtrisé.</p>`;
+    <p class="muted voy-jardin-note">Ton arbre grandit avec tes heures, se garnit selon ta série, et fleurit à chaque morceau maîtrisé.</p>`;
   const tree=el.querySelector('.jb-tree'),leafG=el.querySelector('.jb-leaf'),floG=el.querySelector('.jb-flo');
   tree.style.cssText='transform-origin:50% 100%;transform:scaleY(.02);opacity:.3;transition:transform 1s cubic-bezier(.2,.7,.3,1),opacity .6s;';
   leafG.style.cssText='opacity:0;transition:opacity .8s ease .8s;';
@@ -230,32 +230,31 @@ const CELEB_KIND={
 };
 function celebrate(kind,title,sub){
   const k=CELEB_KIND[kind]||CELEB_KIND.rang;
-  const glow=k.color==='var(--acc)'?'rgba(158,147,242,.22)':'rgba(228,197,138,.22)';
-  const ring=k.color==='var(--acc)'?'rgba(158,147,242,.35)':'rgba(228,197,138,.35)';
+  const medalKind=k.color==='var(--acc)'?'acc':'gold';
   buzz();const o=document.createElement('div');
-  o.style.cssText='position:fixed;inset:0;z-index:80;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(10,10,12,.82);padding:0 28px;';
-  o.innerHTML=`<div style="text-align:center;opacity:0;transform:translateY(12px);transition:opacity .45s,transform .45s cubic-bezier(.2,.8,.3,1);">
-    <div style="position:relative;width:96px;height:96px;margin:0 auto 20px;">
-      <div style="position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle,${glow},transparent 68%);"></div>
-      <div style="position:absolute;inset:0;border-radius:50%;border:1px solid ${ring};"></div>
-      <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:42px;color:${k.color};line-height:1;">${k.glyph}</div>
+  o.className='celeb-ov';
+  o.innerHTML=`<div class="celeb-inner">
+    <div class="celeb-medal ${medalKind}">
+      <div class="celeb-medal-glow"></div>
+      <div class="celeb-medal-ring"></div>
+      <div class="celeb-medal-glyph">${k.glyph}</div>
     </div>
-    <div style="letter-spacing:.14em;text-transform:uppercase;font-size:11px;font-weight:700;color:var(--t2);">${k.label}</div>
-    <div class="serif" style="font-size:27px;color:var(--gold);margin-top:6px;line-height:1.25;">${esc(title)}</div>
-    ${sub?`<div class="muted" style="margin-top:8px;font-size:14px;line-height:1.5;">${esc(sub)}</div>`:''}
-    <button class="btn ghost sm" style="margin:24px auto 0;padding:10px 22px;">Continuer</button>
+    <div class="celeb-kind">${k.label}</div>
+    <div class="serif celeb-title">${esc(title)}</div>
+    ${sub?`<div class="muted celeb-sub">${esc(sub)}</div>`:''}
+    <button class="btn ghost sm celeb-continue">Continuer</button>
   </div>`;
   o.onclick=e=>{if(e.target===o||e.target.tagName==='BUTTON')o.remove();};
   document.body.appendChild(o);
   const inner=o.firstElementChild;
-  (window.requestAnimationFrame||window.setTimeout)(()=>{inner.style.opacity='1';inner.style.transform='none';});
+  (window.requestAnimationFrame||window.setTimeout)(()=>{inner.classList.add('show');});
 }
 function hourHeat(){
   const hrs=new Array(24).fill(0);S.sessions.forEach(s=>{const t=s.ts||Date.parse(s.date+'T12:00');const h=new Date(t).getHours();hrs[h]+=sessionSeconds(s);});
   const max=Math.max(1,...hrs);const best=hrs.map((v,i)=>[i,v]).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]).slice(0,2).map(x=>x[0]+'h');
-  return `<div class="card"><div class="between" style="margin-bottom:10px;"><span style="font-weight:600;">Heure de la journée</span>${best.length?`<span class="muted" style="font-size:13px;">meilleur : ${best.join(', ')}</span>`:''}</div>
-    <div style="display:flex;align-items:flex-end;gap:2px;height:66px;">${hrs.map((v,i)=>`<div style="flex:1;background:${v?'var(--acc)':'var(--surface2)'};height:${v?Math.max(7,Math.round(v/max*100)):4}%;border-radius:2px;opacity:${v?(0.45+0.55*v/max).toFixed(2):1};"></div>`).join('')}</div>
-    <div class="sub" style="margin-top:6px;"><span>0h</span><span>12h</span><span>23h</span></div></div>`;
+  return `<div class="card"><div class="between stat-card-head"><span class="stat-card-title">Heure de la journée</span>${best.length?`<span class="muted stat-card-sub">meilleur : ${best.join(', ')}</span>`:''}</div>
+    <div class="stat-hourheat">${hrs.map((v,i)=>`<div class="stat-hourheat-bar" style="background:${v?'var(--acc)':'var(--surface2)'};height:${v?Math.max(7,Math.round(v/max*100)):4}%;opacity:${v?(0.45+0.55*v/max).toFixed(2):1};"></div>`).join('')}</div>
+    <div class="sub stat-hourheat-labels"><span>0h</span><span>12h</span><span>23h</span></div></div>`;
 }
 function revisionList(){const now=Date.now();
   return S.pieces.filter(p=>!p.isEnsemble&&p.status==='mastered').map(p=>{const days=p.revInterval||S.settings.revisionDays||18;const lp=pieceLastPlayed(p.id);const d=lp?Math.floor((now-new Date(lp+'T00:00'))/86400000):9999;return {p,d,days};}).filter(x=>x.d>=x.days).sort((a,b)=>b.d-a.d).map(x=>x.p);}

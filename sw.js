@@ -1,4 +1,4 @@
-const CACHE = 'piano-b3-17';
+const CACHE = 'piano-b3-18';
 const ASSETS = ['./','./index.html',
   './js/opus.js','./js/state.js','./js/ui.js','./js/home.js','./js/session.js','./js/carnet.js',
   './js/repertoire.js','./js/piece-detail.js','./js/voyage.js','./js/stats.js','./js/settings.js',

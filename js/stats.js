@@ -5,16 +5,18 @@ let statSplit='composer',statsTab='activite';
 function renderStats(){
   document.getElementById('s-stats').innerHTML=`
     <h1>Statistiques</h1>
-    <div class="grid2" style="margin-top:16px;">
-      <div class="metric"><div class="v">${durH(totalSeconds())}</div><div class="l">temps total joué</div></div>
-      <div class="metric"><div class="v">${S.sessions.length}</div><div class="l">séances au total</div></div>
+    <div class="grid2 stat-hero-grid">
+      <div class="metric"><div class="v num" id="stat-hero-time">0</div><div class="l">temps total joué</div></div>
+      <div class="metric"><div class="v num" id="stat-hero-sessions">0</div><div class="l">séances au total</div></div>
     </div>
-    <div class="seg" style="margin:16px 0 4px;">
-      <button class="${statsTab==='activite'?'on':''}" onclick="setStatsTab('activite')" style="font-size:12px;">Activité</button>
-      <button class="${statsTab==='rep'?'on':''}" onclick="setStatsTab('rep')" style="font-size:12px;">Répertoire</button>
-      <button class="${statsTab==='records'?'on':''}" onclick="setStatsTab('records')" style="font-size:12px;">Records</button>
+    <div class="seg stat-tabs">
+      <button class="${statsTab==='activite'?'on':''}" onclick="setStatsTab('activite')">Activité</button>
+      <button class="${statsTab==='rep'?'on':''}" onclick="setStatsTab('rep')">Répertoire</button>
+      <button class="${statsTab==='records'?'on':''}" onclick="setStatsTab('records')">Records</button>
     </div>
     <div id="stats-body"></div>`;
+  countUp(document.getElementById('stat-hero-time'),totalSeconds(),durH,500);
+  countUp(document.getElementById('stat-hero-sessions'),S.sessions.length,v=>Math.round(v).toString(),400);
   renderStatsBody();
 }
 function setStatsTab(t){statsTab=t;renderStats();}
@@ -22,18 +24,19 @@ function renderStatsBody(){
   const el=document.getElementById('stats-body');
   if(!el)return;
   el.innerHTML=statsTab==='rep'?renderStatsRep():statsTab==='records'?renderStatsRecords():renderStatsActivite();
+  if(statsTab==='activite')countUp(document.getElementById('stat-week-time'),weekSeconds(),dur,450);
 }
 function renderStatsActivite(){
   const bars=[];let max=1;for(let i=6;i>=0;i--){const d=addDays(new Date(),-i);const s=secondsOnDay(dkey(d));bars.push({d,s});max=Math.max(max,s);}
   return `
     <h2>7 derniers jours</h2>
     <div class="card">
-      <div class="between" style="margin-bottom:6px;"><span style="font-weight:600;">7 derniers jours</span><span class="muted" style="font-size:13px;">${dur(weekSeconds())} cette sem.</span></div>
-      <div class="bars">${bars.map((x,i)=>{const h=x.s?Math.max(6,Math.round(x.s/max*100)):2;const lb=x.d.toLocaleDateString('fr-FR',{weekday:'short'}).slice(0,3);
-        return `<div class="b ${i===6?'today':''}" style="height:${h}%;${x.s?'':'background:var(--surface2);'}"><span class="cap">${x.s?Math.round(x.s/60)+'′':'·'}</span><span class="lb">${lb}</span></div>`;}).join('')}</div>
+      <div class="between stat-card-head"><span class="stat-card-title">7 derniers jours</span><span class="muted stat-card-sub"><span id="stat-week-time">0</span> cette sem.</span></div>
+      <div class="stat-bars7">${bars.map((x,i)=>{const h=x.s?Math.max(6,Math.round(x.s/max*100)):2;const lb=x.d.toLocaleDateString('fr-FR',{weekday:'short'}).slice(0,3);
+        return `<div class="stat-bar7-col"><div class="stat-bar7 ${i===6?'today':''} ${x.s?'':'empty'}" style="height:${h}%;"><span class="stat-bar7-cap">${x.s?Math.round(x.s/60)+'′':'·'}</span></div><span class="stat-bar7-lb ${i===6?'today':''}">${lb}</span></div>`;}).join('')}</div>
     </div>
     <h2>Comparaison des semaines</h2>
-    ${weekBars()}
+    ${weekCurve()}
     <h2>Régularité · 12 semaines</h2>
     <div class="card">${heatmap()}</div>
     <h2>Meilleurs moments</h2>${hourHeat()}`;
@@ -42,7 +45,7 @@ function renderStatsRep(){
   return `
     <h2>Temps par morceau</h2>${byPiece()}
     <h2>Répartition</h2>
-    <div class="seg" style="margin-bottom:12px;"><button class="${statSplit==='composer'?'on':''}" onclick="setSplit('composer')">Compositeur</button><button class="${statSplit==='epoch'?'on':''}" onclick="setSplit('epoch')">Époque</button></div>
+    <div class="seg stat-split-seg"><button class="${statSplit==='composer'?'on':''}" onclick="setSplit('composer')">Compositeur</button><button class="${statSplit==='epoch'?'on':''}" onclick="setSplit('epoch')">Époque</button></div>
     ${splitView()}
     ${renderInsights()}`;
 }
@@ -56,41 +59,67 @@ function renderStatsRecords(){
       ${rec('Plus longue séance',dur(longest))}${rec('Meilleure journée',dur(bestDay))}
       ${rec('Meilleure semaine',dur(bestWk))}${rec('Meilleure série',bestStreak()+' j')}
     </div>
-    ${retroYears().length?`<h2>Rétrospective</h2><p class="muted" style="font-size:13px;margin:-4px 0 12px;">Une année de piano, en quelques chiffres.</p><div class="chips">${retroYears().map(y=>`<button class="chip" onclick="yearRetroSheet(${y})">${y}</button>`).join('')}</div>`:''}`;
+    ${retroYears().length?`<h2>Rétrospective</h2><p class="muted stat-retro-intro">Une année de piano, en quelques chiffres.</p><div class="chips">${retroYears().map(y=>`<button class="chip" onclick="yearRetroSheet(${y})">${y}</button>`).join('')}</div>`:''}`;
 }
 function setSplit(s){statSplit=s;renderStatsBody();}
-function rec(l,v){return `<div class="metric" style="box-shadow:inset 0 0 0 1px rgba(228,197,138,.22);"><div class="v" style="font-size:20px;">${v}</div><div class="l">${l}</div></div>`;}
+function rec(l,v){return `<div class="metric stat-rec"><div class="v stat-rec-v">${v}</div><div class="l">${l}</div></div>`;}
 function heatmap(){
   const days=[];for(let i=83;i>=0;i--){const d=addDays(new Date(),-i);const s=secondsOnDay(dkey(d));days.push(s);}
   const lv=s=>s===0?0:s<600?1:s<1800?2:s<3600?3:4;
-  const col=['var(--surface2)','rgba(158,147,242,.3)','rgba(158,147,242,.55)','rgba(158,147,242,.8)','var(--acc)'];
+  const col=['rgba(158,147,242,.08)','rgba(158,147,242,.28)','rgba(158,147,242,.52)','rgba(158,147,242,.78)','var(--acc)'];
   return `<div class="hm">${days.map(s=>`<i style="background:${col[lv(s)]}"></i>`).join('')}</div>
-    <div class="sub" style="margin-top:10px;justify-content:flex-end;gap:6px;align-items:center;"><span>moins</span>${col.map(c=>`<span style="width:12px;height:12px;border-radius:3px;background:${c};display:inline-block;"></span>`).join('')}<span>plus</span></div>`;
+    <div class="sub stat-hm-legend"><span>moins</span>${col.map(c=>`<span class="stat-hm-swatch" style="background:${c};"></span>`).join('')}<span>plus</span></div>`;
 }
-function weekBars(){
+function smoothLinePath(pts){
+  if(pts.length<2)return '';
+  const d=['M'+pts[0][0].toFixed(1)+','+pts[0][1].toFixed(1)];
+  for(let i=0;i<pts.length-1;i++){
+    const p0=pts[i===0?0:i-1],p1=pts[i],p2=pts[i+1],p3=pts[Math.min(i+2,pts.length-1)];
+    const c1x=p1[0]+(p2[0]-p0[0])/6,c1y=p1[1]+(p2[1]-p0[1])/6;
+    const c2x=p2[0]-(p3[0]-p1[0])/6,c2y=p2[1]-(p3[1]-p1[1])/6;
+    d.push('C'+c1x.toFixed(1)+','+c1y.toFixed(1)+' '+c2x.toFixed(1)+','+c2y.toFixed(1)+' '+p2[0].toFixed(1)+','+p2[1].toFixed(1));
+  }
+  return d.join(' ');
+}
+function weekCurve(){
   const weeks=[];let max=1;
   for(let i=7;i>=0;i--){const ws=addDays(weekStart(),-7*i);let t=0;for(let d=0;d<7;d++)t+=secondsOnDay(dkey(addDays(ws,d)));weeks.push(t);max=Math.max(max,t);}
   const cur=weeks[7],prev=weeks[6],diff=cur-prev;
+  const w=300,h=90,padL=4,padR=4,padT=10,padB=18,innerW=w-padL-padR,innerH=h-padT-padB;
+  const pts=weeks.map((t,i)=>[padL+i/(weeks.length-1)*innerW,padT+innerH-(t/max*innerH)]);
+  const lineD=smoothLinePath(pts);
+  const baseY=(padT+innerH).toFixed(1);
+  const areaD=lineD+' L'+pts[pts.length-1][0].toFixed(1)+','+baseY+' L'+pts[0][0].toFixed(1)+','+baseY+' Z';
+  const dots=pts.map((pt,i)=>`<circle cx="${pt[0].toFixed(1)}" cy="${pt[1].toFixed(1)}" r="${i===7?3.4:1.8}" fill="${i===7?'var(--gold)':'var(--acc)'}"/>`).join('');
+  const labels=weeks.map((t,i)=>i===7?'cette':'S-'+(7-i));
   return `<div class="card">
-    <div class="between" style="margin-bottom:6px;"><span style="font-weight:600;">8 dernières semaines</span>
-      <span class="muted" style="font-size:13px;">${dur(cur)}${prev>0?' · '+(diff>=0?'+':'−')+dur(Math.abs(diff))+' vs S-1':''}</span></div>
-    <div class="bars">${weeks.map((t,i)=>{const h=t?Math.max(6,Math.round(t/max*100)):2;const lb=i===7?'cette':'S-'+(7-i);
-      return `<div class="b ${i===7?'today':''}" style="height:${h}%;${t?'':'background:var(--surface2);'}"><span class="cap">${t?(Math.round(t/3600*10)/10)+'h':''}</span><span class="lb" style="font-size:9px;">${lb}</span></div>`;}).join('')}</div>
+    <div class="between stat-card-head"><span class="stat-card-title">8 dernières semaines</span>
+      <span class="muted stat-card-sub">${dur(cur)}${prev>0?' · '+(diff>=0?'+':'−')+dur(Math.abs(diff))+' vs S-1':''}</span></div>
+    <svg viewBox="0 0 ${w} ${h}" width="100%" class="stat-curve-svg">
+      <defs><linearGradient id="statWkGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="var(--acc)" stop-opacity=".3"/>
+        <stop offset="100%" stop-color="var(--acc)" stop-opacity="0"/>
+      </linearGradient></defs>
+      <path d="${areaD}" fill="url(#statWkGrad)"/>
+      <path d="${lineD}" class="stat-curve-line"/>
+      ${dots}
+    </svg>
+    <div class="sub stat-curve-labels">${labels.map(l=>`<span>${l}</span>`).join('')}</div>
   </div>`;
 }
 function byPiece(){
   const map={};S.sessions.forEach(s=>s.blocks.forEach(b=>map[b.piece]=(map[b.piece]||0)+b.sec));
   const arr=Object.entries(map).sort((a,b)=>b[1]-a[1]).slice(0,8);if(!arr.length)return '<div class="empty">Pas encore de données.</div>';
   const mx=arr[0][1];
-  return arr.map(([id,s])=>`<div style="margin-bottom:12px;"><div class="sub" style="margin-bottom:6px;"><span style="color:var(--tc);">${esc(pieceName(id))}</span><span>${dur(s)}</span></div><div class="bar"><i style="width:${Math.round(s/mx*100)}%"></i></div></div>`).join('');
+  return arr.map(([id,s])=>`<div class="stat-piece-row"><div class="sub stat-piece-head"><span class="clair">${esc(pieceName(id))}</span><span>${dur(s)}</span></div><div class="bar"><i style="width:${Math.round(s/mx*100)}%"></i></div></div>`).join('');
 }
 function splitView(){
   const map={};S.sessions.forEach(s=>s.blocks.forEach(b=>{let k;if(b.piece===IMPROV){k='Improvisation';}else{const p=pieceById(b.piece);if(!p)return;k=statSplit==='composer'?(p.composer||'—'):(p.epoch||'—');}map[k]=(map[k]||0)+b.sec;}));
   const arr=Object.entries(map).sort((a,b)=>b[1]-a[1]);if(!arr.length)return '<div class="empty">Renseigne compositeur/époque de tes morceaux.</div>';
   const total=arr.reduce((a,b)=>a+b[1],0);const cols=['#9E93F2','#E4C58A','#6FD3E0','#8DB600','#C65B34','#2FB6B0','#B07A2A'];
   let acc=0;const seg=arr.map(([k,v],i)=>{const from=acc/total*100;acc+=v;const to=acc/total*100;return `${cols[i%cols.length]} ${from}% ${to}%`;}).join(',');
-  return `<div class="row" style="gap:18px;align-items:center;"><div style="width:120px;height:120px;border-radius:50%;background:conic-gradient(${seg});flex:0 0 auto;"></div>
-    <div style="flex:1;">${arr.map(([k,v],i)=>`<div class="sub" style="margin-bottom:6px;"><span style="color:var(--tc);"><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${cols[i%cols.length]};margin-right:7px;"></span>${esc(k)}</span><span>${dur(v)}</span></div>`).join('')}</div></div>`;
+  return `<div class="row stat-split-row"><div class="stat-split-donut" style="background:conic-gradient(${seg});"></div>
+    <div class="stat-split-legend">${arr.map(([k,v],i)=>`<div class="sub stat-split-item"><span class="clair"><span class="stat-split-dot" style="background:${cols[i%cols.length]};"></span>${esc(k)}</span><span>${dur(v)}</span></div>`).join('')}</div></div>`;
 }
 
 /* ---------- Aperçus (V3 étape 5) : croisements sobres, pas de sur-analyse ---------- */
@@ -138,7 +167,7 @@ function fractionedInsight(){
 function renderInsights(){
   const lines=[momentInsight(),stagnationInsight(),fractionedInsight()].filter(Boolean);
   if(!lines.length)return '';
-  return `<h2>Aperçus</h2><div class="card" style="padding:14px 16px;">${lines.map(l=>`<p style="margin:0 0 10px;line-height:1.55;font-size:14px;">${l}</p>`).join('')}</div>`;
+  return `<h2>Aperçus</h2>${lines.map(l=>`<div class="card stat-insight-card"><div class="stat-insight-rule"></div><p class="stat-insight-text">${l}</p></div>`).join('')}`;
 }
 
 /* ---------- Rétrospective annuelle (V3 étape 5) ---------- */
@@ -157,14 +186,14 @@ function yearRetroSheet(year){
   const topPiece=topPieceEntry?pieceById(topPieceEntry[0]):null;
   const topComposer=Object.entries(composerMap).sort((a,b)=>b[1]-a[1])[0];
   openSheet(`<h3>Rétrospective ${year}</h3>
-    <p class="muted" style="font-size:14px;margin-top:-6px;">Une année de piano, en quelques chiffres.</p>
-    <div class="grid2" style="margin:16px 0 10px;">
+    <p class="muted sheet-sub">Une année de piano, en quelques chiffres.</p>
+    <div class="grid2 mt16 mb10">
       ${rec('Temps joué',durH(totalSec))}${rec('Séances',sessions.length)}
     </div>
-    <div class="grid2" style="margin-bottom:12px;">
+    <div class="grid2 mb10">
       ${rec('Plus longue série',bestStreakInYear(year)+' j')}${rec('Compositeur dominant',topComposer?esc(topComposer[0]):'—')}
     </div>
-    ${topPiece?`<div class="card" style="padding:14px;"><span class="muted" style="font-size:12px;">Pièce de l'année</span><div style="font-weight:600;margin-top:4px;">${esc(topPiece.title)}</div><div class="muted" style="font-size:12px;margin-top:2px;">${dur(topPieceEntry[1])} joués</div></div>`:''}
-    <button class="btn primary" style="width:100%;margin-top:16px;" onclick="closeSheet()">Fermer</button>`);
+    ${topPiece?`<div class="card stat-insight-card"><div class="stat-insight-rule gold"></div><span class="muted stat-retro-piece-label">Pièce de l'année</span><div class="stat-retro-piece-title">${esc(topPiece.title)}</div><div class="muted stat-retro-piece-sub">${dur(topPieceEntry[1])} joués</div></div>`:''}
+    <button class="btn primary mt16" onclick="closeSheet()">Fermer</button>`);
 }
 
