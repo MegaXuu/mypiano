@@ -5,7 +5,7 @@
 
 const KEY = 'pianoV2';
 const IMPROV = '__improv__';
-const APP_VERSION = 'Bêta 3.7'; // à synchroniser avec CACHE dans sw.js à chaque release
+const APP_VERSION = 'Bêta 3.8'; // à synchroniser avec CACHE dans sw.js à chaque release
 
 const STONES = [
   {n:'Apprenti',h:10,c:'#E0A83B'},{n:'Élève',h:20,c:'#C9CDDA'},{n:'Musicien',h:30,c:'#9BA0AE'},
@@ -145,7 +145,7 @@ async function writeState(){
   if(!_db)return;
   let ok=await idbSet('S',JSON.stringify(S));
   if(!ok)ok=await idbSet('S',JSON.stringify(S)); // un retry avant d'alerter
-  if(!ok)toast('Sauvegarde impossible');
+  if(!ok)toast('Sauvegarde impossible',{danger:true});
 }
 function flush(){
   _saveTimer=null;
@@ -198,19 +198,21 @@ function masteredCount(){return S.pieces.filter(p=>p.status==='mastered').length
 function pieceSessionCount(id){return S.sessions.filter(s=>s.blocks.some(b=>b.piece===id)).length;}
 function needsRevision(p){if(!p||p.status!=='mastered')return false;const days=p.revInterval||S.settings.revisionDays||18;const lp=pieceLastPlayed(p.id);if(!lp)return false;return Math.floor((Date.now()-new Date(lp+'T00:00'))/86400000)>=days;}
 // Phase de travail dérivée (jamais stockée) — statut + avancement.
+// Échelle chromatique partagée par piecePhase() et SEC_STATUS : mêmes teintes pour un même degré d'avancement.
+const PHASE_COL={dechiffrage:'#D2694A',consolidation:'#7FC9C4',polissage:'#9FC93C'};
 function piecePhase(p){if(!p)return null;
   if(p.status==='wishlist')return{k:'wishlist',label:'À apprendre',col:'var(--t2)'};
   if(p.status==='archived')return{k:'archived',label:'Archivé',col:'var(--t2)'};
   if(p.status==='abandoned')return{k:'abandoned',label:'Abandonné',col:'var(--t2)'};
-  if(p.status==='mastered')return needsRevision(p)?{k:'entretien',label:'À entretenir',col:'var(--gold)'}:{k:'mastered',label:'Maîtrisé',col:'var(--acc)'};
+  if(p.status==='mastered')return needsRevision(p)?{k:'entretien',label:'À entretenir',col:'var(--warn)'}:{k:'mastered',label:'Maîtrisé',col:'var(--ok)'};
   const pr=pieceProgress(p);
-  if(pr<30)return{k:'dechiffrage',label:'Déchiffrage',col:'#D2694A'};
-  if(pr<70)return{k:'consolidation',label:'Consolidation',col:'#7FC9C4'};
-  return{k:'polissage',label:'Polissage',col:'#9FC93C'};}
+  if(pr<30)return{k:'dechiffrage',label:'Déchiffrage',col:PHASE_COL.dechiffrage};
+  if(pr<70)return{k:'consolidation',label:'Consolidation',col:PHASE_COL.consolidation};
+  return{k:'polissage',label:'Polissage',col:PHASE_COL.polissage};}
 function phaseChip(p){const ph=piecePhase(p);if(!ph)return '';return `<span class="tag" style="padding:2px 9px;font-size:11px;color:${ph.col};border-color:${ph.col}44;">${ph.label}</span>`;}
 
 /* ---------- Sections & mesures (V3 étape 2) ---------- */
-const SEC_STATUS=[{k:'new',label:'Déchiffrage',col:'#D2694A'},{k:'wip',label:'Travail',col:'#7FC9C4'},{k:'poli',label:'Polissage',col:'#9FC93C'},{k:'ok',label:'Au point',col:'var(--acc)'}];
+const SEC_STATUS=[{k:'new',label:'Déchiffrage',col:PHASE_COL.dechiffrage},{k:'wip',label:'Travail',col:PHASE_COL.consolidation},{k:'poli',label:'Polissage',col:PHASE_COL.polissage},{k:'ok',label:'Au point',col:'var(--ok)'}];
 function secStatusInfo(k){return SEC_STATUS.find(s=>s.k===k)||SEC_STATUS[0];}
 function secList(p){return (p&&p.sections)||[];}
 function sortSections(p){if(p.sections)p.sections.sort((a,b)=>(a.from|0)-(b.from|0));}
@@ -319,7 +321,7 @@ function go(name){
   window.scrollTo(0,0);
   ({home:renderHome,carnet:renderCarnet,rep:renderRep,voyage:renderVoyage,stats:renderStats,settings:renderSettings}[name]||(()=>{}))();
 }
-let toastT;function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),1900);}
+let toastT;function toast(m,opts){const t=document.getElementById('toast');t.textContent=m;t.classList.toggle('danger',!!(opts&&opts.danger));t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),1900);}
 function openSheet(html){
   const sheet=document.getElementById('sheet'),bg=document.getElementById('sheet-bg');
   sheet.style.transition='';sheet.style.animation='';sheet.style.transform='';
@@ -330,6 +332,16 @@ function openSheet(html){
 let _recUrls=[];
 function closeSheet(){document.getElementById('sheet-bg').classList.remove('show');_recUrls.forEach(u=>{try{URL.revokeObjectURL(u);}catch(e){}});_recUrls=[];}
 document.getElementById('sheet-bg').addEventListener('click',e=>{if(e.target.id==='sheet-bg')closeSheet();});
+
+let _confirmCb=null;
+function confirmSheet(message,label,onConfirm){
+  _confirmCb=onConfirm;
+  openSheet(`<h3>Confirmer</h3>
+    <p class="muted" style="font-size:14px;margin-top:-6px;">${esc(message)}</p>
+    <button class="btn danger" style="width:100%;margin-top:18px;" onclick="_runConfirm()">${esc(label)}</button>
+    <button class="btn ghost sm" style="width:100%;margin-top:10px;" onclick="closeSheet()">Annuler</button>`);
+}
+function _runConfirm(){const cb=_confirmCb;_confirmCb=null;closeSheet();if(cb)cb();}
 
 /* ---------- Fermeture de la feuille au glisser (poignée) ---------- */
 let _sheetDrag=null;
@@ -385,31 +397,35 @@ function renderHome(){
     </div>
     ${st?`<div class="tag" style="margin-top:6px;background:var(--surface);">${noteIcon(st.c,17,rankGlyph(st))}<span style="color:var(--gold);">${st.n}</span><span class="muted">· ${Math.floor(totalSeconds()/3600)} h</span></div>`:`<div class="tag" style="margin-top:6px;">Début du voyage</div>`}
     <h1 style="margin-top:12px;">Bonjour Florian</h1>
-    <p class="serif" style="font-style:italic;color:var(--t2);font-size:16px;margin:6px 0 2px;">« ${q[0]} » — ${q[1]}</p>
 
-    <div class="grid2" style="margin-top:18px;">
-      <div class="metric"><div class="row" style="gap:8px;align-items:flex-end;"><span class="flame" style="display:flex;">${flameSvg(23)}</span><span class="v" style="line-height:.82;">${streak}</span></div><div class="l">${streak===1?'jour de série':'jours de série'}</div></div>
-      <div class="metric"><div class="v" style="color:var(--acc);">${notesTotal().toLocaleString('fr-FR')} ♪</div><div class="l">notes accumulées</div></div>
+    <div class="row" style="gap:8px;margin-top:8px;">
+      <div class="tag">${flameSvg(14)}${streak} ${streak===1?'jour':'jours'}</div>
+      <div class="tag acc">${notesTotal().toLocaleString('fr-FR')} ♪</div>
     </div>
 
-    <div class="card hi" style="margin-top:14px;">
-      <div class="between"><span class="muted" style="font-size:14px;">Objectif du jour</span>
-        <button class="btn ghost sm" onclick="goalSheet()">Modifier</button></div>
-      <div class="ring-wrap" style="margin-top:8px;">
-        <div class="ring">
-          <svg width="184" height="184" viewBox="0 0 200 200">
+    <div class="card hi" style="margin-top:14px;padding:14px 16px;">
+      <div class="row" style="gap:16px;">
+        <div class="ring sm">
+          <svg width="120" height="120" viewBox="0 0 200 200">
             <circle cx="100" cy="100" r="84" fill="none" stroke="var(--surface2)" stroke-width="13"/>
             <circle cx="100" cy="100" r="84" fill="none" stroke="${ringCol}" stroke-width="13" stroke-linecap="round"
               stroke-dasharray="${circ}" stroke-dashoffset="${off}" transform="rotate(-90 100 100)" style="transition:stroke-dashoffset .6s ease;"/>
           </svg>
           <div class="c"><b>${minLabel(done)}</b><span>/ ${goalLabel(goal)}</span></div>
         </div>
+        <div style="flex:1;min-width:0;">
+          <span class="muted" style="font-size:14px;">Objectif du jour</span>
+          <div><button class="btn ghost sm" style="margin-top:10px;" onclick="goalSheet()">Modifier</button></div>
+        </div>
       </div>
     </div>
 
-    <button class="btn primary" style="margin-top:18px;font-size:16px;padding:16px;" onclick="startSheet()">
+    <button class="btn primary" style="margin-top:14px;font-size:16px;padding:16px;" onclick="startSheet()">
       ${playSvg()} Démarrer une séance</button>
-    <div class="grid2" style="margin-top:10px;"><button class="btn ghost" onclick="planSheet()">Plan guidé</button><button class="btn ghost" onclick="concertSheet()">Simulation</button></div>
+
+    ${recentPieces(4).length?`<h2>Reprendre</h2><div class="chips">${recentPieces(4).map(id=>`<button class="chip" onclick="quickStart('${id}')">${esc(pieceName(id))}</button>`).join('')}</div>`:''}
+
+    <div class="grid2" style="margin-top:14px;"><button class="btn ghost" onclick="planSheet()">Plan guidé</button><button class="btn ghost" onclick="concertSheet()">Simulation</button></div>
 
     ${homeAlertsHtml()}
 
@@ -418,8 +434,6 @@ function renderHome(){
       <div id="home-todos">${todoLines(todos.slice(0,3))}</div>
       ${todos.length>3?`<button class="btn ghost sm" style="width:100%;margin-top:6px;" onclick="showAllTodos(this)">Voir les ${todos.length} œuvres</button>`:''}</div>`:''}
 
-    ${recentPieces(4).length?`<h2>Reprendre</h2><div class="chips">${recentPieces(4).map(id=>`<button class="chip" onclick="quickStart('${id}')">${esc(pieceName(id))}</button>`).join('')}</div>`:''}
-
     <h2>Cette semaine</h2>
     <div class="grid2">
       <div class="metric"><div class="v">${dur(weekSeconds())}</div><div class="l">temps joué</div></div>
@@ -427,20 +441,22 @@ function renderHome(){
     </div>
     ${revisionList().length?`<div class="between" style="margin-top:22px;margin-bottom:10px;"><h2 style="margin:0;">À entretenir</h2><button class="btn ghost sm" onclick="startRevision()">Réviser</button></div><div class="card" style="padding:14px 16px;">
       <p class="muted" style="font-size:13px;margin:0 0 8px;">Maîtrisés, mais pas rejoués depuis un moment :</p>
-      ${revisionList().slice(0,3).map(p=>`<div class="between" style="padding:8px 0;"><div style="min-width:0;"><div style="font-weight:600;font-size:14px;">${esc(p.title)}</div><div class="muted" style="font-size:12px;">${esc(p.composer||'')}</div></div><button class="btn ghost sm" onclick="quickStart('${p.id}')">Jouer</button></div>`).join('')}</div>`:''}`;
+      ${revisionList().slice(0,3).map(p=>`<div class="between" style="padding:8px 0;"><div style="min-width:0;"><div style="font-weight:600;font-size:14px;">${esc(p.title)}</div><div class="muted" style="font-size:12px;">${esc(p.composer||'')}</div></div><button class="btn ghost sm" onclick="quickStart('${p.id}')">Jouer</button></div>`).join('')}</div>`:''}
+
+    <p class="serif" style="font-style:italic;color:var(--t2);font-size:14px;margin:28px 0 6px;text-align:center;">« ${q[0]} » — ${q[1]}</p>`;
 }
 function homeAlerts(){
   const items=[];
   if(reportReady())items.push({label:'Rapport de la semaine prêt',action:"reportSheet()",cta:'Voir'});
   if(monthReportReady())items.push({label:'Rapport du mois prêt',action:"monthReportSheet()",cta:'Voir'});
-  if(backupDue())items.push({label:'Pense à sauvegarder tes données',action:"exportJSON()",cta:'Exporter',gold:true});
+  if(backupDue())items.push({label:'Pense à sauvegarder tes données',action:"exportJSON()",cta:'Exporter',warn:true});
   if(goalsUnset())items.push({label:"Objectif hebdo ou mensuel non défini",action:"go('settings')",cta:'Régler'});
   return items;
 }
 function homeAlertsHtml(){
   const al=homeAlerts();if(!al.length)return '';
   return `<div class="card" style="margin-top:14px;padding:2px 14px;">
-    ${al.map((a,i)=>`<div class="between" style="padding:11px 0;${i<al.length-1?'border-bottom:1px solid rgba(255,255,255,.05);':''}cursor:pointer;" onclick="${a.action}"><span style="font-size:13px;">${a.label}</span><span style="color:${a.gold?'var(--gold)':'var(--acc)'};font-size:13px;">${a.cta} ›</span></div>`).join('')}
+    ${al.map((a,i)=>`<div class="between" style="padding:11px 0;${i<al.length-1?'border-bottom:1px solid rgba(255,255,255,.05);':''}cursor:pointer;" onclick="${a.action}"><span style="font-size:13px;">${a.label}</span><span style="color:${a.warn?'var(--warn)':'var(--ok)'};font-size:13px;">${a.cta} ›</span></div>`).join('')}
   </div>`;
 }
 function cap(s){return s.charAt(0).toUpperCase()+s.slice(1);}
@@ -509,7 +525,7 @@ function mStep(n){_min=Math.max(5,_min+n);document.getElementById('mv').textCont
 function pickPiece(id,el){_piece=id;document.querySelectorAll('#sheet .chip').forEach(c=>c.classList.remove('on'));if(el)el.classList.add('on');
   const hint=document.getElementById('sc-hint');if(hint){const p=id!==IMPROV?pieceById(id):null;hint.innerHTML=p&&p.todo?`<div class="card" style="margin-top:10px;padding:12px 14px;border-left:2px solid var(--acc);border-radius:0 12px 12px 0;"><span class="muted" style="font-size:12px;">À faire</span><div style="font-size:14px;margin-top:3px;">${esc(p.todo)}</div></div>`:'';}}
 function beginSession(){
-  if(!_piece){toast('Choisis un morceau');return;}
+  if(!_piece){toast('Choisis un morceau',{danger:true});return;}
   timer={mode:_mode,target:_min*60,total:0,running:true,last:Date.now(),blocks:[{piece:_piece,sec:0}],goal:todayGoal(),interval:_interval?{work:1500,brk:300,phase:'work',phaseSec:0}:null};
   closeSheet();go('session');renderSession();startTick();acquireWakeLock();
 }
@@ -544,10 +560,19 @@ function renderSession(){
       <div class="num" id="ss-time" style="font-size:64px;font-weight:600;letter-spacing:.01em;">0′ 00″</div>
       <div class="muted" id="ss-mode" style="margin-top:8px;">chrono</div>
     </div>
-    <div class="row" style="justify-content:center;gap:16px;margin-top:14px;">
-      <button id="ss-pause" onclick="togglePause()" style="width:76px;height:76px;border-radius:50%;background:var(--acc);color:#191A1B;font-size:28px;">❚❚</button>
-      <button onclick="stopSession()" style="width:76px;height:76px;border-radius:50%;border:1px solid var(--border);font-size:24px;">■</button>
-      ${recAvailable()?`<button id="ss-rec" onclick="toggleRecording()" style="width:76px;height:76px;border-radius:50%;border:1px solid var(--border);font-size:22px;">●</button>`:''}
+    <div class="row" style="justify-content:center;gap:16px;margin-top:14px;align-items:flex-start;">
+      <div style="text-align:center;">
+        <button id="ss-pause" onclick="togglePause()" style="width:76px;height:76px;border-radius:50%;background:var(--acc);color:#191A1B;font-size:28px;">❚❚</button>
+        <div class="muted" style="font-size:11px;margin-top:6px;">Pause</div>
+      </div>
+      <div style="text-align:center;">
+        <button onclick="stopSession()" style="width:76px;height:76px;border-radius:50%;border:1px solid var(--border);font-size:24px;">■</button>
+        <div class="muted" style="font-size:11px;margin-top:6px;">Fin</div>
+      </div>
+      ${recAvailable()?`<div style="text-align:center;">
+        <button id="ss-rec" onclick="toggleRecording()" style="width:76px;height:76px;border-radius:50%;border:1px solid var(--border);font-size:22px;">●</button>
+        <div class="muted" style="font-size:11px;margin-top:6px;" id="ss-rec-lbl">Rec</div>
+      </div>`:''}
     </div>
     <p class="muted" id="ss-pausehint" style="text-align:center;font-size:13px;margin-top:18px;display:none;">En pause, tu peux changer de morceau pour la reprise.</p>
     <h2>Répartition de la séance</h2>
@@ -572,7 +597,8 @@ function paintSession(){
   const iv=timer.interval;if(iv&&iv.phase==='break'){if(t)t.textContent=big(Math.max(0,iv.brk-iv.phaseSec));if(md)md.textContent='Pause · repose tes mains';}
   const pb=document.getElementById('ss-pause');if(pb){pb.textContent=timer.running?'❚❚':'▶';}
   const ph=document.getElementById('ss-pausehint');if(ph)ph.style.display=timer.running?'none':'block';
-  const rb=document.getElementById('ss-rec');if(rb){rb.textContent=_rec?'■':'●';rb.style.color=_rec?'#F0857A':'';rb.style.borderColor=_rec?'#F0857A':'';}
+  const rb=document.getElementById('ss-rec');if(rb){rb.textContent=_rec?'■':'●';rb.style.color=_rec?'var(--danger)':'';rb.style.borderColor=_rec?'var(--danger)':'';}
+  const rl=document.getElementById('ss-rec-lbl');if(rl)rl.textContent=_rec?big(Math.max(0,(Date.now()-_rec.startTs)/1000)):'Rec';
   const agg={};timer.blocks.forEach(b=>agg[b.piece]=(agg[b.piece]||0)+b.sec);
   const el=document.getElementById('ss-blocks');
   if(el)el.innerHTML=Object.keys(agg).map(id=>`<div class="item"><div class="title" style="${id===IMPROV?'font-style:italic;color:var(--tc);':''}">${esc(pieceName(id))}</div><div class="r num">${big(agg[id])}</div></div>`).join('')||'<p class="empty">—</p>';
@@ -592,10 +618,11 @@ function resumeWith(id){const last=timer.blocks[timer.blocks.length-1];
   if(id!==last.piece){if(last.sec<1)last.piece=id;else timer.blocks.push({piece:id,sec:0});}
   timer.running=true;timer.last=Date.now();closeSheet();paintSession();}
 function stopSession(){
-  if(_rec){toast("Arrête d'abord l'enregistrement en cours");return;}
-  timer.running=false;clearInterval(tickInt);const total=Math.round(timer.total);
-  if(total<5){if(!confirm('Séance très courte. L\'enregistrer quand même ?')){timer=null;releaseWakeLock();go('home');return;}}
-  carnetSheet(total);}
+  if(_rec){toast("Arrête d'abord l'enregistrement en cours",{danger:true});return;}
+  const total=Math.round(timer.total);
+  if(total<5){confirmSheet('Séance très courte. L\'enregistrer quand même ?','Enregistrer quand même',()=>finishStop(total));return;}
+  finishStop(total);}
+function finishStop(total){timer.running=false;clearInterval(tickInt);carnetSheet(total);}
 function quickCarnet(){toast('Le carnet se remplit en fin de séance');}
 function carnetSheet(total){
   const seen={},pieces=[];timer.blocks.forEach(b=>{if(!seen[b.piece]){seen[b.piece]=1;pieces.push(b.piece);}});
@@ -709,16 +736,16 @@ function recMime(){
 async function toggleRecording(){
   if(!timer)return;
   if(_rec){stopRecording();return;}
-  if(!recAvailable()){toast('Enregistrement audio indisponible sur cet appareil');return;}
+  if(!recAvailable()){toast('Enregistrement audio indisponible sur cet appareil',{danger:true});return;}
   const cur=timer.blocks[timer.blocks.length-1].piece;
-  if(cur===IMPROV){toast('Choisis un morceau pour enregistrer');return;}
+  if(cur===IMPROV){toast('Choisis un morceau pour enregistrer',{danger:true});return;}
   let stream;
   try{stream=await navigator.mediaDevices.getUserMedia({audio:true});}
-  catch(e){toast('Micro indisponible ou refusé');return;}
+  catch(e){toast('Micro indisponible ou refusé',{danger:true});return;}
   const mime=recMime();
   let mr;
   try{mr=mime?new MediaRecorder(stream,{mimeType:mime}):new MediaRecorder(stream);}
-  catch(e){toast('Enregistrement impossible sur cet appareil');stream.getTracks().forEach(t=>t.stop());return;}
+  catch(e){toast('Enregistrement impossible sur cet appareil',{danger:true});stream.getTracks().forEach(t=>t.stop());return;}
   const chunks=[];
   mr.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};
   mr.onstop=()=>{
@@ -755,7 +782,7 @@ async function saveRecording(){
   if(!p){closeSheet();_recDraft=null;return;}
   const id=uid();
   const ok=await idbPutBlob(id,blob);
-  if(!ok){toast("Impossible d'enregistrer l'audio");closeSheet();_recDraft=null;return;}
+  if(!ok){toast("Impossible d'enregistrer l'audio",{danger:true});closeSheet();_recDraft=null;return;}
   p.recordings=p.recordings||[];
   const sec=section?secList(p).find(s=>s.id===section):null;
   const bpm=sec&&sec.bpm&&sec.bpm.length?sec.bpm[sec.bpm.length-1].v:null;
@@ -775,7 +802,9 @@ function renderRecordings(p){
           <div style="font-size:13px;font-weight:600;">${esc(label||frShort(r.date))}</div>
           <div class="muted" style="font-size:11px;margin-top:2px;">${dur(r.dur)} · ${fmtBytes(r.size)}${r.feel?' · '+esc(feelLabel(r.feel)):''}</div>
         </div>
-        <button class="btn ghost sm" style="flex:0 0 auto;color:#F0857A;border-color:#5a2f2b;" onclick="deleteRecording('${p.id}','${r.id}')">Suppr.</button>
+        <span style="display:inline-flex;flex:0 0 auto;padding:10px 14px 10px 10px;margin:-10px -14px -10px -10px;" onclick="deleteRecording('${p.id}','${r.id}')">
+          <button class="btn ghost sm" style="flex:0 0 auto;color:var(--danger);border-color:var(--danger-border);">Suppr.</button>
+        </span>
       </div>
       <div id="rec-pl-${r.id}" style="margin-top:10px;">
         <button class="btn ghost sm" style="width:100%;" onclick="playRecording('${r.id}')">${playSvg()} Écouter</button>
@@ -792,10 +821,11 @@ async function playRecording(rid){
   box.innerHTML=`<audio controls autoplay style="width:100%;" src="${url}"></audio>`;
 }
 function deleteRecording(pid,rid){
-  if(!confirm('Supprimer cet enregistrement ?'))return;
-  const p=pieceById(pid);if(!p)return;
-  p.recordings=(p.recordings||[]).filter(r=>r.id!==rid);
-  save();idbDelBlob(rid);pieceDetail(pid);
+  confirmSheet('Supprimer cet enregistrement ?','Supprimer',()=>{
+    const p=pieceById(pid);if(!p)return;
+    p.recordings=(p.recordings||[]).filter(r=>r.id!==rid);
+    save();idbDelBlob(rid);pieceDetail(pid);
+  });
 }
 
 /* ---------- Séance a posteriori (ajout / édition) ---------- */
@@ -818,7 +848,7 @@ function aposterioriSheet(sess){
     <div class="field"><label>Ce que j'ai travaillé</label><textarea id="a-w">${esc(s.worked||'')}</textarea></div>
     <div class="field"><label>À faire la prochaine fois</label><textarea id="a-n">${esc(s.next||'')}</textarea></div>`}
     <button class="btn primary" onclick="saveApost('${edit?s.id:''}')">${edit?'Enregistrer':'Ajouter la séance'}</button>
-    ${edit?`<button class="btn ghost sm" style="width:100%;margin-top:10px;color:#F0857A;border-color:#5a2f2b;" onclick="deleteSession('${s.id}')">Supprimer la séance</button>`:''}`);
+    ${edit?`<button class="btn ghost sm" style="width:100%;margin-top:10px;color:var(--danger);border-color:var(--danger-border);" onclick="deleteSession('${s.id}')">Supprimer la séance</button>`:''}`);
   _apick=pid;
 }
 let _apick=null;
@@ -841,7 +871,7 @@ function saveApost(id){
   }
   save();closeSheet();renderCarnet();toast('Séance enregistrée');
 }
-function deleteSession(id){if(!confirm('Supprimer cette séance ?'))return;S.sessions=S.sessions.filter(s=>s.id!==id);save();closeSheet();renderCarnet();toast('Séance supprimée');}
+function deleteSession(id){confirmSheet('Supprimer cette séance ?','Supprimer',()=>{S.sessions=S.sessions.filter(s=>s.id!==id);save();closeSheet();renderCarnet();toast('Séance supprimée');});}
 
 /* ==========================================================================
    CARNET
@@ -882,7 +912,7 @@ function noteSheet(pid){_noteSecId='';const p=pieceById(pid),secs=p?secList(p):[
   <button class="btn primary" onclick="saveNote('${pid}')">Ajouter</button>`);}
 function pickNoteSec(id,el){const was=_noteSecId===id;_noteSecId=was?'':id;
   document.querySelectorAll('#n-secs .chip').forEach(b=>b.classList.toggle('on',!was&&b===el));}
-function saveNote(pid){const t=document.getElementById('n-t').value.trim();if(!t){toast('Écris une note');return;}
+function saveNote(pid){const t=document.getElementById('n-t').value.trim();if(!t){toast('Écris une note',{danger:true});return;}
   const p=pieceById(pid);p.notes=p.notes||[];
   const sEl=document.getElementById('n-s'),sec=sEl?sEl.value.trim():_noteSecId;
   p.notes.push({id:uid(),date:dkey(),section:sec,text:t});save();refreshScreen();pieceDetail(pid);toast('Note ajoutée');}
@@ -893,7 +923,7 @@ function wishSheet(){_worksCache=[];
     <div class="field"><label>Titre / œuvre</label><input id="p-t" list="dl-works" placeholder="La Campanella" autocomplete="off"><datalist id="dl-works"></datalist>
       <div class="muted" style="font-size:12px;margin-top:6px;">Choisis un compositeur pré-chargé pour l'autocomplétion.</div></div>
     <button class="btn primary" onclick="saveWish()">Ajouter à la wishlist</button>`);}
-function saveWish(){const t=document.getElementById('p-t').value.trim();if(!t){toast('Donne un titre');return;}
+function saveWish(){const t=document.getElementById('p-t').value.trim();if(!t){toast('Donne un titre',{danger:true});return;}
   const composer=document.getElementById('p-c').value.trim();
   const dup=findDuplicate(t,composer);if(dup){closeSheet();toast('Ce morceau est déjà dans ta liste');pieceDetail(dup.id);return;}
   S.pieces.push({id:uid(),title:t,composer,epoch:(document.getElementById('p-e')||{}).value||'',status:'wishlist',diff:0,progress:0,tags:[],notes:[],todo:'',createdAt:Date.now()});
@@ -970,7 +1000,7 @@ function renderRepList(){
     const groups={};items.forEach(p=>{const k=p.composer||'—';(groups[k]=groups[k]||[]).push(p);});
     Object.keys(groups).sort((a,b)=>a.localeCompare(b)).forEach(k=>{
       const open=_grpOpen[k]!==false;
-      html+=`<div class="between" style="margin:16px 2px 8px;cursor:pointer;" onclick="toggleGrp('${encodeURIComponent(k)}')">
+      html+=`<div class="between" style="margin:0 2px;padding:16px 0 10px;cursor:pointer;" onclick="toggleGrp('${encodeURIComponent(k)}')">
         <span style="font-weight:600;font-size:14px;">${esc(k)}</span><span class="muted" style="font-size:12px;">${groups[k].length} ${open?'▾':'▸'}</span></div>`;
       if(open)html+=groups[k].map(p=>repRow(p,false)).join('');
     });
@@ -1069,7 +1099,7 @@ function pieceSheet(id,prefill){
       <div class="field"><label>Statut</label><div class="seg" id="p-st"><button class="${_pstatus==='active'?'on':''}" onclick="setPStatus('active',this)">En cours</button><button class="${_pstatus==='mastered'?'on':''}" onclick="setPStatus('mastered',this)">Maîtrisé</button></div></div>
     </div>
     <button class="btn primary" style="margin-top:6px;" onclick="savePiece('${isNew?'':p.id}')">${isNew?'Ajouter':'Enregistrer'}</button>
-    ${isNew?'':`<div class="grid2" style="margin-top:10px;"><button class="btn ghost sm" style="width:100%;" onclick="setPieceStatus('${p.id}','archived')">Archiver</button><button class="btn ghost sm" style="width:100%;color:#F0857A;border-color:#5a2f2b;" onclick="setPieceStatus('${p.id}','abandoned')">Abandonner</button></div>`}
+    ${isNew?'':`<div class="grid2" style="margin-top:10px;"><button class="btn ghost sm" style="width:100%;" onclick="setPieceStatus('${p.id}','archived')">Archiver</button><button class="btn ghost sm" style="width:100%;color:var(--danger);border-color:var(--danger-border);" onclick="setPieceStatus('${p.id}','abandoned')">Abandonner</button></div>`}
     ${isNew?'':`<div class="card" style="margin-top:14px;padding:12px 14px;"><div class="muted" style="font-size:12px;">Maturité</div>
       <div style="font-size:13px;margin-top:4px;">Ajouté ${p.createdAt?'le '+new Date(p.createdAt).toLocaleDateString('fr-FR'):'—'}${p.masteredAt?' · maîtrisé le '+new Date(p.masteredAt).toLocaleDateString('fr-FR'):''}</div>
       ${estimateText(p)?`<div style="font-size:13px;margin-top:4px;color:var(--acc);">${estimateText(p)}</div>`:''}</div>`}`);
@@ -1097,7 +1127,7 @@ function onTitleInput(val){
   if(w.diff){_pdiff=w.diff;paintDiff();}
 }
 function setPStatus(s,el){_pstatus=s;document.querySelectorAll('#p-st button').forEach(b=>b.classList.remove('on'));el.classList.add('on');}
-function savePiece(id){const title=document.getElementById('p-t').value.trim();if(!title){toast('Donne un titre');return;}
+function savePiece(id){const title=document.getElementById('p-t').value.trim();if(!title){toast('Donne un titre',{danger:true});return;}
   const data={title,composer:document.getElementById('p-c').value.trim(),epoch:document.getElementById('p-e').value.trim(),
     opus:document.getElementById('p-o').value.trim(),genre:document.getElementById('p-g').value.trim(),key:document.getElementById('p-k').value.trim(),
     bpm:document.getElementById('p-b').value.trim(),diff:_pdiff,status:_pstatus,
@@ -1142,7 +1172,7 @@ function pieceDetail(id){const p=pieceById(id);if(!p)return;
     ${!isWish&&!closed?renderProgressCard(p):''}
     ${p.todo&&p.todo.trim()?`<div class="card" style="padding:12px 14px;margin-bottom:12px;border-left:2px solid var(--acc);border-radius:0 12px 12px 0;"><span class="muted" style="font-size:12px;">À faire</span><div style="font-size:14px;margin-top:3px;">${esc(p.todo)}</div></div>`:''}
     ${isWish?`<button class="btn primary" onclick="startLearning('${p.id}')">Commencer à apprendre</button>
-      <div class="grid2" style="margin-top:10px;"><button class="btn ghost sm" onclick="editPiece('${p.id}')">Modifier</button><button class="btn ghost sm" style="color:#F0857A;border-color:#5a2f2b;" onclick="deleteWish('${p.id}')">Retirer</button></div>`
+      <div class="grid2" style="margin-top:10px;"><button class="btn ghost sm" onclick="editPiece('${p.id}')">Modifier</button><button class="btn ghost sm" style="color:var(--danger);border-color:var(--danger-border);" onclick="deleteWish('${p.id}')">Retirer</button></div>`
     :closed?`<button class="btn primary" onclick="reopenPiece('${p.id}')">Réactiver (en cours)</button>
       <button class="btn ghost sm" style="width:100%;margin-top:10px;" onclick="editPiece('${p.id}')">Modifier</button>`
     :`<div class="grid2"><button class="btn primary" onclick="detailPlay('${p.id}')">${playSvg()} Jouer</button><button class="btn ghost" onclick="noteSheet('${p.id}')">+ Note</button></div>
@@ -1262,7 +1292,7 @@ function renderSecBody(p,s){
         <button class="btn primary sm" style="flex:0 0 auto;" onclick="noteSecBpm('${p.id}','${s.id}')">Noter</button></div>
       <div class="sub" style="margin-top:9px;"><span style="font-size:11px;">Le plus rapide joué proprement${p.bpm?' · cible '+esc(p.bpm):''}</span>
         ${lastBpm?`<span style="font-size:11px;color:var(--acc);">dernier ${lastBpm.v} le ${frShort(lastBpm.d)}</span>`:''}</div></div>
-    <button class="btn ghost sm" style="width:100%;margin-top:14px;color:#F0857A;border-color:#5a2f2b;" onclick="deleteSection('${p.id}','${s.id}')">Supprimer la section</button>
+    <button class="btn ghost sm" style="width:100%;margin-top:14px;color:var(--danger);border-color:var(--danger-border);" onclick="deleteSection('${p.id}','${s.id}')">Supprimer la section</button>
   </div>`;
 }
 let _secOpen=null,_secBpm={},_detailPid=null;
@@ -1286,8 +1316,8 @@ function noteSecBpm(pid,sid){const p=pieceById(pid);const s=secList(p).find(x=>x
   const v=_secBpm[sid];s.bpm=s.bpm||[];const d=dkey();const last=s.bpm[s.bpm.length-1];
   if(last&&last.d===d)last.v=v;else s.bpm.push({d,v});
   save();toast('Tempo noté');pieceDetail(pid);}
-function deleteSection(pid,sid){if(!confirm('Supprimer cette section ?'))return;const p=pieceById(pid);
-  p.sections=secList(p).filter(x=>x.id!==sid);if(_secOpen===sid)_secOpen=null;recordHist(p);save();refreshScreen();pieceDetail(pid);}
+function deleteSection(pid,sid){confirmSheet('Supprimer cette section ?','Supprimer',()=>{const p=pieceById(pid);
+  p.sections=secList(p).filter(x=>x.id!==sid);if(_secOpen===sid)_secOpen=null;recordHist(p);save();refreshScreen();pieceDetail(pid);});}
 let _cutSize=16;
 function cutSheet(pid){const p=pieceById(pid);if(!p)return;_cutSize=16;
   openSheet(`<h3>Découper en sections</h3>
@@ -1312,11 +1342,11 @@ function paintCutPreview(){
   if(_cutSize==='manual'){el.innerHTML=`<div class="muted" style="font-size:12px;">${bars} mesures enregistrées. Ajoute les sections une par une depuis la fiche.</div>`;return;}
   const step=_cutSize,ranges=[];for(let f=1;f<=bars;f+=step)ranges.push([f,Math.min(bars,f+step-1)]);
   el.innerHTML=`<div class="muted" style="font-size:11px;margin-bottom:9px;">Aperçu · ${ranges.length} section${ranges.length>1?'s':''}, renommables ensuite</div>
-    <div class="map" style="height:16px;">${ranges.map(r=>`<i style="flex:${r[1]-r[0]+1};background:#D2694A;"></i>`).join('')}</div>
+    <div class="map" style="height:16px;">${ranges.map(r=>`<i style="flex:${r[1]-r[0]+1};background:${PHASE_COL.dechiffrage};"></i>`).join('')}</div>
     <div class="sub" style="margin-top:9px;font-size:12px;"><span>mes. ${ranges.map(r=>r[0]+'–'+r[1]).join(' · ')}</span></div>`;
 }
 function applyCut(pid){
-  const bars=parseInt((document.getElementById('cut-bars')||{}).value)||0;if(bars<1){toast('Indique le nombre de mesures');return;}
+  const bars=parseInt((document.getElementById('cut-bars')||{}).value)||0;if(bars<1){toast('Indique le nombre de mesures',{danger:true});return;}
   const p=pieceById(pid);p.bars=bars;p.sections=p.sections||[];
   if(_cutSize!=='manual'){const step=_cutSize;for(let f=1;f<=bars;f+=step)p.sections.push({id:uid(),name:'Section '+(p.sections.length+1),from:f,to:Math.min(bars,f+step-1),todo:'',status:'new',bpm:[]});}
   recordHist(p);save();closeSheet();refreshScreen();pieceDetail(pid);
@@ -1328,7 +1358,7 @@ function markMastered(id){const p=pieceById(id);if(!p)return;const was=p.status=
   if(!p.masteredAt)p.masteredAt=Date.now();
   save();closeSheet();refreshScreen();if(!was)celebrate('Morceau maîtrisé !',p.title);else toast('Maîtrisé');}
 function reopenPiece(id){const p=pieceById(id);if(!p)return;p.status='active';save();pieceDetail(id);toast('Réactivé · en cours');}
-function deleteWish(id){if(!confirm('Retirer ce morceau de « à apprendre » ?'))return;S.pieces=S.pieces.filter(p=>p.id!==id);save();closeSheet();refreshScreen();toast('Retiré');}
+function deleteWish(id){confirmSheet('Retirer ce morceau de « à apprendre » ?','Retirer',()=>{S.pieces=S.pieces.filter(p=>p.id!==id);save();closeSheet();refreshScreen();toast('Retiré');});}
 
 /* ---------- Œuvre / recueil à plusieurs mouvements ---------- */
 let _workMovs=[];
@@ -1352,9 +1382,9 @@ function saveWork(){
   const title=document.getElementById('w-t').value.trim();
   const composer=document.getElementById('w-c').value.trim();
   const epoch=document.getElementById('w-e').value.trim();
-  if(!title){toast("Donne un titre à l'œuvre");return;}
+  if(!title){toast("Donne un titre à l'œuvre",{danger:true});return;}
   const movs=_workMovs.map(m=>m.trim()).filter(Boolean);
-  if(!movs.length){toast('Ajoute au moins un mouvement');return;}
+  if(!movs.length){toast('Ajoute au moins un mouvement',{danger:true});return;}
   const parent={id:uid(),title,composer,epoch,opus:'',genre:'',key:'',diff:0,bpm:'',status:'active',progress:0,tags:[],notes:[],todo:'',createdAt:Date.now(),isEnsemble:true};
   S.pieces.push(parent);
   movs.forEach(m=>{S.pieces.push({id:uid(),title:m,composer,epoch,opus:'',genre:'',key:'',diff:0,bpm:'',status:'active',progress:0,tags:[],notes:[],todo:'',createdAt:Date.now(),parentId:parent.id});});
@@ -1617,7 +1647,11 @@ function backupDue(){if(!S.sessions.length)return false;return (Date.now()-(S.la
 function exportJSON(){S.lastBackup=Date.now();save();download('piano_sauvegarde.json',JSON.stringify(S,null,2),'application/json');toast('Sauvegarde exportée');
   if(document.getElementById('s-settings').classList.contains('active'))renderSettings();}
 function importJSON(){document.getElementById('imp').click();}
-function doImport(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.sessions)throw 0;if(confirm('Remplacer toutes tes données par ce fichier ?')){S=migrate(d);saveNow().then(()=>{renderSettings();toast('Données importées');});}}catch(err){toast('Fichier invalide');}};r.readAsText(f);}
+function doImport(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();
+  r.onload=()=>{let d;try{d=JSON.parse(r.result);if(!d.sessions)throw 0;}catch(err){toast('Fichier invalide',{danger:true});return;}
+    confirmSheet('Remplacer toutes tes données par ce fichier ?','Remplacer',()=>{S=migrate(d);saveNow().then(()=>{renderSettings();toast('Données importées');});});
+  };
+  r.readAsText(f);}
 
 /* ==========================================================================
    ÉTAPE B — Notes ♪, succès, défis (sans boutique)
@@ -1858,7 +1892,7 @@ function concertSheet(){
 }
 function progAdd(id){_program.push(id);concertSheet();}
 function progRemove(i){_program.splice(i,1);concertSheet();}
-function runConcert(){if(!_program.length){toast('Ajoute au moins un morceau');return;}closeSheet();_concert={idx:0,times:_program.map(()=>0),rates:_program.map(()=>1)};concertStage();}
+function runConcert(){if(!_program.length){toast('Ajoute au moins un morceau',{danger:true});return;}closeSheet();_concert={idx:0,times:_program.map(()=>0),rates:_program.map(()=>1)};concertStage();}
 function concertStage(){
   const id=_program[_concert.idx],isLast=_concert.idx===_program.length-1;
   let o=document.getElementById('concert-ov');if(!o){o=document.createElement('div');o.id='concert-ov';document.body.appendChild(o);}
@@ -1919,7 +1953,7 @@ function localNotify(title,body,tag){
   }catch(e){}
 }
 function maybeNotifyReport(){if(reportReady()&&S.settings.notif.weekly)localNotify('Piano — rapport de la semaine','Ton bilan hebdo est prêt.','rapport-semaine');}
-function enableNotifs(){if(typeof Notification==='undefined'){toast('Notifications non supportées');return;}
+function enableNotifs(){if(typeof Notification==='undefined'){toast('Notifications non supportées',{danger:true});return;}
   Notification.requestPermission().then(p=>toast(p==='granted'?'Notifications activées':'Notifications refusées'));}
 
 // Rapport mensuel

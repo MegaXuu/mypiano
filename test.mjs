@@ -137,7 +137,9 @@ call('addSection+deleteSection', () => {
   win.addSection('a4');
   const p = S.pieces.find(x => x.id === 'a4');
   const last = p.sections[p.sections.length - 1];
-  win.deleteSection('a4', last.id);
+  win.deleteSection('a4', last.id); // ouvre confirmSheet() (feuille, plus de confirm() natif)
+  win._runConfirm(); // simule le tap sur le bouton de confirmation
+  if (p.sections.some(s => s.id === last.id)) throw new Error('deleteSection n’a pas supprimé la section');
 });
 call('toggleSec+secBpmStep+noteSecBpm', () => {
   win.pieceDetail('a4');
@@ -165,7 +167,8 @@ call('cutSheet+applyCut(pièce sans sections)', () => {
 call('carnetSheet+commitSession(sections)', () => {
   // Démarre une vraie séance (fixe le `timer` interne, pas accessible depuis window autrement).
   win.quickStart('a4');
-  win.stopSession(); // total < 5s → confirm() stubbé à true → carnetSheet() s'ouvre quand même.
+  win.stopSession(); // total < 5s → ouvre confirmSheet()
+  win._runConfirm(); // simule « Enregistrer quand même » → carnetSheet() s'ouvre
   const chip = win.document.querySelector('#csec-chips-0 .chip');
   if (!chip) throw new Error('chip section introuvable dans le carnet');
   chip.click();

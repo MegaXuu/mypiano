@@ -164,7 +164,21 @@ Polices : titres **Playfair Display**, interface **DM Sans**, chiffres **EB Gara
 
 - **Cycle V3 finitions (UI/UX)** — Audit complet (Bêta 3.6) a défini 5 lots ordonnés, chacun = une release Bêta 3.N :
   - **Lot A (Bêta 3.7)** ✅ : wake lock en séance (`acquireWakeLock`/`releaseWakeLock`, ré-acquis sur `visibilitychange→visible` si timer actif), édition de séance non destructive (`isRichSession` : séance multi-blocs ou avec `entries` → seules date/durée éditables, durée redistribuée au prorata des blocs, récap lecture seule ; création « séance oubliée » inchangée), morceau présélectionné au démarrage (`startSheet` → `recentPieces(1)`), micro-fixes (« 1 jour de série » singulier, emojis 🖐/🎉 retirés, placeholder recherche Répertoire raccourci). Doublon ressenti Carnet vérifié : pas de duplication réelle (code + libellé une seule fois), aucun changement nécessaire.
-  - **Lot B (Bêta 3.8)** : accueil réordonné (anneau compact, CTA au-dessus du pli), tokens --danger/--ok/--warn, `confirmSheet()` remplaçant `confirm()`, cibles tactiles ≥ 44 px, boutons de séance étiquetés + chrono d'enregistrement.
+  - **Lot B (Bêta 3.8)** ✅ : accueil réordonné (anneau compact 120 px en carte horizontale, ordre imposé
+    en-tête→rang→salutation→série/notes→objectif→CTA→reprendre→plan/simulation→alertes→à faire→semaine→
+    à entretenir, citation en pied de page). Tokens `--danger`/`--ok`/`--warn` (`index.html :root`,
+    `--ok`/`--warn` alias de `--acc`/`--gold`, `--danger-border` via `color-mix`) ; `piecePhase()` et
+    `SEC_STATUS` unifiés sur une échelle chromatique partagée (`PHASE_COL`). `confirmSheet(message,
+    label, onConfirm)` (feuille sobre + bouton `.btn.danger` + Annuler) remplace les 6 `confirm()`
+    destructifs (deleteSession, deleteSection, deleteRecording, deleteWish, stopSession, doImport) ; le
+    7e `confirm()` (doublon détecté à la création d'une pièce) reste natif, hors périmètre. `doImport`
+    garde son flux async correct (confirmation après lecture du fichier). `stopSession` sur séance très
+    courte n'arrête plus le timer avant confirmation (évite un état de timer mort si la feuille est
+    juste rejetée). Cibles tactiles ≥ 44 px via padding + marge négative (zone tactile étendue, taille
+    visuelle inchangée) : carets compositeurs (`toggleGrp`), `.sec-car`, bouton « Suppr. » enregistrement
+    (wrapper `<span>` dédié). Séance : étiquettes Pause/Fin/Rec (11 px, muted) sous les boutons ronds,
+    durée d'enregistrement en cours affichée à la place du libellé « Rec » (`paintSession`,
+    `_rec.startTs`) ; `toast(message, {danger:true})` pour les messages d'erreur (bordure `--danger`).
   - **Lot C (Bêta 3.9)** : refonte Carnet (regroupement semaine, filtre), Stats (3 sous-onglets, historique supprimé), Répertoire (ajout unifié, « Enrichir la base » vers Réglages), Voyage (sans auto-scroll). Maquettes validées AVANT de coder.
   - **Lot D (Bêta 3.10)** : jardin v2 (SVG organique), cartes recalibrées (Bronze 2/Argent 5/Or 10), célébrations unifiées. Maquettes validées AVANT de coder.
   - **Lot E** : dettes V3 existantes (audio iPhone réel, retrait `LS_MIRROR`, découpage `app.js`).
