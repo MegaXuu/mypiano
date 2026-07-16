@@ -13,5 +13,8 @@ try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();
 const READY=boot();
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));}
 // iOS peut tuer une PWA en arrière-plan sans avertir : on force le disque avant que ça arrive.
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')saveNow();else if(document.visibilityState==='visible'&&timer&&timer.running)acquireWakeLock();});
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='hidden'){if(_rec)interruptRecording();saveNow();}
+  else if(document.visibilityState==='visible'){if(_rec)finalizeRecording();if(timer&&timer.running)acquireWakeLock();}
+});
 window.addEventListener('pagehide',()=>{saveNow();});

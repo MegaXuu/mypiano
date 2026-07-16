@@ -167,8 +167,18 @@ Polices : titres **Playfair Display**, interface **DM Sans**, chiffres **EB Gara
      l'appareil ne supporte pas `MediaRecorder`/`getUserMedia`), blob dans IndexedDB (store
      `recordings`, jamais dans `S`), rattaché à la pièce (et section si étape 2 faite) avec date/durée,
      réécoute paresseuse + suppression + taille affichée dans `pieceDetail`, auto-éval pp–ff à la fin
-     de l'enregistrement. **Format à valider sur iPhone réel** (mp4/aac attendu côté Safari — non
-     testé en conditions réelles, seulement le repli permission/API refusée).
+     de l'enregistrement. **Validé sur iPhone réel (PWA installée, 2026-07-16)** : permission micro,
+     format produit = **`audio/mp4`** (attendu), réécoute immédiate et **après fermeture/réouverture**
+     (blob IndexedDB persistant), taille affichée et suppression (métadonnée + blob) — tout OK.
+     **Bug trouvé + corrigé (Bêta 3.12)** : écran verrouillé pendant l'enregistrement → iOS suspend la
+     captation micro mais l'app croyait enregistrer encore (chrono qui défile, durée finale mensongère).
+     Correctif : `visibilitychange→hidden` **interrompt** l'enregistrement (`interruptRecording`, fige
+     l'instant d'interruption pour une durée honnête) ; finalisation unique et idempotente
+     (`finalizeRecording`, appelée par `onstop` ou en secours au retour au premier plan si `onstop` n'a
+     pas pu se déclencher sous suspension iOS) ; feuille de fin affiche une mention si coupé par le
+     verrouillage ; blob vide → abandon propre avec toast. **Le correctif reste à revérifier sur
+     l'appareil après déploiement** (le comportement iOS en arrière-plan n'est pas reproductible hors
+     device réel).
   5. ✅ **Bilans & insights** (Stats, section « Aperçus ») : trois croisements sobres, chacun affiché
      seulement si le seuil de confiance est atteint (sinon rien plutôt qu'une phrase creuse) —
      ressenti moyen par moment de la journée (`momentInsight`, ≥3 séances par créneau, écart ≥0.6 sur
@@ -226,8 +236,9 @@ Polices : titres **Playfair Display**, interface **DM Sans**, chiffres **EB Gara
     confettis).
   - **Lot E** : dettes V3 existantes. ✅ **Découpage `app.js`** (Bêta 3.11) : monolithe scindé en 14
     modules `<script>` classiques dans `js/` (voir « Fichiers » — découpe byte-identique vérifiée par
-    `diff`, `node --check` par fichier, `npm test` et chargement réel navigateur). **Restent** : audio
-    iPhone réel, retrait `LS_MIRROR`.
+    `diff`, `node --check` par fichier, `npm test` et chargement réel navigateur). **Restent** :
+    revérifier sur iPhone le correctif écran-verrouillé de la Bêta 3.12 (audio validé par ailleurs),
+    retrait `LS_MIRROR`.
 
 - **Reporté en V4** : **sauvegarde auto vers NAS Synology** (on reste sur GitHub Pages quelques
   mois) ; synchro multi-appareils ; éventuelle migration React+TS+Vite ou app SwiftUI native.

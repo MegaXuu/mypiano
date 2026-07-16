@@ -249,7 +249,7 @@ function commitSession(total){
 function buzz(){try{navigator.vibrate&&navigator.vibrate([50,40,50]);}catch(e){}}
 
 /* ---------- Enregistrement audio (étape 4 V3) ---------- */
-let _rec=null,_recDraft=null;
+let _rec=null,_recDraft=null,_recInterrupted=false;
 function recAvailable(){return typeof MediaRecorder!=='undefined'&&!!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia);}
 function recMime(){
   if(typeof MediaRecorder==='undefined')return '';
@@ -272,24 +272,36 @@ async function toggleRecording(){
   catch(e){toast('Enregistrement impossible sur cet appareil',{danger:true});stream.getTracks().forEach(t=>t.stop());return;}
   const chunks=[];
   mr.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};
-  mr.onstop=()=>{
-    stream.getTracks().forEach(t=>t.stop());
-    const startTs=_rec.startTs,pieceId=_rec.pieceId;
-    const blob=new Blob(chunks,{type:mr.mimeType||mime||'audio/webm'});
-    _rec=null;paintSession();
-    finishRecording(pieceId,blob,Math.max(1,Math.round((Date.now()-startTs)/1000)));
-  };
-  _rec={mr,pieceId:cur,startTs:Date.now()};
+  mr.onstop=()=>finalizeRecording();
+  _rec={mr,stream,mime,chunks,pieceId:cur,startTs:Date.now(),interruptTs:0};
+  _recInterrupted=false;
   mr.start();
   paintSession();
 }
 function stopRecording(){if(_rec&&_rec.mr&&_rec.mr.state!=='inactive')_rec.mr.stop();}
+// iOS suspend la captation micro dès que l'app passe en arrière-plan (écran verrouillé) :
+// on fige l'instant d'interruption et on stoppe, pour ne garder que le son réellement capté.
+function interruptRecording(){if(!_rec)return;_recInterrupted=true;_rec.interruptTs=Date.now();stopRecording();}
+// Finalisation unique et idempotente : appelée par onstop, ou en secours au retour au premier
+// plan si onstop n'a pas pu se déclencher pendant la suspension iOS. Le garde `!_rec` évite le double appel.
+function finalizeRecording(){
+  if(!_rec)return;
+  const {stream,mime,chunks,startTs,interruptTs,pieceId,mr}=_rec;
+  try{stream.getTracks().forEach(t=>t.stop());}catch(e){}
+  const blob=new Blob(chunks,{type:(mr&&mr.mimeType)||mime||'audio/webm'});
+  const durSec=Math.max(1,Math.round(((interruptTs||Date.now())-startTs)/1000));
+  _rec=null;paintSession();
+  if(!blob.size){_recInterrupted=false;toast('Enregistrement interrompu, aucun son capté',{danger:true});return;}
+  finishRecording(pieceId,blob,durSec);
+}
 function finishRecording(pieceId,blob,durSec){
   const p=pieceById(pieceId);
+  const interrupted=_recInterrupted;_recInterrupted=false;
   _recDraft={pieceId,blob,durSec,section:'',feel:''};
   const secs=p?secList(p):[];
   openSheet(`<h3>Enregistrement</h3>
     <p class="muted" style="font-size:13px;margin-top:-6px;">${dur(durSec)} · ${esc(p?p.title:'')}</p>
+    ${interrupted?`<p style="font-size:12px;color:var(--warn);margin-top:-2px;">Écran verrouillé pendant l'enregistrement : seul le son capté avant le verrouillage a été gardé.</p>`:''}
     ${secs.length?`<div class="field"><label>Section (optionnel)</label><div class="chips" id="rec-secs">${secs.map(s=>`<button type="button" class="chip" onclick="pickRecSec('${s.id}',this)">${esc(s.name)}</button>`).join('')}</div></div>`:''}
     <div class="field"><label>Ressenti à l'écoute (optionnel)</label><div class="dyn" id="rec-f">${FEEL_ORDER.map(f=>`<button data-f="${f}" onclick="pickRecFeel('${f}',this)">${f}</button>`).join('')}</div>
       <div class="muted" id="rec-fl" style="font-size:13px;margin-top:7px;text-align:center;">—</div></div>
