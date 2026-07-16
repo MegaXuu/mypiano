@@ -151,7 +151,11 @@ et `.filet` (hairline + losange or centré, ornemental).
 - Pas d'emoji dans l'UI (sauf rares exceptions déjà en place). Français partout.
 - **Pas de métronome** (refus explicite). Le suivi de tempo = **saisie manuelle du bpm stable**.
 - Déploiement : `git push` → GitHub Pages republie (~1 min). **Incrémenter `CACHE`** sinon l'app
-  installée ne voit pas la mise à jour ; ouvrir l'app 2 fois côté iPhone pour activer la nouvelle version.
+  installée ne voit pas la mise à jour. Depuis la Bêta 3.16, `js/boot.js` vérifie une nouvelle
+  version à chaque retour au premier plan (`reg.update()`) et recharge automatiquement dès que le
+  nouveau service worker prend la main (`controllerchange`) — un simple retour à l'app suffit
+  normalement ; en cas de blocage, GitHub Pages/Fastly cache les fichiers ~10 min (`Cache-Control:
+  max-age=600`), donc attendre un peu avant de soupçonner autre chose côté iOS.
 
 ## État & feuille de route
 - **Fait (v2)** : séances, fiche morceau unifiée, répertoire trié/filtré/tags, base compositeurs,

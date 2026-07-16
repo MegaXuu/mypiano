@@ -22,9 +22,10 @@
 | ✅ R1 | Bêta 3.13 | Fondations : tokens, grain, composants de base |
 | ✅ R2 | Bêta 3.14 | Dock flottant, transitions orchestrées, accueil « programme » |
 | ✅ R3 | Bêta 3.15 | Séance « mode scène » + feuilles de séance |
-| ☐ R4 | Bêta 3.16 | Carnet, Répertoire, fiche morceau |
-| ☐ R5 | Bêta 3.17 | Voyage, Stats, Réglages, célébrations |
-| ☐ R6 | Bêta 3.18 | Polish transversal, états vides illustrés, accessibilité, QA |
+| ✅ — | Bêta 3.16 | Correctif hors-lot : mise à jour auto du service worker (voir plus bas) |
+| ☐ R4 | Bêta 3.17 | Carnet, Répertoire, fiche morceau |
+| ☐ R5 | Bêta 3.18 | Voyage, Stats, Réglages, célébrations |
+| ☐ R6 | Bêta 3.19 | Polish transversal, états vides illustrés, accessibilité, QA |
 
 ---
 
@@ -170,14 +171,27 @@ Coche R3 dans ROADMAP-RECITAL.md. Termine par un commit (message français).
 
 ---
 
-## Lot R4 — Carnet, Répertoire, fiche morceau (Bêta 3.16)
+## Bêta 3.16 — Correctif hors-lot : mise à jour automatique du service worker
+
+Constat après R3 : sur iPhone, l'app installée reste bloquée sur une ancienne Bêta même
+après un déploiement réussi côté GitHub Pages (le service worker sert son cache tant qu'il
+n'a pas détecté et activé la nouvelle version — iOS ne fait pas ce contrôle de façon fiable
+tout seul). Correctif dans `js/boot.js` : `reg.update()` appelé à chaque retour au premier
+plan (`visibilitychange→visible`) pour forcer la vérification, et rechargement automatique
+une seule fois sur `controllerchange` (le nouveau service worker, déjà en `skipWaiting` +
+`clients.claim`, prend la main mais la page déjà ouverte servait encore l'ancien JS).
+`CACHE` → `piano-b3-16`, `APP_VERSION` → `'Bêta 3.16'`. Aucun changement visuel.
+
+---
+
+## Lot R4 — Carnet, Répertoire, fiche morceau (Bêta 3.17)
 
 **But** : le journal d'édition et les fiches d'œuvres avec monogrammes.
 
 **Prompt à coller :**
 
 ```
-Lot R4 de l'overhaul « Récital » (voir ROADMAP-RECITAL.md, R1–R3 livrés) — Bêta 3.16.
+Lot R4 de l'overhaul « Récital » (voir ROADMAP-RECITAL.md, R1–R3 livrés) — Bêta 3.17.
 Carnet + Répertoire + fiche morceau. Aucune logique modifiée (filtres, pagination,
 sections/mesures, enregistrements : comportements intouchés).
 
@@ -207,21 +221,21 @@ sections/mesures, enregistrements : comportements intouchés).
 5) Vérifie au dev server : filtres du Carnet, groupes du Répertoire, une fiche avec sections
    et une sans ; npm test doit passer.
 
-Contraintes : diffs ciblés ; node --check ; incrémente CACHE (sw.js) en piano-b3-16
-ET APP_VERSION (js/state.js) en 'Bêta 3.16' ; pas d'emoji ; français sobre.
+Contraintes : diffs ciblés ; node --check ; incrémente CACHE (sw.js) en piano-b3-17
+ET APP_VERSION (js/state.js) en 'Bêta 3.17' ; pas d'emoji ; français sobre.
 Coche R4 dans ROADMAP-RECITAL.md. Termine par un commit (message français).
 ```
 
 ---
 
-## Lot R5 — Voyage, Stats, Réglages, célébrations (Bêta 3.17)
+## Lot R5 — Voyage, Stats, Réglages, célébrations (Bêta 3.18)
 
 **But** : l'écrin du prestige (l'or travaille enfin) et une data viz raffinée.
 
 **Prompt à coller :**
 
 ```
-Lot R5 de l'overhaul « Récital » (voir ROADMAP-RECITAL.md, R1–R4 livrés) — Bêta 3.17.
+Lot R5 de l'overhaul « Récital » (voir ROADMAP-RECITAL.md, R1–R4 livrés) — Bêta 3.18.
 Voyage + Stats + Réglages + célébrations. Aucune logique modifiée.
 
 1) Voyage (renderVoyageBody) :
@@ -253,21 +267,21 @@ Voyage + Stats + Réglages + célébrations. Aucune logique modifiée.
 6) Vérifie au dev server les 4 sous-onglets du Voyage, les 3 des Stats, une célébration
    (déclenche-la manuellement en console) ; npm test doit passer.
 
-Contraintes : diffs ciblés ; node --check ; incrémente CACHE (sw.js) en piano-b3-17
-ET APP_VERSION (js/state.js) en 'Bêta 3.17' ; pas d'emoji ; français sobre.
+Contraintes : diffs ciblés ; node --check ; incrémente CACHE (sw.js) en piano-b3-18
+ET APP_VERSION (js/state.js) en 'Bêta 3.18' ; pas d'emoji ; français sobre.
 Coche R5 dans ROADMAP-RECITAL.md. Termine par un commit (message français).
 ```
 
 ---
 
-## Lot R6 — Polish final & QA (Bêta 3.18)
+## Lot R6 — Polish final & QA (Bêta 3.19)
 
 **But** : la passe transversale qui fait tenir l'ensemble, puis validation iPhone.
 
 **Prompt à coller :**
 
 ```
-Lot R6, dernier lot de l'overhaul « Récital » (voir ROADMAP-RECITAL.md, R1–R5 livrés) — Bêta 3.18.
+Lot R6, dernier lot de l'overhaul « Récital » (voir ROADMAP-RECITAL.md, R1–R5 livrés) — Bêta 3.19.
 Polish transversal + QA. Aucune logique modifiée.
 
 1) Passe de cohérence : parcours chaque écran au dev server et corrige les divergences
@@ -292,7 +306,7 @@ Polish transversal + QA. Aucune logique modifiée.
    dock + safe-area, mode scène OLED, fluidité du stagger, feuilles, install PWA à jour).
 
 Contraintes : diffs ciblés ; node --check ; npm test doit passer ; incrémente CACHE (sw.js)
-en piano-b3-18 ET APP_VERSION (js/state.js) en 'Bêta 3.18' ; pas d'emoji ; français sobre.
+en piano-b3-19 ET APP_VERSION (js/state.js) en 'Bêta 3.19' ; pas d'emoji ; français sobre.
 Termine par un commit (message français).
 ```
 
