@@ -5,7 +5,7 @@
 
 const KEY = 'pianoV2';
 const IMPROV = '__improv__';
-const APP_VERSION = 'Bêta 3.8'; // à synchroniser avec CACHE dans sw.js à chaque release
+const APP_VERSION = 'Bêta 3.9'; // à synchroniser avec CACHE dans sw.js à chaque release
 
 const STONES = [
   {n:'Apprenti',h:10,c:'#E0A83B'},{n:'Élève',h:20,c:'#C9CDDA'},{n:'Musicien',h:30,c:'#9BA0AE'},
@@ -876,24 +876,55 @@ function deleteSession(id){confirmSheet('Supprimer cette séance ?','Supprimer',
 /* ==========================================================================
    CARNET
    ========================================================================== */
+let carnetFilter='',carnetShown=60;
 function renderCarnet(){
   document.getElementById('s-carnet').innerHTML=`
     <h1>Carnet</h1><p class="eyebrow">Mon journal de travail.</p>
     <div id="carnet-body"></div>`;
   renderCarnetBody();
 }
+function carnetPieces(){const seen=new Set(),out=[];
+  for(let i=S.sessions.length-1;i>=0&&out.length<10;i--){const bl=S.sessions[i].blocks;
+    for(let j=bl.length-1;j>=0;j--){const pid=bl[j].piece;if(seen.has(pid))continue;seen.add(pid);out.push(pid);if(out.length>=10)break;}}
+  return out;}
+function setCarnetFilter(id){carnetFilter=carnetFilter===id?'':id;carnetShown=60;renderCarnetBody();}
+function moreCarnet(){carnetShown+=60;renderCarnetBody();}
+function truncWord(s,max){if(s.length<=max)return s;const cut=s.slice(0,max+1);const sp=cut.lastIndexOf(' ');return (sp>0?cut.slice(0,sp):cut.slice(0,max))+'…';}
 function renderCarnetBody(){
   const el=document.getElementById('carnet-body');
   if(!el)return;
-  const list=[...S.sessions].reverse();
+  const all=[...S.sessions].reverse();
+  const filtered=carnetFilter?all.filter(s=>s.blocks.some(b=>b.piece===carnetFilter)):all;
+  const shown=filtered.slice(0,carnetShown);
+  const chips=carnetPieces();
+  const chipsHtml=chips.length?`<div class="chips" style="flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;margin-bottom:4px;">
+    <button class="chip ${carnetFilter?'':'on'}" style="flex:0 0 auto;" onclick="setCarnetFilter('')">Tous</button>
+    ${chips.map(id=>`<button class="chip ${carnetFilter===id?'on':''}" style="flex:0 0 auto;" onclick="setCarnetFilter('${id}')">${esc(pieceName(id))}</button>`).join('')}
+  </div>`:'';
+  const curWk=weekKey();
+  let groups='',gWk='',gSec=0,gDays=new Set(),gItems=[];
+  const flush=()=>{if(!gItems.length)return;
+    const label=gWk===curWk?'Cette semaine':'Semaine du '+frShort(gWk);
+    groups+=`<div class="between" style="margin:22px 2px 8px;">
+      <span class="serif" style="font-size:17px;">${label}</span>
+      <span class="muted" style="font-size:12px;">${dur(gSec)} · ${gDays.size} j</span></div>${gItems.join('')}`;};
+  shown.forEach(s=>{
+    const wk=weekKey(new Date(s.date+'T00:00'));
+    if(wk!==gWk){flush();gWk=wk;gSec=0;gDays=new Set();gItems=[];}
+    gSec+=sessionSeconds(s);gDays.add(s.date);
+    const names=[...new Set(s.blocks.map(b=>pieceName(b.piece)))].join(' · ');
+    const prev=sessPreview(s);
+    gItems.push(`<div class="item" onclick='aposterioriSheet(${JSON.stringify(s).replace(/'/g,"&#39;")})'>
+      <div style="min-width:0;"><div class="title">${esc(names)}</div>
+      <div class="meta">${frShort(s.date)} · ${dur(sessionSeconds(s))}${s.feeling?' · '+esc(feelLabel(s.feeling)):''}${prev?' · '+esc(truncWord(prev,32)):''}</div></div>
+      <div class="r muted">›</div></div>`);
+  });
+  flush();
+  const more=filtered.length>carnetShown?`<button class="btn ghost sm" style="width:100%;margin-top:16px;" onclick="moreCarnet()">Afficher 60 séances de plus</button>
+    <p class="muted" style="font-size:12px;text-align:center;margin:10px 0 0;">${shown.length} séance${shown.length>1?'s':''} sur ${filtered.length}</p>`:'';
   el.innerHTML=`<button class="btn ghost sm" style="width:100%;margin:16px 0 14px;" onclick="aposterioriSheet()">+ Ajouter une séance oubliée</button>`+
-    (list.length?list.slice(0,60).map(s=>{
-      const names=[...new Set(s.blocks.map(b=>pieceName(b.piece)))].join(' · ');
-      return `<div class="item" onclick='aposterioriSheet(${JSON.stringify(s).replace(/'/g,"&#39;")})'>
-        <div style="min-width:0;"><div class="title">${esc(names)}</div>
-        <div class="meta">${frShort(s.date)} · ${dur(sessionSeconds(s))}${s.feeling?' · '+esc(feelLabel(s.feeling)):''}${sessPreview(s)?' · '+esc(sessPreview(s).slice(0,32)):''}</div></div>
-        <div class="r muted">›</div></div>`;
-    }).join(''):'<div class="empty">Aucune séance.<br>Lance-toi, ou ajoute une séance oubliée.</div>');
+    chipsHtml+
+    (shown.length?groups+more:'<div class="empty">'+(carnetFilter?'Aucune séance pour ce morceau.':'Aucune séance.<br>Lance-toi, ou ajoute une séance oubliée.')+'</div>');
 }
 function dynScale(label,val,field){const idx=FEEL_ORDER.indexOf(val);
   return `<div style="margin-bottom:12px;"><div class="sub" style="margin-bottom:6px;"><span>${label}</span><span>${val?esc(feelLabel(val)):'—'}</span></div>
@@ -939,16 +970,31 @@ const SORT_LABELS={composer:'compositeur',title:'titre',recent:'dernière fois',
 function activeFilterCount(){let n=0;if(repF.composer)n++;if(repF.epoch)n++;if(repF.genre)n++;if(repF.tag)n++;if(repF.diffMin>1||repF.diffMax<9)n++;if(repF.notPlayed>0)n++;return n;}
 function distinctVals(key){const s=new Set();S.pieces.forEach(p=>{if(!p.isEnsemble&&p[key])s.add(p[key]);});return [...s].sort((a,b)=>a.localeCompare(b));}
 function distinctTags(){const s=new Set();S.pieces.forEach(p=>(p.tags||[]).forEach(t=>s.add(t)));return [...s].sort((a,b)=>a.localeCompare(b));}
+function addChoiceSheet(){
+  openSheet(`<h3>Ajouter au répertoire</h3>
+    <div class="item" style="align-items:flex-start;" onclick="addPieceSheet()">
+      <svg viewBox="0 0 24 24" class="ic" style="width:20px;height:20px;color:var(--acc);margin-top:2px;"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.4"/><circle cx="16.5" cy="16" r="2.4"/></svg>
+      <div style="min-width:0;"><div class="title">Un morceau</div>
+      <div class="meta" style="line-height:1.45;">Une pièce seule, que tu commences à travailler.</div></div>
+      <div class="r muted">›</div></div>
+    <div class="item" style="align-items:flex-start;" onclick="workSheet()">
+      <svg viewBox="0 0 24 24" class="ic" style="width:20px;height:20px;color:var(--acc);margin-top:2px;"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 9.5h16M4 15h16"/></svg>
+      <div style="min-width:0;"><div class="title">Une œuvre à mouvements</div>
+      <div class="meta" style="line-height:1.45;">Sonate, suite, cycle… chaque mouvement devient un morceau.</div></div>
+      <div class="r muted">›</div></div>
+    <div class="item" style="align-items:flex-start;" onclick="wishSheet()">
+      <svg viewBox="0 0 24 24" class="ic" style="width:20px;height:20px;color:var(--t2);margin-top:2px;"><path d="M12 3v18M3 12h18"/><circle cx="12" cy="12" r="9"/></svg>
+      <div style="min-width:0;"><div class="title">À apprendre un jour</div>
+      <div class="meta" style="line-height:1.45;">Une envie à garder de côté, sans la commencer.</div></div>
+      <div class="r muted">›</div></div>
+    <button class="btn ghost sm" style="width:100%;margin-top:12px;" onclick="closeSheet()">Annuler</button>`);
+}
 function renderRep(){
   document.getElementById('s-rep').innerHTML=`
-    <div class="between"><h1>Répertoire</h1><div class="row" style="gap:8px;"><button class="btn ghost sm" onclick="workSheet()">+ Œuvre</button><button class="btn primary sm" onclick="addPieceSheet()">+ Ajouter</button></div></div>
+    <div class="between"><h1>Répertoire</h1><button class="btn primary sm" onclick="addChoiceSheet()">+ Ajouter</button></div>
     <div class="field" style="margin-top:16px;position:relative;">
       <input id="rep-q" placeholder="Compositeur ou œuvre…" oninput="repSearch(this.value)" autocomplete="off">
       <div id="rep-sug"></div></div>
-    <div class="row" style="gap:10px;margin:-2px 0 12px;align-items:center;justify-content:center;">
-      <button id="sync-btn" class="btn ghost sm" style="flex:0 0 auto;" onclick="syncOpus(true)">↻ Enrichir la base</button>
-      <span class="muted" style="font-size:11px;">${Object.values(S.opusCache||{}).reduce((a,x)=>a+x.length,0)?Object.values(S.opusCache).reduce((a,x)=>a+x.length,0)+' œuvres':'hors-ligne'}</span>
-    </div>
     <div class="seg" style="margin:6px 0 10px;">
       <button class="${repFilter==='wishlist'?'on':''}" onclick="setRep('wishlist')" style="font-size:12px;">Apprendre</button>
       <button class="${repFilter==='active'?'on':''}" onclick="setRep('active')" style="font-size:12px;">En cours</button>
@@ -1007,8 +1053,7 @@ function renderRepList(){
   } else {
     html+=items.map(p=>repRow(p,false)).join('');
   }
-  const addWishBtn=repFilter==='wishlist'?'<button class="btn ghost sm" style="width:100%;margin-bottom:12px;" onclick="wishSheet()">+ Ajouter un morceau à apprendre</button>':'';
-  el.innerHTML=addWishBtn+(html||'<div class="empty">Aucun morceau ne correspond.<br>'+(repFilter==='wishlist'?'Rien pour l\'instant.':'Ajuste les filtres, ou ajoute une œuvre.')+'</div>');
+  el.innerHTML=html||'<div class="empty">Aucun morceau ne correspond.<br>'+(repFilter==='wishlist'?'Rien pour l\'instant.':'Ajuste les filtres, ou ajoute une œuvre.')+'</div>';
 }
 function toggleGrp(k){k=decodeURIComponent(k);_grpOpen[k]=_grpOpen[k]===false?true:false;renderRepList();}
 function repSortSheet(){
@@ -1394,7 +1439,7 @@ function saveWork(){
 /* ==========================================================================
    VOYAGE
    ========================================================================== */
-let voyageTab='voyage';
+let voyageTab='voyage',voyageRanksOpen=false;
 function renderVoyage(){
   document.getElementById('s-voyage').innerHTML=`
     <h1 class="serif">Le Grand Voyage</h1>
@@ -1408,6 +1453,7 @@ function renderVoyage(){
   renderVoyageBody();
 }
 function setVoyage(t){voyageTab=t;renderVoyage();}
+function toggleVoyageRanks(){voyageRanksOpen=!voyageRanksOpen;renderVoyageBody();}
 function renderVoyageBody(){
   const el=document.getElementById('voyage-body');
   if(voyageTab==='succes'){renderSucces(el);return;}
@@ -1416,6 +1462,15 @@ function renderVoyageBody(){
   const hours=totalSeconds()/3600, cur=currentStone(), next=nextStone();
   const hoursDisp=hours<10?hours.toFixed(1):Math.round(hours);
   const prevH=cur?cur.h:0, span=next?(next.h-prevH):1, prog=next?Math.min(1,(hours-prevH)/span):1;
+  const focusIdx=Math.max(0,cur?STONES.indexOf(cur):0);
+  const from=voyageRanksOpen?0:Math.max(0,focusIdx-3);
+  const to=voyageRanksOpen?STONES.length-1:Math.min(STONES.length-1,focusIdx+3);
+  let rows='';
+  for(let idx=to;idx>=from;idx--){const s=STONES[idx],reached=hours>=s.h,isNext=next&&s.n===next.n;
+    rows+=`<div class="rank" style="${reached?'':'opacity:.42;'}">
+      <div class="dot">${noteIcon(reached?s.c:'#6A6A78',reached?24:19,glyphFor(idx))}</div>
+      <div class="between" style="flex:1;min-width:0;"><span style="font-weight:600;color:${reached?'var(--gold)':'var(--tc)'};">${s.n}${isNext?' <span class="tag acc" style="padding:2px 8px;">en cours</span>':''}</span>
+      <span class="num muted">${s.h.toLocaleString('fr-FR')} h</span></div></div>`;}
   el.innerHTML=`
     <div class="card hi" style="box-shadow:inset 0 0 0 1px rgba(228,197,138,.25);">
       <div class="between"><div class="row" style="gap:12px;">${noteIcon(cur?cur.c:'#888',32,cur?rankGlyph(cur):'♪')}
@@ -1425,33 +1480,41 @@ function renderVoyageBody(){
       <div class="bar"><i style="width:${Math.round(prog*100)}%;background:linear-gradient(90deg,var(--acc),var(--gold));"></i></div>
       <div class="muted" style="font-size:12px;margin-top:8px;">Encore ${Math.max(0,Math.round(next.h-hours))} h avant ${next.n}</div>`:'<div class="muted" style="margin-top:14px;">Voyage accompli — Maestro Assoluto atteint. ♫</div>'}
     </div>
-    <div class="muted" style="font-size:12px;margin:20px 0 10px;">18 rangs · d'Apprenti à Maestro Assoluto</div>
-    <div class="path">${[...STONES].reverse().map((s,ri)=>{
-      const idx=STONES.length-1-ri;const reached=hours>=s.h,isNext=next&&s.n===next.n;
-      return `<div class="rank" id="${isNext?'voyage-current':(!next&&cur&&s.n===cur.n?'voyage-current':'')}" style="${reached?'':'opacity:.42;'}">
-        <div class="dot">${noteIcon(reached?s.c:'#6A6A78',reached?24:19,glyphFor(idx))}</div>
-        <div class="between" style="flex:1;min-width:0;"><span style="font-weight:600;color:${reached?'var(--gold)':'var(--tc)'};">${s.n}${isNext?' <span class="tag acc" style="padding:2px 8px;">en cours</span>':''}</span>
-        <span class="num muted">${s.h.toLocaleString('fr-FR')} h</span></div></div>`;}).join('')}</div>`;
-  try{(window.requestAnimationFrame||window.setTimeout)(()=>{try{const c=document.getElementById('voyage-current');if(c)c.scrollIntoView({block:'center'});}catch(e){}},0);}catch(e){}
+    <div class="muted" style="font-size:12px;margin:20px 0 10px;">${voyageRanksOpen?"18 rangs · d'Apprenti à Maestro Assoluto":'Autour de toi · rang '+(focusIdx+1)+' sur 18'}</div>
+    <div class="path">${rows}</div>
+    <button class="btn ghost sm" style="width:100%;margin-top:14px;" onclick="toggleVoyageRanks()">${voyageRanksOpen?'Réduire':'Voir les 18 rangs'}</button>`;
 }
 
 /* ==========================================================================
    STATISTIQUES
    ========================================================================== */
-let statSplit='composer';
+let statSplit='composer',statsTab='activite';
 function renderStats(){
-  const bars=[];let max=1;for(let i=6;i>=0;i--){const d=addDays(new Date(),-i);const s=secondsOnDay(dkey(d));bars.push({d,s});max=Math.max(max,s);}
-  let longest=0;S.sessions.forEach(s=>longest=Math.max(longest,sessionSeconds(s)));
-  let bestDay=0;practiceDays().forEach(k=>bestDay=Math.max(bestDay,secondsOnDay(k)));
-  let bestWk=0;if(S.sessions.length){const first=new Date([...practiceDays()].sort()[0]);for(let d=new Date(first);d<=new Date();d=addDays(d,7)){let t=0;for(let i=0;i<7;i++)t+=secondsOnDay(dkey(addDays(d,i)));bestWk=Math.max(bestWk,t);}}
   document.getElementById('s-stats').innerHTML=`
     <h1>Statistiques</h1>
     <div class="grid2" style="margin-top:16px;">
       <div class="metric"><div class="v">${durH(totalSeconds())}</div><div class="l">temps total joué</div></div>
       <div class="metric"><div class="v">${S.sessions.length}</div><div class="l">séances au total</div></div>
     </div>
-    <h2>Aperçus</h2>${renderInsights()}
-    <div class="card" style="margin-top:14px;">
+    <div class="seg" style="margin:16px 0 4px;">
+      <button class="${statsTab==='activite'?'on':''}" onclick="setStatsTab('activite')" style="font-size:12px;">Activité</button>
+      <button class="${statsTab==='rep'?'on':''}" onclick="setStatsTab('rep')" style="font-size:12px;">Répertoire</button>
+      <button class="${statsTab==='records'?'on':''}" onclick="setStatsTab('records')" style="font-size:12px;">Records</button>
+    </div>
+    <div id="stats-body"></div>`;
+  renderStatsBody();
+}
+function setStatsTab(t){statsTab=t;renderStats();}
+function renderStatsBody(){
+  const el=document.getElementById('stats-body');
+  if(!el)return;
+  el.innerHTML=statsTab==='rep'?renderStatsRep():statsTab==='records'?renderStatsRecords():renderStatsActivite();
+}
+function renderStatsActivite(){
+  const bars=[];let max=1;for(let i=6;i>=0;i--){const d=addDays(new Date(),-i);const s=secondsOnDay(dkey(d));bars.push({d,s});max=Math.max(max,s);}
+  return `
+    <h2>7 derniers jours</h2>
+    <div class="card">
       <div class="between" style="margin-bottom:6px;"><span style="font-weight:600;">7 derniers jours</span><span class="muted" style="font-size:13px;">${dur(weekSeconds())} cette sem.</span></div>
       <div class="bars">${bars.map((x,i)=>{const h=x.s?Math.max(6,Math.round(x.s/max*100)):2;const lb=x.d.toLocaleDateString('fr-FR',{weekday:'short'}).slice(0,3);
         return `<div class="b ${i===6?'today':''}" style="height:${h}%;${x.s?'':'background:var(--surface2);'}"><span class="cap">${x.s?Math.round(x.s/60)+'′':'·'}</span><span class="lb">${lb}</span></div>`;}).join('')}</div>
@@ -1460,20 +1523,29 @@ function renderStats(){
     ${weekBars()}
     <h2>Régularité · 12 semaines</h2>
     <div class="card">${heatmap()}</div>
-    <h2>Meilleurs moments</h2>${hourHeat()}
+    <h2>Meilleurs moments</h2>${hourHeat()}`;
+}
+function renderStatsRep(){
+  return `
     <h2>Temps par morceau</h2>${byPiece()}
     <h2>Répartition</h2>
     <div class="seg" style="margin-bottom:12px;"><button class="${statSplit==='composer'?'on':''}" onclick="setSplit('composer')">Compositeur</button><button class="${statSplit==='epoch'?'on':''}" onclick="setSplit('epoch')">Époque</button></div>
     ${splitView()}
+    ${renderInsights()}`;
+}
+function renderStatsRecords(){
+  let longest=0;S.sessions.forEach(s=>longest=Math.max(longest,sessionSeconds(s)));
+  let bestDay=0;practiceDays().forEach(k=>bestDay=Math.max(bestDay,secondsOnDay(k)));
+  let bestWk=0;if(S.sessions.length){const first=new Date([...practiceDays()].sort()[0]);for(let d=new Date(first);d<=new Date();d=addDays(d,7)){let t=0;for(let i=0;i<7;i++)t+=secondsOnDay(dkey(addDays(d,i)));bestWk=Math.max(bestWk,t);}}
+  return `
     <h2>Records</h2>
     <div class="grid2">
       ${rec('Plus longue séance',dur(longest))}${rec('Meilleure journée',dur(bestDay))}
       ${rec('Meilleure semaine',dur(bestWk))}${rec('Meilleure série',bestStreak()+' j')}
     </div>
-    ${retroYears().length?`<h2>Rétrospective</h2><div class="chips">${retroYears().map(y=>`<button class="chip" onclick="yearRetroSheet(${y})">${y}</button>`).join('')}</div>`:''}
-    <h2>Historique</h2>${history()}`;
+    ${retroYears().length?`<h2>Rétrospective</h2><p class="muted" style="font-size:13px;margin:-4px 0 12px;">Une année de piano, en quelques chiffres.</p><div class="chips">${retroYears().map(y=>`<button class="chip" onclick="yearRetroSheet(${y})">${y}</button>`).join('')}</div>`:''}`;
 }
-function setSplit(s){statSplit=s;renderStats();}
+function setSplit(s){statSplit=s;renderStatsBody();}
 function rec(l,v){return `<div class="metric" style="box-shadow:inset 0 0 0 1px rgba(228,197,138,.22);"><div class="v" style="font-size:20px;">${v}</div><div class="l">${l}</div></div>`;}
 function heatmap(){
   const days=[];for(let i=83;i>=0;i--){const d=addDays(new Date(),-i);const s=secondsOnDay(dkey(d));days.push(s);}
@@ -1507,9 +1579,6 @@ function splitView(){
   return `<div class="row" style="gap:18px;align-items:center;"><div style="width:120px;height:120px;border-radius:50%;background:conic-gradient(${seg});flex:0 0 auto;"></div>
     <div style="flex:1;">${arr.map(([k,v],i)=>`<div class="sub" style="margin-bottom:6px;"><span style="color:var(--tc);"><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${cols[i%cols.length]};margin-right:7px;"></span>${esc(k)}</span><span>${dur(v)}</span></div>`).join('')}</div></div>`;
 }
-function history(){const h=[...S.sessions].reverse().slice(0,30);if(!h.length)return '<div class="empty">Aucune séance.</div>';
-  return h.map(s=>{const names=[...new Set(s.blocks.map(b=>pieceName(b.piece)))].join(', ');
-    return `<div class="item"><div style="min-width:0;"><div class="title">${esc(names)}</div><div class="meta">${frShort(s.date)} · ${dur(sessionSeconds(s))}${s.feeling?' · '+esc(feelLabel(s.feeling)):''}</div></div></div>`;}).join('');}
 
 /* ---------- Aperçus (V3 étape 5) : croisements sobres, pas de sur-analyse ---------- */
 const MOMENTS={matin:'le matin',apresmidi:"l'après-midi",soir:'le soir',nuit:'la nuit'};
@@ -1555,8 +1624,8 @@ function fractionedInsight(){
 }
 function renderInsights(){
   const lines=[momentInsight(),stagnationInsight(),fractionedInsight()].filter(Boolean);
-  if(!lines.length)return '<div class="empty">Pas encore assez de données pour un aperçu fiable.</div>';
-  return `<div class="card" style="padding:14px 16px;">${lines.map(l=>`<p style="margin:0 0 10px;line-height:1.55;font-size:14px;">${l}</p>`).join('')}</div>`;
+  if(!lines.length)return '';
+  return `<h2>Aperçus</h2><div class="card" style="padding:14px 16px;">${lines.map(l=>`<p style="margin:0 0 10px;line-height:1.55;font-size:14px;">${l}</p>`).join('')}</div>`;
 }
 
 /* ---------- Rétrospective annuelle (V3 étape 5) ---------- */
@@ -1618,7 +1687,8 @@ function renderSettings(){
     <h2>Données</h2><div class="card" style="padding:6px 16px;">
       ${setLine('Exporter en CSV','',"exportCSV()")}
       ${setLine('Exporter tout (JSON)',S.lastBackup?'le '+new Date(S.lastBackup).toLocaleDateString('fr-FR'):'jamais',"exportJSON()")}
-      ${setLine('Importer un JSON','',"importJSON()",true)}
+      ${setLine('Importer un JSON','',"importJSON()")}
+      ${setLine('Enrichir la base d’œuvres',Object.values(S.opusCache||{}).reduce((a,x)=>a+x.length,0)?Object.values(S.opusCache).reduce((a,x)=>a+x.length,0)+' œuvres':'hors-ligne',"syncOpus(true)",true)}
     </div>
     <div class="card" style="margin-top:12px;">
       <div class="between"><span style="font-weight:600;">Sauvegarde NAS</span><div class="toggle ${S.settings.nas.enabled?'on':''}" onclick="toggleNas()"></div></div>

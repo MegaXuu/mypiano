@@ -179,8 +179,17 @@ Polices : titres **Playfair Display**, interface **DM Sans**, chiffres **EB Gara
     (wrapper `<span>` dédié). Séance : étiquettes Pause/Fin/Rec (11 px, muted) sous les boutons ronds,
     durée d'enregistrement en cours affichée à la place du libellé « Rec » (`paintSession`,
     `_rec.startTs`) ; `toast(message, {danger:true})` pour les messages d'erreur (bordure `--danger`).
-  - **Lot C (Bêta 3.9)** : refonte Carnet (regroupement semaine, filtre), Stats (3 sous-onglets, historique supprimé), Répertoire (ajout unifié, « Enrichir la base » vers Réglages), Voyage (sans auto-scroll). Maquettes validées AVANT de coder.
-  - **Lot D (Bêta 3.10)** : jardin v2 (SVG organique), cartes recalibrées (Bronze 2/Argent 5/Or 10), célébrations unifiées. Maquettes validées AVANT de coder.
+  - **Lot C (Bêta 3.9)** ✅ : Carnet (`renderCarnetBody` regroupé par semaine via `weekKey`, sous-total
+    temps + jours par groupe, chips de filtre par morceau `carnetPieces`/`setCarnetFilter`, aperçu coupé
+    en fin de mot `truncWord`, pagination `carnetShown`/`moreCarnet` au-delà de 60) ; Stats (`renderStats`
+    découpé en 3 sous-onglets `statsTab` — Activité `renderStatsActivite`, Répertoire `renderStatsRep`
+    avec Aperçus déplacé et masqué si vide, Records `renderStatsRecords` — section Historique et
+    fonction `history()` supprimées) ; Répertoire (bouton unique `addChoiceSheet()` aiguillant vers
+    `pieceSheet(null)`/`workSheet()`/`wishSheet()`, ligne « Enrichir la base d'œuvres » déplacée dans
+    Réglages → Données via `syncOpus(true)`) ; Voyage (`renderVoyageBody` sans `scrollIntoView`, carte du
+    rang en tête + liste ±3 rangs autour du rang courant, `toggleVoyageRanks()` pour déplier les 18).
+  - **Lot D (Bêta 3.10)** : jardin v2 (SVG estampe au trait, silhouette or sur ciel améthyste — direction
+    validée), cartes recalibrées (Bronze 2/Argent 5/Or 10), célébrations unifiées. Maquettes validées.
   - **Lot E** : dettes V3 existantes (audio iPhone réel, retrait `LS_MIRROR`, découpage `app.js`).
 
 - **Reporté en V4** : **sauvegarde auto vers NAS Synology** (on reste sur GitHub Pages quelques
