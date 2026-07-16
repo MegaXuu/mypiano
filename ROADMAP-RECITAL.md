@@ -20,7 +20,7 @@
 | Lot | Release | Contenu |
 |-----|---------|---------|
 | ✅ R1 | Bêta 3.13 | Fondations : tokens, grain, composants de base |
-| ☐ R2 | Bêta 3.14 | Dock flottant, transitions orchestrées, accueil « programme » |
+| ✅ R2 | Bêta 3.14 | Dock flottant, transitions orchestrées, accueil « programme » |
 | ☐ R3 | Bêta 3.15 | Séance « mode scène » + feuilles de séance |
 | ☐ R4 | Bêta 3.16 | Carnet, Répertoire, fiche morceau |
 | ☐ R5 | Bêta 3.17 | Voyage, Stats, Réglages, célébrations |
