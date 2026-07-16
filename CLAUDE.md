@@ -188,8 +188,20 @@ Polices : titres **Playfair Display**, interface **DM Sans**, chiffres **EB Gara
     `pieceSheet(null)`/`workSheet()`/`wishSheet()`, ligne « Enrichir la base d'œuvres » déplacée dans
     Réglages → Données via `syncOpus(true)`) ; Voyage (`renderVoyageBody` sans `scrollIntoView`, carte du
     rang en tête + liste ±3 rangs autour du rang courant, `toggleVoyageRanks()` pour déplier les 18).
-  - **Lot D (Bêta 3.10)** : jardin v2 (SVG estampe au trait, silhouette or sur ciel améthyste — direction
-    validée), cartes recalibrées (Bronze 2/Argent 5/Or 10), célébrations unifiées. Maquettes validées.
+  - **Lot D (Bêta 3.10)** ✅ : Jardin v2 (`renderJardin` réécrit — estampe au trait, silhouette or sur ciel
+    améthyste dégradé, branches générées récursivement (`grow()`, 3 niveaux), feuillage en nuée de traits
+    or/améthyste/lavande sur les extrémités de branches, fleurs = points lumineux à halo (dégradé `gloB`)
+    posés en bout de branche pour les morceaux maîtrisés, collines + brume + horizon en aplats ; même
+    modèle de données qu'avant — heures→croissance via `rankIdx`/`growth`, série→nombre de traits,
+    maîtrises→fleurs ; croissance animée à l'ouverture via `(window.requestAnimationFrame||window.setTimeout)`,
+    transform-origin en `%` sur les groupes `.jb-tree/.jb-leaf/.jb-flo`) ; Cartes (`cardLevel` recalibré
+    Bronze 2/Argent 5/Or 10, `cardNext()` calcule la barre + le libellé vers le palier suivant,
+    `composerSeconds()` ajoute le temps joué par compositeur sur la carte, en plus de l'époque déjà
+    affichée) ; Célébrations (`celebrate(kind,title,sub)` — `kind` ∈ `rang`/`piece`/`defi`/`concert`,
+    table `CELEB_KIND` pour glyphe/couleur/sur-titre, écrin unique sans confettis ni fermeture
+    automatique, fermeture par bouton ou tap sur le fond ; `checkChallenges()` migré du `toast()` vers
+    `celebrate('defi',…)` pour unifier les 4 occasions). CSS : keyframe `conffall` retirée (mort avec les
+    confettis).
   - **Lot E** : dettes V3 existantes (audio iPhone réel, retrait `LS_MIRROR`, découpage `app.js`).
 
 - **Reporté en V4** : **sauvegarde auto vers NAS Synology** (on reste sur GitHub Pages quelques

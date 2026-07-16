@@ -5,7 +5,7 @@
 
 const KEY = 'pianoV2';
 const IMPROV = '__improv__';
-const APP_VERSION = 'Bêta 3.9'; // à synchroniser avec CACHE dans sw.js à chaque release
+const APP_VERSION = 'Bêta 3.10'; // à synchroniser avec CACHE dans sw.js à chaque release
 
 const STONES = [
   {n:'Apprenti',h:10,c:'#E0A83B'},{n:'Élève',h:20,c:'#C9CDDA'},{n:'Musicien',h:30,c:'#9BA0AE'},
@@ -719,7 +719,7 @@ function commitSession(total){
   save();checkChallenges();timer=null;releaseWakeLock();closeSheet();
   const after=currentStone();
   go('home');
-  if(after&&(!before||after.n!==before.n))setTimeout(()=>celebrate('Nouveau rang',after.n),300);
+  if(after&&(!before||after.n!==before.n))setTimeout(()=>celebrate('rang',after.n,Math.round(totalSeconds()/3600)+' heures de piano. Rang '+(STONES.indexOf(after)+1)+' sur '+STONES.length+'.'),300);
   else toast('Séance enregistrée · '+dur(total));
 }
 function buzz(){try{navigator.vibrate&&navigator.vibrate([50,40,50]);}catch(e){}}
@@ -1187,7 +1187,7 @@ function savePiece(id){const title=document.getElementById('p-t').value.trim();i
     if(dup){if(confirm('« '+dup.title+' » est déjà dans ton répertoire. Ouvrir sa fiche ?')){closeSheet();pieceDetail(dup.id);return;}}
     const np=Object.assign({id:uid(),notes:[],createdAt:Date.now()},data);if(np.status==='mastered')np.masteredAt=Date.now();S.pieces.push(np);}
   save();closeSheet();renderRep();
-  if(newlyMastered)celebrate('Morceau maîtrisé !',title);else toast('Enregistré');}
+  if(newlyMastered)celebrate('piece',title);else toast('Enregistré');}
 function togglePMore(){const m=document.getElementById('p-more'),b=document.getElementById('p-more-btn');if(!m)return;
   const open=m.style.display!=='none';m.style.display=open?'none':'block';if(b)b.textContent=open?'Détails (facultatif) ⌄':'Masquer les détails ⌃';}
 function setPieceStatus(id,st){pieceById(id).status=st;save();closeSheet();renderRep();toast(st==='archived'?'Archivé':'Abandonné');}
@@ -1401,7 +1401,7 @@ function nudgeProgress(id,d){const p=pieceById(id);if(!p)return;p.progress=Math.
 function markMastered(id){const p=pieceById(id);if(!p)return;const was=p.status==='mastered';p.status='mastered';p.progress=100;
   if(hasDerivedProgress(p)){secList(p).forEach(s=>s.status='ok');recordHist(p);}
   if(!p.masteredAt)p.masteredAt=Date.now();
-  save();closeSheet();refreshScreen();if(!was)celebrate('Morceau maîtrisé !',p.title);else toast('Maîtrisé');}
+  save();closeSheet();refreshScreen();if(!was)celebrate('piece',p.title);else toast('Maîtrisé');}
 function reopenPiece(id){const p=pieceById(id);if(!p)return;p.status='active';save();pieceDetail(id);toast('Réactivé · en cours');}
 function deleteWish(id){confirmSheet('Retirer ce morceau de « à apprendre » ?','Retirer',()=>{S.pieces=S.pieces.filter(p=>p.id!==id);save();closeSheet();refreshScreen();toast('Retiré');});}
 
@@ -1817,7 +1817,7 @@ function completeFree(period){const ch=S.challenges[period];if(ch&&ch.type==='fr
 function checkChallenges(){let changed=false;
   ['week','month'].forEach(period=>{const ch=S.challenges[period];if(!ch)return;
     if(challengeProgress(ch)>=ch.target){const id=period+':'+ch.key;
-      if(!(S.challenges.log||[]).some(l=>l.id===id)){S.challenges.log.push({id,reward:ch.reward,label:ch.label});changed=true;setTimeout(()=>toast('Défi réussi · +'+ch.reward+' ♪'),200);}}});
+      if(!(S.challenges.log||[]).some(l=>l.id===id)){S.challenges.log.push({id,reward:ch.reward,label:ch.label});changed=true;celebrate('defi',ch.label,'+'+ch.reward+' ♪');}}});
   if(changed)save();}
 function renderSucces(el){
   checkChallenges();
@@ -1854,7 +1854,13 @@ function renderSucces(el){
 function hashStr(s){s=s||'';let h=0;for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0;return h;}
 function masteredByComposer(name){name=(name||'').toLowerCase();return S.pieces.filter(p=>!p.isEnsemble&&p.status==='mastered'&&(p.composer||'').toLowerCase()===name).length;}
 function ownedComposers(){const s=new Set();S.pieces.forEach(p=>{if(!p.isEnsemble&&p.composer)s.add(p.composer);});return [...s].sort((a,b)=>a.localeCompare(b));}
-function cardLevel(n){return n>=30?{n:'Or',c:'#E4C58A'}:n>=20?{n:'Argent',c:'#C9CDDA'}:n>=10?{n:'Bronze',c:'#C98A3A'}:null;}
+function cardLevel(n){return n>=10?{n:'Or',c:'#E4C58A'}:n>=5?{n:'Argent',c:'#C9CDDA'}:n>=2?{n:'Bronze',c:'#C98A3A'}:null;}
+function cardNext(n,lv){
+  if(lv&&lv.n==='Or')return {pct:100,label:'niveau max'};
+  const target=!lv?2:lv.n==='Bronze'?5:10,label=!lv?'Bronze':lv.n==='Bronze'?'Argent':'Or';
+  return {pct:Math.min(100,Math.round(n/target*100)),label:label+' à '+target};
+}
+function composerSeconds(name){let t=0;S.pieces.forEach(p=>{if(!p.isEnsemble&&(p.composer||'').toLowerCase()===name.toLowerCase())t+=pieceSeconds(p.id);});return t;}
 
 function composerSheet(name){
   const c=OPUS.composerByName(name);const dates=c.b?(c.b+(c.d?'–'+c.d:'– …')):'';
@@ -1870,40 +1876,104 @@ function composerSheet(name){
 function renderCartes(el){
   const comps=ownedComposers();
   if(!comps.length){el.innerHTML='<div class="empty">Joue des morceaux pour collectionner des cartes de compositeurs.</div>';return;}
-  el.innerHTML=`<p class="muted" style="font-size:13px;margin:0 0 12px;">Niveaux : Bronze 10 · Argent 20 · Or 30 morceaux maîtrisés.</p>
-   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">${comps.map(name=>{const m=masteredByComposer(name),lv=cardLevel(m),c=OPUS.composerByName(name);
+  el.innerHTML=`<p class="muted" style="font-size:13px;margin:0 0 12px;">Niveaux : Bronze 2 · Argent 5 · Or 10 morceaux maîtrisés.</p>
+   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">${comps.map(name=>{
+     const m=masteredByComposer(name),lv=cardLevel(m),c=OPUS.composerByName(name),next=cardNext(m,lv),sec=composerSeconds(name);
      return `<div class="card" style="padding:14px;${lv?'box-shadow:inset 0 0 0 1px '+lv.c+';':''}" onclick="composerSheet('${name.replace(/'/g,"\\'")}')">
-       <div class="serif" style="font-size:17px;">${esc(name)}</div>
-       <div class="muted" style="font-size:12px;margin-top:2px;">${esc(c.epoch||'')}</div>
-       <div class="between" style="margin-top:12px;"><span class="num" style="font-size:20px;">${m}</span>${lv?`<span class="tag" style="background:${lv.c}22;color:${lv.c};">${lv.n}</span>`:`<span class="muted" style="font-size:12px;">${m}/10</span>`}</div></div>`;}).join('')}</div>`;
+       <div class="between" style="align-items:flex-start;">
+         <div style="min-width:0;"><div class="serif" style="font-size:17px;">${esc(name)}</div>
+         <div class="muted" style="font-size:11px;margin-top:2px;">${esc(c.epoch||'')}</div></div>
+         ${lv?`<span class="tag" style="background:${lv.c}22;color:${lv.c};padding:3px 9px;font-size:11px;">${lv.n}</span>`:''}</div>
+       <div class="row" style="gap:8px;margin-top:14px;align-items:baseline;">
+         <span class="num" style="font-size:22px;font-weight:600;${lv?'color:'+lv.c+';':''}">${m}</span>
+         <span class="muted" style="font-size:11px;">${m>1?'maîtrisés':'maîtrisé'}</span></div>
+       <div class="bar" style="height:5px;margin-top:8px;"><i style="width:${next.pct}%;${lv?'background:'+lv.c+';':''}"></i></div>
+       <div class="muted" style="font-size:11px;margin-top:8px;">${sec?dur(sec)+' joués · ':''}${next.label}</div></div>`;}).join('')}</div>`;
 }
 function renderJardin(el){
   const hours=totalSeconds()/3600,streak=computeStreak(),mastered=S.pieces.filter(p=>!p.isEnsemble&&p.status==='mastered');
   const rankIdx=STONES.reduce((a,s,i)=>hours>=s.h?i:a,-1);
   const growth=Math.max(0.14,Math.min(1,(rankIdx+2)/19));
-  const cx=200,groundY=340,trunkH=60+growth*130,topY=groundY-trunkH,canopyR=42+growth*72;
-  const leafN=Math.min(70,8+streak*3);let leaves='';
-  for(let i=0;i<leafN;i++){const a=(hashStr('l'+i)%628)/100,r=(hashStr('r'+i)%100)/100*canopyR;const x=cx+Math.cos(a)*r,y=topY+Math.sin(a)*r*0.92;leaves+=`<circle cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" r="${4+hashStr('s'+i)%4}" fill="#3E7D4E" opacity="0.85"/>`;}
-  let flowers='';const cols=['#E4C58A','#9E93F2','#D06E86','#6FD3E0','#8DB600','#E5A100'];
-  mastered.slice(0,44).forEach((p,i)=>{const a=(i/Math.max(1,mastered.length))*6.283,r=canopyR*(0.35+0.55*((i%3)/2));const x=cx+Math.cos(a)*r,y=topY+Math.sin(a)*r*0.92;flowers+=`<circle cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" r="4.5" fill="${cols[hashStr(p.composer||p.title)%cols.length]}"/>`;});
+  const W=400,H=340,groundY=286,cx=200,trunkH=66+growth*136;
+  let branches='',tips=[];
+  const grow=(x,y,ang,len,w,depth)=>{
+    const x2=x+Math.cos(ang)*len,y2=y+Math.sin(ang)*len;
+    const mx=(x+x2)/2+Math.cos(ang+1.5708)*len*0.16,my=(y+y2)/2+Math.sin(ang+1.5708)*len*0.16;
+    branches+=`<path d="M${x.toFixed(1)} ${y.toFixed(1)} Q${mx.toFixed(1)} ${my.toFixed(1)} ${x2.toFixed(1)} ${y2.toFixed(1)}" stroke="#E4C58A" stroke-opacity="${(0.35+depth*0.16).toFixed(2)}" stroke-width="${w.toFixed(1)}" stroke-linecap="round" fill="none"/>`;
+    if(depth===0){tips.push([x2,y2,ang]);return;}
+    const sp=0.46+(hashStr('b'+depth+x.toFixed(0))%20)/100;
+    grow(x2,y2,ang-sp,len*0.72,w*0.6,depth-1);
+    grow(x2,y2,ang+sp,len*0.68,w*0.6,depth-1);
+    if(depth>1)grow(x2,y2,ang+(hashStr('a'+x.toFixed(0))%50-25)/100,len*0.5,w*0.4,depth-2);
+  };
+  grow(cx,groundY,-1.5708,trunkH*0.5,9+growth*5,3);
+  const leafN=Math.min(150,24+streak*9);let leaves='';
+  const cols=['#E4C58A','#9E93F2','#C9A9E8','#EDD9AE'];
+  for(let i=0;i<leafN;i++){
+    const t=tips[hashStr('t'+i)%tips.length];
+    const a=(hashStr('la'+i)%628)/100,r=(hashStr('lr'+i)%100)/100*(22+growth*20);
+    const x=t[0]+Math.cos(a)*r,y=t[1]+Math.sin(a)*r*0.8;
+    const ln=3+hashStr('ll'+i)%4,ang=(hashStr('lg'+i)%180)-90;
+    leaves+=`<line x1="${x.toFixed(0)}" y1="${y.toFixed(0)}" x2="${(x+ln).toFixed(0)}" y2="${y.toFixed(0)}" stroke="${cols[i%4]}" stroke-opacity="${(0.3+(hashStr('lo'+i)%50)/100).toFixed(2)}" stroke-width="1.7" stroke-linecap="round" transform="rotate(${ang} ${x.toFixed(0)} ${y.toFixed(0)})"/>`;
+  }
+  let flowers='';
+  mastered.slice(0,44).forEach((p,i)=>{
+    const t=tips[(i*3+1)%tips.length];
+    const x=t[0]+Math.cos(t[2])*7,y=t[1]+Math.sin(t[2])*7;
+    flowers+=`<g><circle cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" r="9" fill="url(#gloB)"/><circle cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" r="2.6" fill="#F6EEDA"/></g>`;
+  });
   const cur=currentStone();
-  el.innerHTML=`<div class="card" style="padding:8px;background:linear-gradient(180deg,#1c1e2c,#191a1b);">
-    <svg viewBox="0 0 400 360" width="100%">
-      <ellipse cx="200" cy="346" rx="118" ry="12" fill="#0f2417" opacity="0.55"/>
-      <path d="M${cx-9} ${groundY} C ${cx-15} ${topY+trunkH*0.4} ${cx-6} ${topY+18} ${cx} ${topY} C ${cx+6} ${topY+18} ${cx+15} ${topY+trunkH*0.4} ${cx+9} ${groundY} Z" fill="#5b4632"/>
-      <circle cx="${cx}" cy="${topY}" r="${canopyR}" fill="#2f6b3f" opacity="0.92"/>${leaves}${flowers}
+  el.innerHTML=`<div class="card" style="padding:0;overflow:hidden;">
+    <svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;">
+      <defs><linearGradient id="skyB" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2A2440"/><stop offset="52%" stop-color="#221F32"/><stop offset="1" stop-color="#191A1B"/></linearGradient>
+      <radialGradient id="gloB"><stop offset="0" stop-color="#F6EEDA" stop-opacity=".75"/><stop offset="1" stop-color="#E4C58A" stop-opacity="0"/></radialGradient>
+      <linearGradient id="mistB" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9E93F2" stop-opacity="0"/><stop offset="1" stop-color="#9E93F2" stop-opacity=".16"/></linearGradient></defs>
+      <rect width="${W}" height="${H}" fill="url(#skyB)"/>
+      <circle cx="304" cy="66" r="34" fill="none" stroke="#E4C58A" stroke-opacity=".3" stroke-width="1"/>
+      <circle cx="304" cy="66" r="20" fill="#E4C58A" opacity=".1"/>
+      <path d="M0 250 Q 90 214 190 240 T 400 226 L400 ${H} L0 ${H} Z" fill="#201E30"/>
+      <path d="M0 268 Q 130 236 250 262 T 400 252 L400 ${H} L0 ${H} Z" fill="#1A1926"/>
+      <g class="jb-tree">${branches}</g><g class="jb-leaf">${leaves}</g><g class="jb-flo">${flowers}</g>
+      <rect x="0" y="248" width="${W}" height="92" fill="url(#mistB)"/>
+      <path d="M0 ${groundY+4} H${W}" stroke="#E4C58A" stroke-opacity=".22" stroke-width="1"/>
     </svg>
-    <div style="padding:8px 12px 6px;text-align:center;"><div class="serif" style="font-size:18px;color:var(--gold);">${cur?cur.n:'La graine'}</div>
-      <div class="muted" style="font-size:13px;margin-top:4px;">${Math.round(hours)} h cultivées · ${streak} j de série · ${mastered.length} fleurs</div></div></div>
+    <div style="padding:14px 16px 16px;text-align:center;"><div class="serif" style="font-size:19px;color:var(--gold);">${cur?cur.n:'La graine'}</div>
+      <div class="muted" style="font-size:13px;margin-top:5px;">${Math.round(hours)} h cultivées · ${streak} j de série · ${mastered.length} fleurs</div></div>
+  </div>
     <p class="muted" style="font-size:12px;text-align:center;margin-top:10px;line-height:1.5;">Ton arbre grandit avec tes heures, se garnit selon ta série, et fleurit à chaque morceau maîtrisé.</p>`;
+  const tree=el.querySelector('.jb-tree'),leafG=el.querySelector('.jb-leaf'),floG=el.querySelector('.jb-flo');
+  tree.style.cssText='transform-origin:50% 100%;transform:scaleY(.02);opacity:.3;transition:transform 1s cubic-bezier(.2,.7,.3,1),opacity .6s;';
+  leafG.style.cssText='opacity:0;transition:opacity .8s ease .8s;';
+  floG.style.cssText='opacity:0;transition:opacity .7s ease 1.5s;';
+  (window.requestAnimationFrame||window.setTimeout)(()=>{tree.style.transform='scaleY(1)';tree.style.opacity='1';leafG.style.opacity='1';floG.style.opacity='1';});
 }
-function celebrate(title,sub){
+const CELEB_KIND={
+  rang:{glyph:'♫',color:'var(--gold)',label:'Nouveau rang'},
+  piece:{glyph:'♬',color:'var(--gold)',label:'Morceau maîtrisé'},
+  defi:{glyph:'♪',color:'var(--acc)',label:'Défi accompli'},
+  concert:{glyph:'𝄞',color:'var(--gold)',label:'Concert terminé'},
+};
+function celebrate(kind,title,sub){
+  const k=CELEB_KIND[kind]||CELEB_KIND.rang;
+  const glow=k.color==='var(--acc)'?'rgba(158,147,242,.22)':'rgba(228,197,138,.22)';
+  const ring=k.color==='var(--acc)'?'rgba(158,147,242,.35)':'rgba(228,197,138,.35)';
   buzz();const o=document.createElement('div');
-  o.style.cssText='position:fixed;inset:0;z-index:80;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(10,10,12,.74);animation:fade .3s;overflow:hidden;';
-  let conf='';for(let i=0;i<44;i++){const c=['#E4C58A','#9E93F2','#6FD3E0','#D06E86'][i%4],l=(hashStr('c'+i)%100),d=(1+(hashStr('d'+i)%150)/100).toFixed(2),de=((hashStr('e'+i)%80)/100).toFixed(2);
-    conf+=`<span style="position:absolute;top:-24px;left:${l}%;width:8px;height:13px;background:${c};border-radius:2px;animation:conffall ${d}s ease-in ${de}s forwards;"></span>`;}
-  o.innerHTML=`${conf}<div style="font-size:56px;">♫</div><div class="serif" style="font-size:26px;color:var(--gold);margin-top:8px;text-align:center;padding:0 24px;">${esc(title)}</div><div class="muted" style="margin-top:6px;text-align:center;">${esc(sub||'')}</div>`;
-  o.onclick=()=>o.remove();document.body.appendChild(o);setTimeout(()=>{try{o.remove();}catch(e){}},2600);
+  o.style.cssText='position:fixed;inset:0;z-index:80;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(10,10,12,.82);padding:0 28px;';
+  o.innerHTML=`<div style="text-align:center;opacity:0;transform:translateY(12px);transition:opacity .45s,transform .45s cubic-bezier(.2,.8,.3,1);">
+    <div style="position:relative;width:96px;height:96px;margin:0 auto 20px;">
+      <div style="position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle,${glow},transparent 68%);"></div>
+      <div style="position:absolute;inset:0;border-radius:50%;border:1px solid ${ring};"></div>
+      <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:42px;color:${k.color};line-height:1;">${k.glyph}</div>
+    </div>
+    <div style="letter-spacing:.14em;text-transform:uppercase;font-size:11px;font-weight:700;color:var(--t2);">${k.label}</div>
+    <div class="serif" style="font-size:27px;color:var(--gold);margin-top:6px;line-height:1.25;">${esc(title)}</div>
+    ${sub?`<div class="muted" style="margin-top:8px;font-size:14px;line-height:1.5;">${esc(sub)}</div>`:''}
+    <button class="btn ghost sm" style="margin:24px auto 0;padding:10px 22px;">Continuer</button>
+  </div>`;
+  o.onclick=e=>{if(e.target===o||e.target.tagName==='BUTTON')o.remove();};
+  document.body.appendChild(o);
+  const inner=o.firstElementChild;
+  (window.requestAnimationFrame||window.setTimeout)(()=>{inner.style.opacity='1';inner.style.transform='none';});
 }
 function hourHeat(){
   const hrs=new Array(24).fill(0);S.sessions.forEach(s=>{const t=s.ts||Date.parse(s.date+'T12:00');const h=new Date(t).getHours();hrs[h]+=sessionSeconds(s);});
@@ -1995,7 +2065,7 @@ function saveConcert(){
   S.sessions.push({id:uid(),date:dkey(),mode:'concert',goal:todayGoal(),feeling:'',blocks,concert:{rates:_concert.rates},ts:Date.now()});
   S.challenges.log.push({id:'concert:'+uid(),reward:300,label:'Simulation de concert'});
   save();checkChallenges();closeConcert();_program=[];go('home');
-  celebrate('Concert terminé !','+300 ♪'+(first?' · succès « Sur scène »':''));
+  celebrate('concert',blocks.length+' morceau'+(blocks.length>1?'x':'')+', sans arrêt','+300 ♪'+(first?' · succès « Sur scène »':''));
 }
 
 // Rapport hebdomadaire
