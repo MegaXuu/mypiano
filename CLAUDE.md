@@ -115,9 +115,20 @@ carnet de travail, et se motiver par la gamification. Cible : iPhone (PWA instal
 - **Enregistrements audio (V3 étape 4)** : `p.recordings?[] = {id,date,dur(sec),section?,bpm?(dernier bpm connu de la section au moment de l'enregistrement),feel?(pp–ff),size(octets),mime}`, **facultatif**. Le blob audio n'est **jamais** dans `S`/localStorage : il vit à part dans IndexedDB, store `recordings`, clé = `id` (voir « Architecture »). `deleteRecording` supprime la métadonnée **et** le blob.
 
 ## Design tokens (dans `index.html :root`)
-Fond `#191A1B` · surface `#242833` · surface haute `#2E3242` · bordure `#515060` · texte2 `#9B97A8`
-· texte clair `#B9B5C3` · texte principal `#EDEBF2` · **accent améthyste `#9E93F2`** · **or (rangs) `#E4C58A`**.
-Polices : titres **Playfair Display**, interface **DM Sans**, chiffres **EB Garamond**. Minuscules de phrase.
+Depuis le lot R1 (Bêta 3.13, overhaul « Récital », voir `ROADMAP-RECITAL.md`) :
+fond `--bg:#131118` (noir violacé profond) · `--bg-deep:#0C0B10` (réservé au mode scène, R3) ·
+cartes en dégradé `--surface-g:linear-gradient(180deg,#232030,#1C1926)` + liseré lumineux
+(`--hairline`/`--hairline-hi`, border-top plus clair) · `--surface:#201D2A` (aplat, usages coûteux
+en dégradé) · `--surface2:#2B2839` · bordure `--border:#515060` · texte2 `--t2:#9A94AB` · texte clair
+`--tc:#C9C4D6` · texte principal `--tp:#F0EDF7` · **accent améthyste `--acc:#A99EF5`**
+(`--acc-deep:#9A8FF0`) · **or (accomplissement) `--gold:#E4C58A`** · halos `--glow-acc`/`--glow-gold`
+(réservés aux boutons primaires/gold) · motion `--dur1/2/3` + `--easeout`. Grain SVG discret (≤3 %
+opacité) sur le fond. **Discipline chromatique** : améthyste = interaction uniquement, or =
+accomplissement uniquement (rangs, records, maîtrise, célébrations), le reste en neutres.
+Polices : titres **Playfair Display**, interface **DM Sans**, chiffres **EB Garamond**
+(variante italique `.num.it` pour les valeurs musicales). Minuscules de phrase, sauf `.eyebrow`
+(petites capitales espacées, exception assumée pour les surtitres). Séparateurs : `.divi` (simple)
+et `.filet` (hairline + losange or centré, ornemental).
 
 ## Gamification (repères)
 - **Grand Voyage** : `STONES[]` = 18 rangs honorifiques (Apprenti → Maestro Assoluto) + couleur, seuils 10 h → 10 000 h. Icônes notes `glyphFor(i)` (♩♪♫♬𝄞). Palier via `currentStone()`.
