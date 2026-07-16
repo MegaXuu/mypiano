@@ -18,10 +18,19 @@ import { indexedDB, IDBKeyRange } from 'fake-indexeddb';
 const root = new URL('.', import.meta.url).pathname;
 const read = f => readFileSync(root + f, 'utf8');
 
-// Inline opus.js + app.js, puis des accesseurs (partage le scope lexical).
+// L'app est découpée en modules <script> classiques (js/*.js). En prod ils
+// partagent la portée globale ; sous jsdom c'est pareil, mais on les inline en
+// UN seul <script> (concaténation dans l'ordre de chargement = l'ancien app.js)
+// pour rester robuste, puis on ajoute les accesseurs (même scope lexical).
+const FILES = [
+  'js/opus.js', 'js/state.js', 'js/ui.js', 'js/home.js', 'js/session.js', 'js/carnet.js',
+  'js/repertoire.js', 'js/piece-detail.js', 'js/voyage.js', 'js/stats.js', 'js/settings.js',
+  'js/gamification.js', 'js/plan.js', 'js/boot.js',
+];
+const bundle = FILES.map(read).join('\n');
 const html = read('index.html')
-  .replace('<script src="opus.js"></script>', `<script>${read('opus.js')}</script>`)
-  .replace('<script src="app.js"></script>',  `<script>${read('app.js')}</script>\n<script>window.__S=function(){return S;};window.__ready=function(){return READY;};window.__flush=function(){return saveNow();};</script>`);
+  .replace(/<script src="js\/[^"]+"><\/script>\s*/g, '') // retire les 14 balises externes
+  .replace('</body>', `<script>${bundle}</script>\n<script>window.__S=function(){return S;};window.__ready=function(){return READY;};window.__flush=function(){return saveNow();};</script>\n</body>`);
 
 const now = Date.now();
 const seed = {

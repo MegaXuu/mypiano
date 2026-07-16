@@ -176,7 +176,24 @@ a{color:var(--acc);}
 <div class="sheet-bg" id="sheet-bg"><div class="sheet" id="sheet"></div></div>
 <div class="toast" id="toast"></div>
 
-<script src="opus.js"></script>
-<script src="app.js"></script>
+<!-- Application découpée en modules <script> classiques (pas de build).
+     ORDRE IMPÉRATIF : state.js d'abord (socle + `S`), boot.js en dernier
+     (démarrage). Portée globale partagée entre scripts classiques : chaque
+     fonction/const est visible des autres fichiers. Miroir dans sw.js (ASSETS)
+     et test.mjs (inlining). -->
+<script src="js/opus.js"></script>
+<script src="js/state.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/home.js"></script>
+<script src="js/session.js"></script>
+<script src="js/carnet.js"></script>
+<script src="js/repertoire.js"></script>
+<script src="js/piece-detail.js"></script>
+<script src="js/voyage.js"></script>
+<script src="js/stats.js"></script>
+<script src="js/settings.js"></script>
+<script src="js/gamification.js"></script>
+<script src="js/plan.js"></script>
+<script src="js/boot.js"></script>
 </body>
 </html>

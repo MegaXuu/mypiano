@@ -18,22 +18,44 @@ carnet de travail, et se motiver par la gamification. Cible : iPhone (PWA instal
 
 ## Fichiers
 - `index.html` — squelette + **tous les styles CSS** (`<style>`) + conteneurs d'écrans (`#s-*`) + tab bar + fonts Google.
-- `app.js` — **toute la logique et le rendu** (~2000 lignes, un seul fichier pour l'instant).
-- `opus.js` — base de compositeurs (7 favoris avec id, ~100 en tout) + helpers API Open Opus.
-- `sw.js` — service worker (cache hors-ligne). **Incrémenter `CACHE` à chaque release** (`piano-b3-N`).
+- `js/` — **toute la logique et le rendu**, découpée en modules `<script>` **classiques** (pas d'ES
+  modules, pas de build). L'ancien `app.js` monolithique (~2130 lignes) a été scindé par domaine
+  (Lot E). **Ordre de chargement impératif** (déclaré dans `index.html`, miroir dans `sw.js` et
+  `test.mjs`) : `opus.js` → `state.js` → `ui.js` → `home.js` → `session.js` → `carnet.js` →
+  `repertoire.js` → `piece-detail.js` → `voyage.js` → `stats.js` → `settings.js` → `gamification.js`
+  → `plan.js` → **`boot.js` (toujours en dernier)**.
+  - Les scripts classiques **partagent une portée globale unique** : `function foo()` devient
+    `window.foo` (appelable depuis `onclick=` et depuis tout autre fichier) ; `let`/`const` racine
+    (dont `let S`, `const READY`) sont des bindings globaux partagés et mutables entre fichiers.
+    Donc **aucun export/import** ; on continue d'ajouter les fonctions au niveau racine (jamais dans
+    une IIFE, sinon les `onclick=` HTML ne les voient plus).
+  - **Deux seules règles d'ordre** : `state.js` en premier (socle + `S`, aucun rendu DOM), `boot.js`
+    en dernier (il touche presque tout au démarrage). Entre les deux, l'ordre est libre (ces fichiers
+    n'ont aucun code exécuté au chargement, uniquement des déclarations).
+  - Rôle par fichier : `state.js` = constantes + IndexedDB + `defaults`/`migrate` + `S` + helpers
+    purs/dérivés ; `ui.js` = navigation `go`/toast/feuilles ; `home.js` = accueil ; `session.js` =
+    séance + audio + carnet de fin ; `carnet.js` = écran Carnet + notes + wishlist ; `repertoire.js`
+    = liste/filtres/ajout ; `piece-detail.js` = fiche `pieceDetail` + sections/mesures + découpage ;
+    `voyage.js` = écran Voyage ; `stats.js` = Stats + aperçus + rétrospective ; `settings.js` =
+    réglages + export/import ; `gamification.js` = notes/succès/défis + cartes/Jardin/célébrations +
+    révision ; `plan.js` = plan guidé + concert + rapports + notifications ; `boot.js` = démarrage.
+- `opus.js` — base de compositeurs (7 favoris avec id, ~100 en tout) + helpers API Open Opus. **Dans `js/`.**
+- `sw.js` — service worker (cache hors-ligne), **à la racine** (portée = son emplacement). **Incrémenter
+  `CACHE` à chaque release** (`piano-b3-N`) ; `ASSETS` liste les 14 fichiers `./js/*.js`.
 - `manifest.webmanifest`, `icon-180/192/512.png`.
 
 ## Lancer / tester
 - Ouvrir `index.html` dans un navigateur. Les fonctions PWA (service worker, install, stockage
   persistant, IndexedDB) exigent du **HTTPS** (ou `localhost`) — une IP `http://` ne suffit pas.
-- **Vérif syntaxe** : `node --check app.js`.
+- **Vérif syntaxe** : `node --check js/<fichier>.js` (par fichier ; chaque module doit parser seul).
 - **Test fumée** (recommandé après chaque changement) : `npm test` — charge `index.html` sous `jsdom`
-  (avec `fake-indexeddb` injecté, `jsdom` n'a pas IndexedDB nativement) en inlinant `opus.js` + `app.js`,
-  attend la fin du boot asynchrone (`await window.__ready()`), exécute les fonctions clés (`go`,
-  `startSheet`/`beginSession`/`commitSession`, `renderRep`, etc.), vérifie la migration
+  (avec `fake-indexeddb` injecté, `jsdom` n'a pas IndexedDB nativement) en inlinant les 14 fichiers
+  `js/*.js` **concaténés dans l'ordre de chargement** (voir `FILES` dans `test.mjs`) en un seul
+  `<script>`, attend la fin du boot asynchrone (`await window.__ready()`), exécute les fonctions clés
+  (`go`, `startSheet`/`beginSession`/`commitSession`, `renderRep`, etc.), vérifie la migration
   localStorage → IndexedDB et `aucune erreur runtime`.
-- **À chaque release** : incrémenter `CACHE` dans `sw.js` **et** `APP_VERSION` dans `app.js` (même
-  numéro, ex. `piano-b3-6` / `'Bêta 3.6'`), sinon l'app installée garde l'ancienne version.
+- **À chaque release** : incrémenter `CACHE` dans `sw.js` **et** `APP_VERSION` dans `js/state.js`
+  (même numéro, ex. `piano-b3-11` / `'Bêta 3.11'`), sinon l'app installée garde l'ancienne version.
 
 ## Architecture (conventions)
 - État global unique `S` (objet) → IndexedDB. `save()` après chaque mutation (signature inchangée,
@@ -202,7 +224,10 @@ Polices : titres **Playfair Display**, interface **DM Sans**, chiffres **EB Gara
     automatique, fermeture par bouton ou tap sur le fond ; `checkChallenges()` migré du `toast()` vers
     `celebrate('defi',…)` pour unifier les 4 occasions). CSS : keyframe `conffall` retirée (mort avec les
     confettis).
-  - **Lot E** : dettes V3 existantes (audio iPhone réel, retrait `LS_MIRROR`, découpage `app.js`).
+  - **Lot E** : dettes V3 existantes. ✅ **Découpage `app.js`** (Bêta 3.11) : monolithe scindé en 14
+    modules `<script>` classiques dans `js/` (voir « Fichiers » — découpe byte-identique vérifiée par
+    `diff`, `node --check` par fichier, `npm test` et chargement réel navigateur). **Restent** : audio
+    iPhone réel, retrait `LS_MIRROR`.
 
 - **Reporté en V4** : **sauvegarde auto vers NAS Synology** (on reste sur GitHub Pages quelques
   mois) ; synchro multi-appareils ; éventuelle migration React+TS+Vite ou app SwiftUI native.
