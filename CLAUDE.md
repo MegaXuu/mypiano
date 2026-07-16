@@ -240,6 +240,16 @@ Polices : titres **Playfair Display**, interface **DM Sans**, chiffres **EB Gara
     revérifier sur iPhone le correctif écran-verrouillé de la Bêta 3.12 (audio validé par ailleurs),
     retrait `LS_MIRROR`.
 
+- **Cycle V3 — Overhaul graphique « Récital » (validé 2026-07-16)** : direction « programme de
+  concert imprimé × lumière de scène » — continuité améthyste/or + typos actuelles, **sombre seul**
+  (thème clair reporté V4), motion signature riche (`prefers-reduced-motion` respecté). Discipline
+  chromatique : **améthyste = interaction, or = accomplissement**, le reste en neutres. 6 lots
+  R1–R6 = Bêta 3.13 → 3.18, **détail + prompts à copier-coller dans `ROADMAP-RECITAL.md`**
+  (R1 fondations tokens/composants ; R2 dock flottant + accueil ; R3 séance « mode scène » ;
+  R4 carnet/répertoire/fiche ; R5 voyage/stats/réglages/célébrations ; R6 polish + QA).
+  Les ~488 styles inline des `renderX()` migrent vers des classes **dans le lot de leur écran**.
+  À terminer avant de passer à V4.
+
 - **Reporté en V4** : **sauvegarde auto vers NAS Synology** (on reste sur GitHub Pages quelques
   mois) ; synchro multi-appareils ; éventuelle migration React+TS+Vite ou app SwiftUI native.
 
