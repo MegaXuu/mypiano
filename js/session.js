@@ -334,19 +334,16 @@ function renderRecordings(p){
   if(!recs.length)return '<div class="empty rec-empty">Aucun enregistrement.</div>';
   return recs.map(r=>{
     const label=[r.section?secName(p,r.section):'',frShort(r.date),r.bpm?r.bpm+' bpm':''].filter(Boolean).join(' · ');
-    return `<div class="card rec-card">
-      <div class="between rec-card-head">
-        <div class="rec-info">
-          <div class="rec-title">${esc(label||frShort(r.date))}</div>
-          <div class="muted rec-meta">${dur(r.dur)} · ${fmtBytes(r.size)}${r.feel?' · '+esc(feelLabel(r.feel)):''}</div>
-        </div>
-        <span class="rec-del-wrap" onclick="deleteRecording('${p.id}','${r.id}')">
-          <button class="btn ghost sm rec-del-btn danger-outline">Suppr.</button>
-        </span>
+    return `<div class="rec-row">
+      <button class="rec-play-btn" onclick="playRecording('${r.id}')">${playSvg()}</button>
+      <div class="rec-info">
+        <div class="rec-title">${esc(label||frShort(r.date))}</div>
+        <div class="muted rec-meta"><span class="num">${dur(r.dur)}</span> · <span class="num">${fmtBytes(r.size)}</span>${r.feel?' · '+esc(feelLabel(r.feel)):''}</div>
+        <div id="rec-pl-${r.id}" class="rec-player"></div>
       </div>
-      <div id="rec-pl-${r.id}" class="mt10">
-        <button class="btn ghost sm btn-full" onclick="playRecording('${r.id}')">${playSvg()} Écouter</button>
-      </div>
+      <span class="rec-del-wrap" onclick="deleteRecording('${p.id}','${r.id}')">
+        <button class="btn ghost sm rec-del-btn danger-outline">Suppr.</button>
+      </span>
     </div>`;
   }).join('');
 }

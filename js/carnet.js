@@ -22,37 +22,37 @@ function renderCarnetBody(){
   const filtered=carnetFilter?all.filter(s=>s.blocks.some(b=>b.piece===carnetFilter)):all;
   const shown=filtered.slice(0,carnetShown);
   const chips=carnetPieces();
-  const chipsHtml=chips.length?`<div class="chips" style="flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;margin-bottom:4px;">
-    <button class="chip ${carnetFilter?'':'on'}" style="flex:0 0 auto;" onclick="setCarnetFilter('')">Tous</button>
-    ${chips.map(id=>`<button class="chip ${carnetFilter===id?'on':''}" style="flex:0 0 auto;" onclick="setCarnetFilter('${id}')">${esc(pieceName(id))}</button>`).join('')}
+  const chipsHtml=chips.length?`<div class="carnet-chips">
+    <button class="chip ${carnetFilter?'':'on'}" onclick="setCarnetFilter('')">Tous</button>
+    ${chips.map(id=>`<button class="chip ${carnetFilter===id?'on':''}" onclick="setCarnetFilter('${id}')">${esc(pieceName(id))}</button>`).join('')}
   </div>`:'';
   const curWk=weekKey();
   let groups='',gWk='',gSec=0,gDays=new Set(),gItems=[];
   const flush=()=>{if(!gItems.length)return;
     const label=gWk===curWk?'Cette semaine':'Semaine du '+frShort(gWk);
-    groups+=`<div class="between" style="margin:22px 2px 8px;">
-      <span class="serif" style="font-size:17px;">${label}</span>
-      <span class="muted" style="font-size:12px;">${dur(gSec)} · ${gDays.size} j</span></div>${gItems.join('')}`;};
+    groups+=`<div class="carnet-week-head"><span class="eyebrow carnet-week-label">${label}</span>
+      <span class="num it carnet-week-sub">${dur(gSec)} · ${gDays.size} j</span></div>
+      <div class="filet carnet-week-filet"></div>${gItems.join('')}`;};
   shown.forEach(s=>{
     const wk=weekKey(new Date(s.date+'T00:00'));
     if(wk!==gWk){flush();gWk=wk;gSec=0;gDays=new Set();gItems=[];}
     gSec+=sessionSeconds(s);gDays.add(s.date);
     const names=[...new Set(s.blocks.map(b=>pieceName(b.piece)))].join(' · ');
     const prev=sessPreview(s);
-    gItems.push(`<div class="item" onclick='aposterioriSheet(${JSON.stringify(s).replace(/'/g,"&#39;")})'>
-      <div style="min-width:0;"><div class="title">${esc(names)}</div>
-      <div class="meta">${frShort(s.date)} · ${dur(sessionSeconds(s))}${s.feeling?' · '+esc(feelLabel(s.feeling)):''}${prev?' · '+esc(truncWord(prev,32)):''}</div></div>
-      <div class="r muted">›</div></div>`);
+    gItems.push(`<div class="carnet-entry" onclick='aposterioriSheet(${JSON.stringify(s).replace(/'/g,"&#39;")})'>
+      <div class="carnet-entry-body"><div class="carnet-entry-title">${esc(names)}</div>
+      <div class="carnet-entry-meta">${frShort(s.date)} · ${dur(sessionSeconds(s))}${s.feeling?' · '+esc(feelLabel(s.feeling)):''}${prev?' · '+esc(truncWord(prev,32)):''}</div></div>
+      <div class="carnet-entry-chevron muted">›</div></div>`);
   });
   flush();
-  const more=filtered.length>carnetShown?`<button class="btn ghost sm" style="width:100%;margin-top:16px;" onclick="moreCarnet()">Afficher 60 séances de plus</button>
-    <p class="muted" style="font-size:12px;text-align:center;margin:10px 0 0;">${shown.length} séance${shown.length>1?'s':''} sur ${filtered.length}</p>`:'';
-  el.innerHTML=`<button class="btn ghost sm" style="width:100%;margin:16px 0 14px;" onclick="aposterioriSheet()">+ Ajouter une séance oubliée</button>`+
+  const more=filtered.length>carnetShown?`<button class="btn ghost sm btn-full carnet-more-btn" onclick="moreCarnet()">Afficher 60 séances de plus</button>
+    <p class="muted carnet-more-count">${shown.length} séance${shown.length>1?'s':''} sur ${filtered.length}</p>`:'';
+  el.innerHTML=`<button class="btn ghost sm btn-full carnet-add-btn" onclick="aposterioriSheet()">+ Ajouter une séance oubliée</button>`+
     chipsHtml+
     (shown.length?groups+more:'<div class="empty">'+(carnetFilter?'Aucune séance pour ce morceau.':'Aucune séance.<br>Lance-toi, ou ajoute une séance oubliée.')+'</div>');
 }
 function dynScale(label,val,field){const idx=FEEL_ORDER.indexOf(val);
-  return `<div style="margin-bottom:12px;"><div class="sub" style="margin-bottom:6px;"><span>${label}</span><span>${val?esc(feelLabel(val)):'—'}</span></div>
+  return `<div class="dyn-scale"><div class="sub dyn-scale-head"><span>${label}</span><span>${val?esc(feelLabel(val)):'—'}</span></div>
     <div class="dyn">${FEEL_ORDER.map((f,i)=>`<button class="${val&&i<=idx?'on':''}" onclick="setJournal('${field}','${f}')">${f}</button>`).join('')}</div></div>`;
 }
 function setJournal(field,v){const k=dkey();S.journal[k]=S.journal[k]||{mood:'',energy:''};S.journal[k][field]=v;save();
@@ -77,7 +77,7 @@ function wishSheet(){_worksCache=[];
   openSheet(`<h3>À apprendre un jour</h3>
     <div class="field"><label>Compositeur</label><input id="p-c" list="dl-comp" placeholder="Liszt" oninput="onComposerInput(this.value)" autocomplete="off"><datalist id="dl-comp">${comps}</datalist></div>
     <div class="field"><label>Titre / œuvre</label><input id="p-t" list="dl-works" placeholder="La Campanella" autocomplete="off"><datalist id="dl-works"></datalist>
-      <div class="muted" style="font-size:12px;margin-top:6px;">Choisis un compositeur pré-chargé pour l'autocomplétion.</div></div>
+      <div class="muted field-hint">Choisis un compositeur pré-chargé pour l'autocomplétion.</div></div>
     <button class="btn primary" onclick="saveWish()">Ajouter à la wishlist</button>`);}
 function saveWish(){const t=document.getElementById('p-t').value.trim();if(!t){toast('Donne un titre',{danger:true});return;}
   const composer=document.getElementById('p-c').value.trim();
@@ -85,4 +85,3 @@ function saveWish(){const t=document.getElementById('p-t').value.trim();if(!t){t
   S.pieces.push({id:uid(),title:t,composer,epoch:(document.getElementById('p-e')||{}).value||'',status:'wishlist',diff:0,progress:0,tags:[],notes:[],todo:'',createdAt:Date.now()});
   save();closeSheet();refreshScreen();toast('Ajouté à « à apprendre »');}
 function startLearning(id){const p=pieceById(id);if(!p)return;p.status='active';if(p.createdAt==null)p.createdAt=Date.now();save();closeSheet();refreshScreen();toast('Direction le répertoire · en cours');}
-

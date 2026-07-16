@@ -9,38 +9,38 @@ function distinctVals(key){const s=new Set();S.pieces.forEach(p=>{if(!p.isEnsemb
 function distinctTags(){const s=new Set();S.pieces.forEach(p=>(p.tags||[]).forEach(t=>s.add(t)));return [...s].sort((a,b)=>a.localeCompare(b));}
 function addChoiceSheet(){
   openSheet(`<h3>Ajouter au répertoire</h3>
-    <div class="item" style="align-items:flex-start;" onclick="addPieceSheet()">
-      <svg viewBox="0 0 24 24" class="ic" style="width:20px;height:20px;color:var(--acc);margin-top:2px;"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.4"/><circle cx="16.5" cy="16" r="2.4"/></svg>
-      <div style="min-width:0;"><div class="title">Un morceau</div>
-      <div class="meta" style="line-height:1.45;">Une pièce seule, que tu commences à travailler.</div></div>
+    <div class="item add-choice-item" onclick="addPieceSheet()">
+      <svg viewBox="0 0 24 24" class="ic add-choice-ic acc"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.4"/><circle cx="16.5" cy="16" r="2.4"/></svg>
+      <div class="rep-item-body"><div class="title">Un morceau</div>
+      <div class="meta add-choice-meta">Une pièce seule, que tu commences à travailler.</div></div>
       <div class="r muted">›</div></div>
-    <div class="item" style="align-items:flex-start;" onclick="workSheet()">
-      <svg viewBox="0 0 24 24" class="ic" style="width:20px;height:20px;color:var(--acc);margin-top:2px;"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 9.5h16M4 15h16"/></svg>
-      <div style="min-width:0;"><div class="title">Une œuvre à mouvements</div>
-      <div class="meta" style="line-height:1.45;">Sonate, suite, cycle… chaque mouvement devient un morceau.</div></div>
+    <div class="item add-choice-item" onclick="workSheet()">
+      <svg viewBox="0 0 24 24" class="ic add-choice-ic acc"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 9.5h16M4 15h16"/></svg>
+      <div class="rep-item-body"><div class="title">Une œuvre à mouvements</div>
+      <div class="meta add-choice-meta">Sonate, suite, cycle… chaque mouvement devient un morceau.</div></div>
       <div class="r muted">›</div></div>
-    <div class="item" style="align-items:flex-start;" onclick="wishSheet()">
-      <svg viewBox="0 0 24 24" class="ic" style="width:20px;height:20px;color:var(--t2);margin-top:2px;"><path d="M12 3v18M3 12h18"/><circle cx="12" cy="12" r="9"/></svg>
-      <div style="min-width:0;"><div class="title">À apprendre un jour</div>
-      <div class="meta" style="line-height:1.45;">Une envie à garder de côté, sans la commencer.</div></div>
+    <div class="item add-choice-item" onclick="wishSheet()">
+      <svg viewBox="0 0 24 24" class="ic add-choice-ic muted2"><path d="M12 3v18M3 12h18"/><circle cx="12" cy="12" r="9"/></svg>
+      <div class="rep-item-body"><div class="title">À apprendre un jour</div>
+      <div class="meta add-choice-meta">Une envie à garder de côté, sans la commencer.</div></div>
       <div class="r muted">›</div></div>
-    <button class="btn ghost sm" style="width:100%;margin-top:12px;" onclick="closeSheet()">Annuler</button>`);
+    <button class="btn ghost sm add-choice-cancel" onclick="closeSheet()">Annuler</button>`);
 }
 function renderRep(){
   document.getElementById('s-rep').innerHTML=`
     <div class="between"><h1>Répertoire</h1><button class="btn primary sm" onclick="addChoiceSheet()">+ Ajouter</button></div>
-    <div class="field" style="margin-top:16px;position:relative;">
+    <div class="field rep-search-field">
       <input id="rep-q" placeholder="Compositeur ou œuvre…" oninput="repSearch(this.value)" autocomplete="off">
       <div id="rep-sug"></div></div>
-    <div class="seg" style="margin:6px 0 10px;">
-      <button class="${repFilter==='wishlist'?'on':''}" onclick="setRep('wishlist')" style="font-size:12px;">Apprendre</button>
-      <button class="${repFilter==='active'?'on':''}" onclick="setRep('active')" style="font-size:12px;">En cours</button>
-      <button class="${repFilter==='mastered'?'on':''}" onclick="setRep('mastered')" style="font-size:12px;">Maîtrisés</button>
-      <button class="${repFilter==='archived'?'on':''}" onclick="setRep('archived')" style="font-size:12px;">Archivés</button>
+    <div class="seg rep-seg">
+      <button class="${repFilter==='wishlist'?'on':''}" onclick="setRep('wishlist')">Apprendre</button>
+      <button class="${repFilter==='active'?'on':''}" onclick="setRep('active')">En cours</button>
+      <button class="${repFilter==='mastered'?'on':''}" onclick="setRep('mastered')">Maîtrisés</button>
+      <button class="${repFilter==='archived'?'on':''}" onclick="setRep('archived')">Archivés</button>
     </div>
-    <div class="row" style="gap:8px;margin-bottom:12px;">
-      <button class="btn ghost sm" style="flex:1;" onclick="repSortSheet()">Trier : ${SORT_LABELS[repSort]}</button>
-      <button class="btn ghost sm" style="flex:1;${activeFilterCount()?'color:var(--acc);border-color:var(--acc);':''}" onclick="repFilterSheet()">Filtres${activeFilterCount()?' · '+activeFilterCount():''}</button>
+    <div class="row rep-tools">
+      <button class="btn ghost sm rep-tool-btn" onclick="repSortSheet()">Trier : ${SORT_LABELS[repSort]}</button>
+      <button class="btn ghost sm rep-tool-btn${activeFilterCount()?' rep-tool-btn-active':''}" onclick="repFilterSheet()">Filtres${activeFilterCount()?' · '+activeFilterCount():''}</button>
     </div>
     <div id="rep-list"></div>`;
   renderRepList();
@@ -72,19 +72,19 @@ function renderRepList(){
   S.pieces.filter(p=>p.isEnsemble).forEach(e=>{
     const subs=S.pieces.filter(p=>p.parentId===e.id);if(!subs.some(match))return;
     const done=subs.filter(s=>s.status==='mastered').length;const open=_ensOpen[e.id];
-    html+=`<div class="item" style="flex-direction:column;align-items:stretch;">
-      <div class="row" onclick="toggleEns('${e.id}')" style="cursor:pointer;">
-        <svg viewBox="0 0 24 24" class="ic" style="width:20px;height:20px;color:var(--t2);"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.4"/><circle cx="16.5" cy="16" r="2.4"/></svg>
+    html+=`<div class="item rep-ens">
+      <div class="row rep-ens-head" onclick="toggleEns('${e.id}')">
+        <svg viewBox="0 0 24 24" class="ic rep-ens-ic"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.4"/><circle cx="16.5" cy="16" r="2.4"/></svg>
         <div><div class="title">${esc(e.title)}</div><div class="meta">${esc(e.composer||'')} · ${done}/${subs.length} maîtrisés</div></div>
-        <div class="r muted" style="transform:rotate(${open?90:0}deg);transition:.2s;">›</div></div>
-      ${open?'<div style="margin-top:10px;padding-left:8px;border-left:1px solid var(--surface2);">'+subs.map(s=>repRow(s,true)).join('')+'</div>':''}</div>`;
+        <div class="r muted rep-ens-chevron${open?' open':''}">›</div></div>
+      ${open?'<div class="rep-ens-subs">'+subs.map(s=>repRow(s,true)).join('')+'</div>':''}</div>`;
   });
   if(repGroup&&repSort==='composer'){
     const groups={};items.forEach(p=>{const k=p.composer||'—';(groups[k]=groups[k]||[]).push(p);});
     Object.keys(groups).sort((a,b)=>a.localeCompare(b)).forEach(k=>{
       const open=_grpOpen[k]!==false;
-      html+=`<div class="between" style="margin:0 2px;padding:16px 0 10px;cursor:pointer;" onclick="toggleGrp('${encodeURIComponent(k)}')">
-        <span style="font-weight:600;font-size:14px;">${esc(k)}</span><span class="muted" style="font-size:12px;">${groups[k].length} ${open?'▾':'▸'}</span></div>`;
+      html+=`<div class="between rep-group-head" onclick="toggleGrp('${encodeURIComponent(k)}')">
+        <span class="rep-group-name">${esc(k)}</span><span class="muted rep-group-count">${groups[k].length} ${open?'▾':'▸'}</span></div>`;
       if(open)html+=groups[k].map(p=>repRow(p,false)).join('');
     });
   } else {
@@ -95,8 +95,8 @@ function renderRepList(){
 function toggleGrp(k){k=decodeURIComponent(k);_grpOpen[k]=_grpOpen[k]===false?true:false;renderRepList();}
 function repSortSheet(){
   openSheet(`<h3>Trier le répertoire</h3>
-    ${Object.keys(SORT_LABELS).map(k=>`<div class="item" onclick="setSort('${k}')"><div class="title" style="font-size:14px;">Par ${SORT_LABELS[k]}</div><div class="r">${repSort===k?'<span style="color:var(--acc);">✓</span>':''}</div></div>`).join('')}
-    <div class="between" style="margin-top:10px;padding:12px 4px;"><span>Regrouper par compositeur</span><div class="toggle ${repGroup?'on':''}" onclick="toggleGroup(this)"></div></div>`);
+    ${Object.keys(SORT_LABELS).map(k=>`<div class="item" onclick="setSort('${k}')"><div class="title rep-sort-title">Par ${SORT_LABELS[k]}</div><div class="r">${repSort===k?'<span class="rep-sort-check">✓</span>':''}</div></div>`).join('')}
+    <div class="between rep-sort-toggle-row"><span>Regrouper par compositeur</span><div class="toggle ${repGroup?'on':''}" onclick="toggleGroup(this)"></div></div>`);
 }
 function setSort(k){repSort=k;save();closeSheet();renderRep();}
 function toggleGroup(el){repGroup=!repGroup;el.classList.toggle('on');}
@@ -111,19 +111,22 @@ function repFilterSheet(){
       <div class="field"><label>Difficulté max</label><input id="f-dmax" type="number" min="1" max="9" value="${repF.diffMax}"></div></div>
     <div class="field"><label>Pas joué depuis (jours) — 0 = ignorer</label><input id="f-np" type="number" min="0" value="${repF.notPlayed}"></div>
     <button class="btn primary" onclick="applyFilters()">Appliquer</button>
-    <button class="btn ghost sm" style="width:100%;margin-top:10px;" onclick="resetFilters()">Réinitialiser</button>`);
+    <button class="btn ghost sm btn-full mt10" onclick="resetFilters()">Réinitialiser</button>`);
 }
 function applyFilters(){const v=id=>document.getElementById(id).value;
   repF.composer=v('f-comp');repF.epoch=v('f-epoch');repF.genre=v('f-genre');repF.tag=v('f-tag');
   repF.diffMin=Math.max(1,parseInt(v('f-dmin'))||1);repF.diffMax=Math.min(9,parseInt(v('f-dmax'))||9);repF.notPlayed=Math.max(0,parseInt(v('f-np'))||0);
   closeSheet();renderRep();}
 function resetFilters(){repF={composer:'',epoch:'',genre:'',tag:'',diffMin:1,diffMax:9,notPlayed:0};closeSheet();renderRep();}
+function repMonoLetter(p){return ((p.composer||p.title||'?').trim().charAt(0)||'?').toUpperCase();}
 function repRow(p,sub){
   const meta=[p.composer,p.diff?('Henle '+p.diff):'',pieceSeconds(p.id)?dur(pieceSeconds(p.id))+' joués':''].filter(Boolean).join(' · ');
-  const tags=(p.tags||[]).length?`<div style="margin-top:6px;display:flex;gap:5px;flex-wrap:wrap;">${p.tags.map(t=>`<span class="tag" style="padding:2px 8px;font-size:11px;">${esc(t)}</span>`).join('')}</div>`:'';
-  return `<div class="item" style="${sub?'margin-bottom:8px;background:var(--surface2);':''}" onclick="pieceDetail('${p.id}')">
-    <div style="min-width:0;"><div class="title">${esc(p.title)}</div><div class="meta">${esc(meta)}</div>${tags}</div>
-    <div class="r">${phaseChip(p)}<span class="muted">›</span></div></div>`;
+  const tags=(p.tags||[]).length?`<div class="rep-tags">${p.tags.map(t=>`<span class="tag tag-sm">${esc(t)}</span>`).join('')}</div>`:'';
+  const ph=piecePhase(p);
+  return `<div class="item rep-item${sub?' rep-item-sub':''}" onclick="pieceDetail('${p.id}')">
+    <div class="rep-mono" style="border-color:${ph?`color-mix(in srgb, ${ph.col} 45%, var(--hairline))`:'var(--hairline)'};"><span>${esc(repMonoLetter(p))}</span></div>
+    <div class="rep-item-body"><div class="title">${esc(p.title)}</div><div class="meta">${esc(meta)}</div>${tags}</div>
+    <div class="r rep-item-r">${ph?`<span class="rep-phase"><i class="rep-phase-dot" style="background:${ph.col};"></i>${esc(ph.label)}</span>`:''}<span class="muted">›</span></div></div>`;
 }
 function toggleEns(id){_ensOpen[id]=!_ensOpen[id];renderRepList();}
 let _searchTO,_sugList=[];
@@ -143,11 +146,11 @@ function buildSug(res){
   res.works.forEach(w=>items.push({type:'œuvre',label:w.title+(w.opus?' '+w.opus:''),sub:w.composer,data:w}));
   _sugList=items.slice(0,10);
   const box=document.getElementById('rep-sug');if(!box)return;
-  if(!_sugList.length){box.innerHTML='<div class="empty" style="padding:16px;">Aucun résultat</div>';return;}
-  box.innerHTML='<div class="card" style="margin-top:8px;padding:6px;">'+_sugList.map((it,i)=>
-    `<div class="row" style="padding:10px;border-radius:10px;" onclick="addSug(${i})">
-      <span class="tag" style="padding:3px 9px;">${it.type}</span>
-      <div style="min-width:0;"><div class="title" style="font-size:14px;">${esc(it.label)}</div><div class="meta">${esc(it.sub||'')}</div></div>
+  if(!_sugList.length){box.innerHTML='<div class="empty empty-sm">Aucun résultat</div>';return;}
+  box.innerHTML='<div class="card rep-sug-card">'+_sugList.map((it,i)=>
+    `<div class="row rep-sug-row" onclick="addSug(${i})">
+      <span class="tag rep-sug-tag">${it.type}</span>
+      <div class="rep-item-body"><div class="title rep-sug-title">${esc(it.label)}</div><div class="meta">${esc(it.sub||'')}</div></div>
       <div class="r muted">+</div></div>`).join('')+'</div>';
 }
 function addSug(i){const it=_sugList[i];if(!it)return;const w=it.data;
@@ -164,11 +167,11 @@ function pieceSheet(id,prefill){
   openSheet(`<h3>${isNew?'Nouveau morceau':esc(p.title)||'Morceau'}</h3>
     <div class="field"><label>Compositeur</label><input id="p-c" list="dl-comp" value="${esc(p.composer)}" placeholder="Chopin" oninput="onComposerInput(this.value)" autocomplete="off"><datalist id="dl-comp">${comps}</datalist></div>
     <div class="field"><label>Titre / œuvre</label><input id="p-t" list="dl-works" value="${esc(p.title)}" placeholder="Nocturne op. 9 no 2" oninput="onTitleInput(this.value)" autocomplete="off"><datalist id="dl-works"></datalist>
-      <div class="muted" style="font-size:12px;margin-top:6px;">Un compositeur pré-chargé complète l'opus, le genre, la tonalité et la difficulté.</div></div>
-    <div class="field"><label>Difficulté · Henle 1–9</label><div class="row" id="p-diff" style="gap:5px;">${[1,2,3,4,5,6,7,8,9].map(i=>`<button onclick="setDiff(${i})" data-i="${i}" style="flex:1;height:22px;border-radius:5px;background:${i<=_pdiff?'var(--acc)':'var(--surface2)'};"></button>`).join('')}</div>
-      <div class="muted" id="p-diffl" style="font-size:13px;margin-top:6px;">${_pdiff?'Niveau '+_pdiff:'Non défini'}</div></div>
-    <button type="button" class="btn ghost sm" id="p-more-btn" style="width:100%;margin:4px 0 2px;" onclick="togglePMore()">${isNew?'Détails (facultatif) ⌄':'Masquer les détails ⌃'}</button>
-    <div id="p-more" style="display:${isNew?'none':'block'};">
+      <div class="muted field-hint">Un compositeur pré-chargé complète l'opus, le genre, la tonalité et la difficulté.</div></div>
+    <div class="field"><label>Difficulté · Henle 1–9</label><div class="row p-diff-row" id="p-diff">${[1,2,3,4,5,6,7,8,9].map(i=>`<button class="p-diff-btn" onclick="setDiff(${i})" data-i="${i}" style="background:${i<=_pdiff?'var(--acc)':'var(--surface2)'};"></button>`).join('')}</div>
+      <div class="muted p-diffl" id="p-diffl">${_pdiff?'Niveau '+_pdiff:'Non défini'}</div></div>
+    <button type="button" class="btn ghost sm p-more-btn" id="p-more-btn" onclick="togglePMore()">${isNew?'Détails (facultatif) ⌄':'Masquer les détails ⌃'}</button>
+    <div id="p-more" class="p-more${isNew?'':' show'}">
       <div class="grid2"><div class="field"><label>Époque</label><input id="p-e" value="${esc(p.epoch)}" placeholder="Romantique"></div>
         <div class="field"><label>Opus</label><input id="p-o" value="${esc(p.opus)}" placeholder="op. 9 no 2"></div></div>
       <div class="grid2"><div class="field"><label>Genre</label><input id="p-g" value="${esc(p.genre)}" placeholder="Nocturne"></div>
@@ -176,15 +179,15 @@ function pieceSheet(id,prefill){
       <div class="grid2"><div class="field"><label>Tempo cible (bpm)</label><input id="p-b" inputmode="numeric" value="${esc(p.bpm)}" placeholder="92"></div>
         <div class="field"><label>Mesures totales</label><input id="p-bars" inputmode="numeric" value="${p.bars||''}" placeholder="57"></div></div>
       <div class="field"><label>Tags (séparés par des virgules)</label><input id="p-tags" value="${esc((p.tags||[]).join(', '))}" placeholder="concert, par cœur, déchiffrage"></div>
-      ${hasDerivedProgress(p)?`<div class="field"><label>Avancement</label><div class="muted" style="font-size:13px;">Calculé automatiquement à partir des sections (${pieceProgress(p)} %). Modifiable depuis la fiche.</div></div>`
+      ${hasDerivedProgress(p)?`<div class="field"><label>Avancement</label><div class="muted field-hint-md">Calculé automatiquement à partir des sections (${pieceProgress(p)} %). Modifiable depuis la fiche.</div></div>`
         :`<div class="field"><label>Avancement · <span id="p-progl">${_pprog}</span> %</label><input id="p-prog" type="range" min="0" max="100" step="5" value="${_pprog}" oninput="document.getElementById('p-progl').textContent=this.value"></div>`}
-      <div class="field"><label>Statut</label><div class="seg" id="p-st"><button class="${_pstatus==='active'?'on':''}" onclick="setPStatus('active',this)">En cours</button><button class="${_pstatus==='mastered'?'on':''}" onclick="setPStatus('mastered',this)">Maîtrisé</button></div></div>
+      <div class="field field-end"><label>Statut</label><div class="seg" id="p-st"><button class="${_pstatus==='active'?'on':''}" onclick="setPStatus('active',this)">En cours</button><button class="${_pstatus==='mastered'?'on':''}" onclick="setPStatus('mastered',this)">Maîtrisé</button></div></div>
     </div>
-    <button class="btn primary" style="margin-top:6px;" onclick="savePiece('${isNew?'':p.id}')">${isNew?'Ajouter':'Enregistrer'}</button>
-    ${isNew?'':`<div class="grid2" style="margin-top:10px;"><button class="btn ghost sm" style="width:100%;" onclick="setPieceStatus('${p.id}','archived')">Archiver</button><button class="btn ghost sm" style="width:100%;color:var(--danger);border-color:var(--danger-border);" onclick="setPieceStatus('${p.id}','abandoned')">Abandonner</button></div>`}
-    ${isNew?'':`<div class="card" style="margin-top:14px;padding:12px 14px;"><div class="muted" style="font-size:12px;">Maturité</div>
-      <div style="font-size:13px;margin-top:4px;">Ajouté ${p.createdAt?'le '+new Date(p.createdAt).toLocaleDateString('fr-FR'):'—'}${p.masteredAt?' · maîtrisé le '+new Date(p.masteredAt).toLocaleDateString('fr-FR'):''}</div>
-      ${estimateText(p)?`<div style="font-size:13px;margin-top:4px;color:var(--acc);">${estimateText(p)}</div>`:''}</div>`}`);
+    <button class="btn primary mt6" onclick="savePiece('${isNew?'':p.id}')">${isNew?'Ajouter':'Enregistrer'}</button>
+    ${isNew?'':`<div class="grid2 mt10"><button class="btn ghost sm btn-full" onclick="setPieceStatus('${p.id}','archived')">Archiver</button><button class="btn ghost sm btn-full danger-outline" onclick="setPieceStatus('${p.id}','abandoned')">Abandonner</button></div>`}
+    ${isNew?'':`<div class="card p-maturity-card"><div class="muted field-hint-sm">Maturité</div>
+      <div class="p-maturity-text">Ajouté ${p.createdAt?'le '+new Date(p.createdAt).toLocaleDateString('fr-FR'):'—'}${p.masteredAt?' · maîtrisé le '+new Date(p.masteredAt).toLocaleDateString('fr-FR'):''}</div>
+      ${estimateText(p)?`<div class="p-maturity-estimate">${estimateText(p)}</div>`:''}</div>`}`);
   onComposerInput(p.composer);
 }
 let _pstatus='active',_pdiff=0,_worksCache=[],_pprog=0;
@@ -226,7 +229,7 @@ function savePiece(id){const title=document.getElementById('p-t').value.trim();i
   save();closeSheet();renderRep();
   if(newlyMastered)celebrate('piece',title);else toast('Enregistré');}
 function togglePMore(){const m=document.getElementById('p-more'),b=document.getElementById('p-more-btn');if(!m)return;
-  const open=m.style.display!=='none';m.style.display=open?'none':'block';if(b)b.textContent=open?'Détails (facultatif) ⌄':'Masquer les détails ⌃';}
+  const open=m.classList.contains('show');m.classList.toggle('show');if(b)b.textContent=open?'Détails (facultatif) ⌄':'Masquer les détails ⌃';}
 function setPieceStatus(id,st){pieceById(id).status=st;save();closeSheet();renderRep();toast(st==='archived'?'Archivé':'Abandonné');}
 function refreshScreen(){const a=document.querySelector('.screen.active');if(!a)return;const n=a.id.replace('s-','');
   ({home:renderHome,carnet:renderCarnet,rep:renderRep,voyage:renderVoyage,stats:renderStats,settings:renderSettings}[n]||(()=>{}))();}

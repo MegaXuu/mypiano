@@ -23,7 +23,7 @@
 | ✅ R2 | Bêta 3.14 | Dock flottant, transitions orchestrées, accueil « programme » |
 | ✅ R3 | Bêta 3.15 | Séance « mode scène » + feuilles de séance |
 | ✅ — | Bêta 3.16 | Correctif hors-lot : mise à jour auto du service worker (voir plus bas) |
-| ☐ R4 | Bêta 3.17 | Carnet, Répertoire, fiche morceau |
+| ✅ R4 | Bêta 3.17 | Carnet, Répertoire, fiche morceau |
 | ☐ R5 | Bêta 3.18 | Voyage, Stats, Réglages, célébrations |
 | ☐ R6 | Bêta 3.19 | Polish transversal, états vides illustrés, accessibilité, QA |
 
