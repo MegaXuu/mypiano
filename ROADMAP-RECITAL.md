@@ -25,7 +25,7 @@
 | ✅ — | Bêta 3.16 | Correctif hors-lot : mise à jour auto du service worker (voir plus bas) |
 | ✅ R4 | Bêta 3.17 | Carnet, Répertoire, fiche morceau |
 | ✅ R5 | Bêta 3.18 | Voyage, Stats, Réglages, célébrations |
-| ☐ R6 | Bêta 3.19 | Polish transversal, états vides illustrés, accessibilité, QA |
+| ✅ R6 | Bêta 3.19 | Polish transversal, états vides illustrés, accessibilité, QA |
 
 ---
 
@@ -309,6 +309,25 @@ Contraintes : diffs ciblés ; node --check ; npm test doit passer ; incrémente 
 en piano-b3-19 ET APP_VERSION (js/state.js) en 'Bêta 3.19' ; pas d'emoji ; français sobre.
 Termine par un commit (message français).
 ```
+
+**Réalisé (Bêta 3.19)** : passe de cohérence sur tous les écrans + surfaces secondaires (toasts,
+confirmSheet, workSheet, wishSheet, rapports, plan guidé, simulation concert) — a révélé un vrai
+bug visuel : la pastille de rang courant de l'accueil (`.home-rank-tag.stone`) entrait en collision
+de nom de classe avec l'ancien composant `.stone` (rond 34×34, hérité d'avant le cycle Récital et
+devenu mort), ce qui écrasait la pastille en cercle tronqué masquant tout son contenu — renommé en
+`.home-rank-tag.cur`, `.stone` supprimé. États vides : helper `emptyState()` (js/ui.js) + 3
+illustrations SVG au trait réutilisables (portée, note, pupitre — 1,5px, or/améthyste ~40 %)
+appliquées au Carnet, Répertoire, fiche morceau (notes/enregistrements), Stats et cartes
+compositeurs ; les micro-hints inline (résultats de recherche, listes de sheet) restent sobres,
+sans illustration, pour ne pas alourdir des zones transitoires. Accessibilité : contraste AA déjà
+respecté par les tokens R1 (vérifié par calcul, ratio minimal 4,91:1 sur `--t2`) ; ajout d'un
+`:focus-visible` global (liseré améthyste) sur boutons/onglets/chips/liens ; reduced-motion déjà
+correctement câblé depuis R2–R3 (stagger, countUp, halo, dessin d'anneau). Performance :
+`backdrop-filter` déjà cantonné au dock ; aucun filtre animé ; listes (Carnet/Répertoire) déjà en
+aplat `--surface`, pas de dégradé répété. Dette : 5 classes CSS mortes retirées (`.stone`, `.divi`,
+`.flame`, `.plan-sub`, `.ring-wrap`) ; `style=""` inline résiduel nettoyé dans `confirmSheet` et
+`editNum` (classes utilitaires existantes) — le reste est légitimement dynamique (couleurs/largeurs
+calculées).
 
 ---
 

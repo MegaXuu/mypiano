@@ -10,7 +10,7 @@ function pieceDetail(id){const p=pieceById(id);if(!p)return;
   const meta=[p.composer,p.epoch,p.opus].filter(Boolean).join(' · ');
   const stat=(v,l)=>`<div class="metric detail-stat"><div class="v num it">${v}</div><div class="l">${l}</div></div>`;
   const isWish=p.status==='wishlist',closed=p.status==='archived'||p.status==='abandoned';
-  const notes=(p.notes||[]).length?'<div class="tl mt6">'+[...p.notes].reverse().slice(0,12).map(n=>`<div class="n"><div class="between"><span class="muted detail-note-date">${frShort(n.date)}</span>${n.section?`<span class="tag detail-note-tag">${esc(secName(p,n.section))}</span>`:''}</div><div class="detail-note-text">${esc(n.text)}</div></div>`).join('')+'</div>':'<div class="empty empty-sm">Aucune note pour l\'instant.</div>';
+  const notes=(p.notes||[]).length?'<div class="tl mt6">'+[...p.notes].reverse().slice(0,12).map(n=>`<div class="n"><div class="between"><span class="muted detail-note-date">${frShort(n.date)}</span>${n.section?`<span class="tag detail-note-tag">${esc(secName(p,n.section))}</span>`:''}</div><div class="detail-note-text">${esc(n.text)}</div></div>`).join('')+'</div>':emptyState('Aucune note pour l\'instant.','staff','empty-sm');
   openSheet(`<div class="between detail-header">
       <div class="detail-header-info"><h3 class="detail-title">${esc(p.title)}</h3>${meta?`<div class="muted detail-meta">${esc(meta)}</div>`:''}</div>
       ${phaseChip(p)}</div>

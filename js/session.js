@@ -331,7 +331,7 @@ function discardRecording(){_recDraft=null;closeSheet();}
 function fmtBytes(n){if(!n)return '';if(n<1024*1024)return Math.round(n/1024)+' Ko';return (n/1024/1024).toFixed(1)+' Mo';}
 function renderRecordings(p){
   const recs=[...(p.recordings||[])].reverse();
-  if(!recs.length)return '<div class="empty rec-empty">Aucun enregistrement.</div>';
+  if(!recs.length)return emptyState('Aucun enregistrement.','stand','rec-empty');
   return recs.map(r=>{
     const label=[r.section?secName(p,r.section):'',frShort(r.date),r.bpm?r.bpm+' bpm':''].filter(Boolean).join(' · ');
     return `<div class="rec-row">

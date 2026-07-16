@@ -44,7 +44,7 @@ function setLine(l,v,fn){return `<div class="set-line" onclick="${fn}"><span>${l
 function togLine(l,on,key){return `<div class="set-tog-line"><span>${l}</span><div class="toggle ${key==='palier'?'gold ':''}${on?'on':''}" onclick="togNotif('${key}',this)"></div></div>`;}
 function togNotif(k,el){S.settings.notif[k]=!S.settings.notif[k];el.classList.toggle('on');save();}
 function setTol(t){S.settings.tolerance=t;save();renderSettings();toast('Tolérance : '+t+' jour(s)');}
-function editNum(field,label,clearable){openSheet(`<h3>${label}</h3><div class="field"><input id="en" type="number" inputmode="numeric" value="${S.settings[field]==null?'':S.settings[field]}"></div><button class="btn primary" onclick="saveNum('${field}')">Valider</button>${clearable?`<button class="btn ghost sm" style="width:100%;margin-top:10px;" onclick="clearNum('${field}')">Non défini</button>`:''}`);}
+function editNum(field,label,clearable){openSheet(`<h3>${label}</h3><div class="field"><input id="en" type="number" inputmode="numeric" value="${S.settings[field]==null?'':S.settings[field]}"></div><button class="btn primary" onclick="saveNum('${field}')">Valider</button>${clearable?`<button class="btn ghost sm btn-full mt10" onclick="clearNum('${field}')">Non défini</button>`:''}`);}
 function saveNum(field){const v=parseInt(document.getElementById('en').value);if(v>0){S.settings[field]=v;save();}closeSheet();renderSettings();}
 function clearNum(field){S.settings[field]=null;save();closeSheet();renderSettings();}
 function toggleNas(){S.settings.nas.enabled=!S.settings.nas.enabled;save();renderSettings();}

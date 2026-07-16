@@ -90,7 +90,7 @@ function renderRepList(){
   } else {
     html+=items.map(p=>repRow(p,false)).join('');
   }
-  el.innerHTML=html||'<div class="empty">Aucun morceau ne correspond.<br>'+(repFilter==='wishlist'?'Rien pour l\'instant.':'Ajuste les filtres, ou ajoute une œuvre.')+'</div>';
+  el.innerHTML=html||emptyState('Aucun morceau ne correspond.<br>'+(repFilter==='wishlist'?'Rien pour l\'instant.':'Ajuste les filtres, ou ajoute une œuvre.'),'note');
 }
 function toggleGrp(k){k=decodeURIComponent(k);_grpOpen[k]=_grpOpen[k]===false?true:false;renderRepList();}
 function repSortSheet(){

@@ -115,20 +115,32 @@ carnet de travail, et se motiver par la gamification. Cible : iPhone (PWA instal
 - **Enregistrements audio (V3 étape 4)** : `p.recordings?[] = {id,date,dur(sec),section?,bpm?(dernier bpm connu de la section au moment de l'enregistrement),feel?(pp–ff),size(octets),mime}`, **facultatif**. Le blob audio n'est **jamais** dans `S`/localStorage : il vit à part dans IndexedDB, store `recordings`, clé = `id` (voir « Architecture »). `deleteRecording` supprime la métadonnée **et** le blob.
 
 ## Design tokens (dans `index.html :root`)
-Depuis le lot R1 (Bêta 3.13, overhaul « Récital », voir `ROADMAP-RECITAL.md`) :
-fond `--bg:#131118` (noir violacé profond) · `--bg-deep:#0C0B10` (réservé au mode scène, R3) ·
+Overhaul « Récital » (Bêta 3.13–3.19, cycle terminé — voir `ROADMAP-RECITAL.md`) :
+fond `--bg:#131118` (noir violacé profond) · `--bg-deep:#0C0B10` (mode scène de la séance) ·
 cartes en dégradé `--surface-g:linear-gradient(180deg,#232030,#1C1926)` + liseré lumineux
 (`--hairline`/`--hairline-hi`, border-top plus clair) · `--surface:#201D2A` (aplat, usages coûteux
-en dégradé) · `--surface2:#2B2839` · bordure `--border:#515060` · texte2 `--t2:#9A94AB` · texte clair
-`--tc:#C9C4D6` · texte principal `--tp:#F0EDF7` · **accent améthyste `--acc:#A99EF5`**
-(`--acc-deep:#9A8FF0`) · **or (accomplissement) `--gold:#E4C58A`** · halos `--glow-acc`/`--glow-gold`
-(réservés aux boutons primaires/gold) · motion `--dur1/2/3` + `--easeout`. Grain SVG discret (≤3 %
-opacité) sur le fond. **Discipline chromatique** : améthyste = interaction uniquement, or =
-accomplissement uniquement (rangs, records, maîtrise, célébrations), le reste en neutres.
+en dégradé, ex. listes longues Carnet/Répertoire) · `--surface2:#2B2839` · bordure `--border:#515060`
+· texte2 `--t2:#9A94AB` · texte clair `--tc:#C9C4D6` · texte principal `--tp:#F0EDF7` ·
+**accent améthyste `--acc:#A99EF5`** (`--acc-deep:#9A8FF0`) · **or (accomplissement) `--gold:#E4C58A`**
+· halos `--glow-acc`/`--glow-gold` (réservés aux boutons primaires/gold) · motion `--dur1/2/3` +
+`--easeout`. Grain SVG discret (≤3 % opacité) sur le fond. Contraste AA vérifié par calcul sur tous
+les fonds (`--t2` ≥ 4,91:1) — aucun ajustement de token nécessaire.
 Polices : titres **Playfair Display**, interface **DM Sans**, chiffres **EB Garamond**
 (variante italique `.num.it` pour les valeurs musicales). Minuscules de phrase, sauf `.eyebrow`
-(petites capitales espacées, exception assumée pour les surtitres). Séparateurs : `.divi` (simple)
-et `.filet` (hairline + losange or centré, ornemental).
+(petites capitales espacées, exception assumée pour les surtitres). Séparateur : `.filet`
+(hairline + losange or centré, ornemental). États vides : `emptyState(text, icon, cls?)` (`js/ui.js`)
+— 3 illustrations SVG au trait réutilisables (`staff`/`note`/`stand`, 1,5px, or/améthyste ~40 %),
+remplace les `.empty` texte-seul (pas les micro-hints inline transitoires, qui restent sobres).
+Accessibilité : `:focus-visible` global (liseré améthyste) sur boutons/onglets/chips/liens ;
+`prefers-reduced-motion` coupe stagger/countUp/halo/dessin d'anneau (câblé depuis R2–R3).
+
+### Discipline chromatique (règle d'or, tout le reste de l'app)
+Améthyste = **interaction** uniquement (CTA, sélection, focus, progression en cours) · or =
+**accomplissement** uniquement (rangs, records, maîtrise, célébrations) · le reste en neutres.
+Exception assumée et pérenne : `PHASE_COL` (`js/state.js`) — palette catégorielle
+déchiffrage/consolidation/polissage antérieure au cycle Récital, utilisée pour coder un statut
+(phase d'une pièce, carte de couverture, sections), pas une accroche décorative ; de même les
+niveaux de cartes compositeurs (Bronze/Argent/Or) ont leurs propres teintes de médaille.
 
 ## Gamification (repères)
 - **Grand Voyage** : `STONES[]` = 18 rangs honorifiques (Apprenti → Maestro Assoluto) + couleur, seuils 10 h → 10 000 h. Icônes notes `glyphFor(i)` (♩♪♫♬𝄞). Palier via `currentStone()`.
@@ -255,15 +267,16 @@ et `.filet` (hairline + losange or centré, ornemental).
     revérifier sur iPhone le correctif écran-verrouillé de la Bêta 3.12 (audio validé par ailleurs),
     retrait `LS_MIRROR`.
 
-- **Cycle V3 — Overhaul graphique « Récital » (validé 2026-07-16)** : direction « programme de
-  concert imprimé × lumière de scène » — continuité améthyste/or + typos actuelles, **sombre seul**
-  (thème clair reporté V4), motion signature riche (`prefers-reduced-motion` respecté). Discipline
-  chromatique : **améthyste = interaction, or = accomplissement**, le reste en neutres. 6 lots
-  R1–R6 = Bêta 3.13 → 3.18, **détail + prompts à copier-coller dans `ROADMAP-RECITAL.md`**
-  (R1 fondations tokens/composants ; R2 dock flottant + accueil ; R3 séance « mode scène » ;
-  R4 carnet/répertoire/fiche ; R5 voyage/stats/réglages/célébrations ; R6 polish + QA).
-  Les ~488 styles inline des `renderX()` migrent vers des classes **dans le lot de leur écran**.
-  À terminer avant de passer à V4.
+- **Cycle V3 — Overhaul graphique « Récital » (validé 2026-07-16) — ✅ TERMINÉ (Bêta 3.19)** :
+  direction « programme de concert imprimé × lumière de scène » — continuité améthyste/or + typos
+  actuelles, **sombre seul** (thème clair reporté V4), motion signature riche
+  (`prefers-reduced-motion` respecté). Discipline chromatique : voir section « Design tokens ».
+  6 lots R1–R6 = Bêta 3.13 → 3.19, **détail + prompts dans `ROADMAP-RECITAL.md`** (R1 fondations
+  tokens/composants ; R2 dock flottant + accueil ; R3 séance « mode scène » ; R4 carnet/répertoire/
+  fiche ; R5 voyage/stats/réglages/célébrations ; R6 polish transversal + états vides illustrés +
+  accessibilité + QA — a aussi corrigé un bug de collision de classe CSS sur la pastille de rang de
+  l'accueil, voir `ROADMAP-RECITAL.md`). Les styles inline des `renderX()` ont migré vers des
+  classes lot par lot ; ce qui reste est légitimement dynamique (couleurs/largeurs calculées).
 
 - **Reporté en V4** : **sauvegarde auto vers NAS Synology** (on reste sur GitHub Pages quelques
   mois) ; synchro multi-appareils ; éventuelle migration React+TS+Vite ou app SwiftUI native.

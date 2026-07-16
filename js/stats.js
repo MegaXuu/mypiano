@@ -109,13 +109,13 @@ function weekCurve(){
 }
 function byPiece(){
   const map={};S.sessions.forEach(s=>s.blocks.forEach(b=>map[b.piece]=(map[b.piece]||0)+b.sec));
-  const arr=Object.entries(map).sort((a,b)=>b[1]-a[1]).slice(0,8);if(!arr.length)return '<div class="empty">Pas encore de données.</div>';
+  const arr=Object.entries(map).sort((a,b)=>b[1]-a[1]).slice(0,8);if(!arr.length)return emptyState('Pas encore de données.','staff');
   const mx=arr[0][1];
   return arr.map(([id,s])=>`<div class="stat-piece-row"><div class="sub stat-piece-head"><span class="clair">${esc(pieceName(id))}</span><span>${dur(s)}</span></div><div class="bar"><i style="width:${Math.round(s/mx*100)}%"></i></div></div>`).join('');
 }
 function splitView(){
   const map={};S.sessions.forEach(s=>s.blocks.forEach(b=>{let k;if(b.piece===IMPROV){k='Improvisation';}else{const p=pieceById(b.piece);if(!p)return;k=statSplit==='composer'?(p.composer||'—'):(p.epoch||'—');}map[k]=(map[k]||0)+b.sec;}));
-  const arr=Object.entries(map).sort((a,b)=>b[1]-a[1]);if(!arr.length)return '<div class="empty">Renseigne compositeur/époque de tes morceaux.</div>';
+  const arr=Object.entries(map).sort((a,b)=>b[1]-a[1]);if(!arr.length)return emptyState('Renseigne compositeur/époque de tes morceaux.','staff');
   const total=arr.reduce((a,b)=>a+b[1],0);const cols=['#9E93F2','#E4C58A','#6FD3E0','#8DB600','#C65B34','#2FB6B0','#B07A2A'];
   let acc=0;const seg=arr.map(([k,v],i)=>{const from=acc/total*100;acc+=v;const to=acc/total*100;return `${cols[i%cols.length]} ${from}% ${to}%`;}).join(',');
   return `<div class="row stat-split-row"><div class="stat-split-donut" style="background:conic-gradient(${seg});"></div>

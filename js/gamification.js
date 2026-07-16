@@ -150,7 +150,7 @@ function composerSheet(name){
 }
 function renderCartes(el){
   const comps=ownedComposers();
-  if(!comps.length){el.innerHTML='<div class="empty">Joue des morceaux pour collectionner des cartes de compositeurs.</div>';return;}
+  if(!comps.length){el.innerHTML=emptyState('Joue des morceaux pour collectionner des cartes de compositeurs.','note');return;}
   el.innerHTML=`<p class="muted voy-cartes-intro">Niveaux : Bronze 2 · Argent 5 · Or 10 morceaux maîtrisés.</p>
    <div class="voy-card-grid">${comps.map(name=>{
      const m=masteredByComposer(name),lv=cardLevel(m),c=OPUS.composerByName(name),next=cardNext(m,lv),sec=composerSeconds(name);

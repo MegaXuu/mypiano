@@ -16,7 +16,7 @@ function renderHome(){
         <svg viewBox="0 0 24 24" class="ic"><circle cx="12" cy="12" r="3.2"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2l-.3-2.6h-4l-.3 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 0 0 5 12a7 7 0 0 0 .1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 2 1.2l.3 2.6h4l.3-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6A7 7 0 0 0 19 12Z"/></svg>
       </button>
     </div>
-    ${st?`<div class="tag home-rank-tag stone">${noteIcon(st.c,17,rankGlyph(st))}<span class="home-rank-name">${st.n}</span><span class="muted">· ${Math.floor(totalSeconds()/3600)} h</span></div>`:`<div class="tag home-rank-tag">Début du voyage</div>`}
+    ${st?`<div class="tag home-rank-tag cur">${noteIcon(st.c,17,rankGlyph(st))}<span class="home-rank-name">${st.n}</span><span class="muted">· ${Math.floor(totalSeconds()/3600)} h</span></div>`:`<div class="tag home-rank-tag">Début du voyage</div>`}
     <h1 class="home-title">Bonjour Florian</h1>
     <div class="filet"></div>
 

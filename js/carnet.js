@@ -49,7 +49,7 @@ function renderCarnetBody(){
     <p class="muted carnet-more-count">${shown.length} séance${shown.length>1?'s':''} sur ${filtered.length}</p>`:'';
   el.innerHTML=`<button class="btn ghost sm btn-full carnet-add-btn" onclick="aposterioriSheet()">+ Ajouter une séance oubliée</button>`+
     chipsHtml+
-    (shown.length?groups+more:'<div class="empty">'+(carnetFilter?'Aucune séance pour ce morceau.':'Aucune séance.<br>Lance-toi, ou ajoute une séance oubliée.')+'</div>');
+    (shown.length?groups+more:emptyState(carnetFilter?'Aucune séance pour ce morceau.':'Aucune séance.<br>Lance-toi, ou ajoute une séance oubliée.','stand'));
 }
 function dynScale(label,val,field){const idx=FEEL_ORDER.indexOf(val);
   return `<div class="dyn-scale"><div class="sub dyn-scale-head"><span>${label}</span><span>${val?esc(feelLabel(val)):'—'}</span></div>

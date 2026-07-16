@@ -34,6 +34,12 @@ function countUp(el,target,fmt,dur){
     if(p<1)raf(frame);
   })(start);
 }
+const EMPTY_ICONS={
+  staff:'<svg viewBox="0 0 64 40" class="empty-ic" aria-hidden="true"><g fill="none" stroke="rgba(169,158,245,.4)" stroke-width="1.5" stroke-linecap="round"><path d="M4 8h56M4 16h56M4 24h56M4 32h56"/></g></svg>',
+  note:'<svg viewBox="0 0 40 56" class="empty-ic" aria-hidden="true"><g fill="none" stroke="rgba(228,197,138,.4)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="44" rx="8" ry="6"/><path d="M20 44V8l14 6"/></g></svg>',
+  stand:'<svg viewBox="0 0 56 56" class="empty-ic" aria-hidden="true"><g fill="none" stroke="rgba(169,158,245,.4)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 14h32l-4 14H16z"/><path d="M28 28v20M18 52h20M28 14V6M22 6h12"/></g></svg>'
+};
+function emptyState(text,icon,cls){return '<div class="empty'+(cls?' '+cls:'')+'">'+(EMPTY_ICONS[icon]||EMPTY_ICONS.staff)+'<p>'+text+'</p></div>';}
 let toastT;function toast(m,opts){const t=document.getElementById('toast');t.textContent=m;t.classList.toggle('danger',!!(opts&&opts.danger));t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),1900);}
 function openSheet(html){
   const sheet=document.getElementById('sheet'),bg=document.getElementById('sheet-bg');
@@ -50,9 +56,9 @@ let _confirmCb=null;
 function confirmSheet(message,label,onConfirm){
   _confirmCb=onConfirm;
   openSheet(`<h3>Confirmer</h3>
-    <p class="muted" style="font-size:14px;margin-top:-6px;">${esc(message)}</p>
-    <button class="btn danger" style="width:100%;margin-top:18px;" onclick="_runConfirm()">${esc(label)}</button>
-    <button class="btn ghost sm" style="width:100%;margin-top:10px;" onclick="closeSheet()">Annuler</button>`);
+    <p class="muted sheet-sub">${esc(message)}</p>
+    <button class="btn danger btn-full mt18" onclick="_runConfirm()">${esc(label)}</button>
+    <button class="btn ghost sm btn-full mt10" onclick="closeSheet()">Annuler</button>`);
 }
 function _runConfirm(){const cb=_confirmCb;_confirmCb=null;closeSheet();if(cb)cb();}
 

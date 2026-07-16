@@ -37,6 +37,8 @@ input,textarea,select{font-family:var(--sans);font-size:16px;color:var(--tp);bac
   transition:border-color var(--dur1);}
 textarea{resize:vertical;min-height:74px;line-height:1.5;}
 input:focus,textarea:focus,select:focus{border-color:var(--acc);box-shadow:0 0 0 3px rgba(169,158,245,.18);}
+button:focus-visible,a:focus-visible,.tab:focus-visible,.chip:focus-visible,[tabindex]:focus-visible{
+  outline:2px solid var(--acc);outline-offset:2px;border-radius:10px;}
 ::placeholder{color:var(--t2);opacity:.7;}
 .num{font-family:var(--num);font-variant-numeric:tabular-nums;}
 .num.it{font-style:italic;}
@@ -86,12 +88,10 @@ svg.ic{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.6;str
   font-size:14px;font-weight:600;color:var(--tc);}
 .chip.on{background:rgba(169,158,245,.18);color:var(--acc);box-shadow:inset 0 0 0 1px var(--acc);border-color:transparent;}
 .chips{display:flex;flex-wrap:wrap;gap:8px;}
-.stone{width:34px;height:34px;border-radius:50%;flex:0 0 auto;box-shadow:inset 0 2px 5px rgba(255,255,255,.3),inset 0 -3px 6px rgba(0,0,0,.35);}
 .item{background:var(--surface);border-radius:14px;padding:14px 16px;display:flex;align-items:center;gap:13px;margin-bottom:10px;}
 .item .title{font-weight:600;font-size:15px;color:var(--tp);}
 .item .meta{font-size:13px;color:var(--t2);margin-top:2px;}
 .item .r{margin-left:auto;display:flex;align-items:center;gap:8px;}
-.ring-wrap{display:flex;flex-direction:column;align-items:center;gap:6px;}
 .ring{position:relative;width:184px;height:184px;flex:0 0 auto;}
 .ring .c{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;}
 .ring .c b{font-family:var(--num);font-size:38px;font-weight:600;line-height:1;color:var(--tp);}
@@ -159,17 +159,18 @@ svg.ic{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.6;str
 .toast.danger{border-color:var(--danger);}
 .toast.show{opacity:1;transform:translateX(-50%);}
 .empty{text-align:center;color:var(--t2);padding:34px 12px;font-size:14px;line-height:1.6;}
-.divi{height:1px;background:var(--hairline);margin:14px 0;}
+.empty p{margin:0;}
+.empty-ic{display:block;margin:0 auto 14px;width:56px;height:56px;}
+.empty-sm .empty-ic{width:38px;height:38px;margin-bottom:8px;}
 .filet{height:1px;background:var(--hairline);margin:18px 0;position:relative;}
 .filet:after{content:"";position:absolute;top:50%;left:50%;width:5px;height:5px;background:var(--gold);
   transform:translate(-50%,-50%) rotate(45deg);}
-.flame{color:var(--acc);}
 a{color:var(--acc);}
 .sub{display:flex;justify-content:space-between;font-size:13px;color:var(--t2);}
 
 /* ---------- Accueil (Lot R2) ---------- */
 .home-rank-tag{margin-top:6px;}
-.home-rank-tag.stone{background:var(--surface);}
+.home-rank-tag.cur{background:var(--surface);}
 .home-rank-name{color:var(--gold);}
 .home-title{margin-top:12px;}
 .home-chips{display:flex;gap:8px;margin-top:8px;}
@@ -620,7 +621,6 @@ a{color:var(--acc);}
 .set-version{font-size:13px;text-align:center;margin-top:24px;}
 
 /* ---------- Plan, concert, rapports (Lot R5) ---------- */
-.plan-sub{margin-top:-6px;}
 .plan-block-card{margin-bottom:10px;padding:13px 15px;}
 .plan-block-title{font-weight:600;}
 .plan-block-min{color:var(--t2);}
