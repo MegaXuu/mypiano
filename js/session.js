@@ -63,11 +63,8 @@ function tick(){
       timer.total+=dt;timer.blocks[timer.blocks.length-1].sec+=dt;
       if(iv){iv.phaseSec+=dt;if(iv.phaseSec>=iv.work){iv.phase='break';iv.phaseSec=0;buzz();toast('Pause · repose tes mains');}}
       if(timer.mode==='minuteur'&&timer.total>=timer.target){timer.total=timer.target;timer.running=false;buzz();toast('Minuteur terminé ✓');}
-      if(timer.plan){const cb=timer.plan[timer.planIdx];
-        if(timer.blocks[timer.blocks.length-1].sec>=cb.min*60){
-          if(timer.planIdx<timer.plan.length-1){timer.planIdx++;const nb=timer.plan[timer.planIdx];timer.blocks.push({piece:nb.piece||IMPROV,sec:0});buzz();toast('Étape : '+nb.focus);}
-          else{timer.running=false;buzz();toast('Plan terminé ✓');}
-        }
+      if(timer.plan&&!timer.blockPending){const cb=timer.plan[timer.planIdx];
+        if(timer.blocks[timer.blocks.length-1].sec>=cb.min*60){timer.blockPending=true;buzz();}
       }
     }
   }
@@ -85,6 +82,8 @@ function renderSession(){
       <div class="num it sess-time" id="ss-time">0′ 00″</div>
       <div class="eyebrow sess-mode" id="ss-mode">chrono</div>
     </div>
+    <div class="sess-timeline" id="ss-timeline"></div>
+    <div id="ss-blockend"></div>
     <div class="sess-controls">
       <div class="sess-ctrl">
         <button id="ss-pause" onclick="togglePause()" class="sess-ctrl-btn sess-pause-btn">❚❚</button>
@@ -119,6 +118,8 @@ function paintSession(){
         :secLine?`<div class="sess-note"><div class="sess-note-text">${esc(secLine)}</div></div>`:'';}
   }
   if(timer.plan&&md)md.textContent='Plan guidé';
+  const tl=document.getElementById('ss-timeline');if(tl){tl.innerHTML=renderTimeline();tl.style.display=timer.plan?'flex':'none';}
+  const be=document.getElementById('ss-blockend');if(be)be.innerHTML=renderBlockEnd();
   const iv=timer.interval;if(iv&&iv.phase==='break'){if(t)t.textContent=big(Math.max(0,iv.brk-iv.phaseSec));if(md)md.textContent='Pause · repose tes mains';}
   const halo=document.getElementById('ss-halo');if(halo){halo.classList.toggle('paused',!timer.running);halo.classList.toggle('brk',!!(iv&&iv.phase==='break'));}
   const pb=document.getElementById('ss-pause');if(pb){pb.textContent=timer.running?'❚❚':'▶';}
@@ -128,6 +129,33 @@ function paintSession(){
   const agg={};timer.blocks.forEach(b=>agg[b.piece]=(agg[b.piece]||0)+b.sec);
   const el=document.getElementById('ss-blocks');
   if(el)el.innerHTML=Object.keys(agg).map(id=>`<div class="sess-block-row"><div class="sess-block-title ${id===IMPROV?'txt-improv':''}">${esc(pieceName(id))}</div><div class="sess-block-dur num it">${big(agg[id])}</div></div>`).join('')||'<p class="empty">—</p>';
+}
+function extendBlock(){
+  if(!timer||!timer.plan)return;
+  timer.plan[timer.planIdx].min+=5;timer.blockPending=false;paintSession();
+}
+function nextPlanBlock(){
+  if(!timer||!timer.plan)return;
+  if(timer.planIdx<timer.plan.length-1){
+    timer.planIdx++;const nb=timer.plan[timer.planIdx];timer.blocks.push({piece:nb.piece||IMPROV,sec:0});
+    timer.blockPending=false;toast('Étape : '+nb.focus);paintSession();
+  }else{timer.blockPending=false;stopSession();}
+}
+function renderTimeline(){
+  if(!timer||!timer.plan)return '';
+  const total=timer.plan.reduce((a,b)=>a+b.min,0)||1;
+  return timer.plan.map((b,i)=>{
+    const w=(b.min/total*100).toFixed(2);
+    const cls=i<timer.planIdx?'done':i===timer.planIdx?'now':'next';
+    return `<div class="sess-tl-seg ${cls}" style="width:${w}%;"></div>`;
+  }).join('');
+}
+function renderBlockEnd(){
+  if(!timer||!timer.plan||!timer.blockPending)return '';
+  const last=timer.planIdx===timer.plan.length-1;
+  return `<div class="sess-blockend"><div class="sess-blockend-txt">${last?'Plan terminé — prêt à finir ?':'Bloc terminé — passer à la suite ?'}</div>
+    <div class="row sess-blockend-actions"><button class="btn ghost sm" onclick="extendBlock()">Prolonger (+5 min)</button>
+    <button class="btn primary sm" onclick="nextPlanBlock()">${last?'Terminer':'Passer'}</button></div></div>`;
 }
 function togglePause(){
   if(!timer)return;
@@ -150,6 +178,11 @@ function stopSession(){
   finishStop(total);}
 function finishStop(total){timer.running=false;clearInterval(tickInt);carnetSheet(total);}
 function quickCarnet(){toast('Le carnet se remplit en fin de séance');}
+function planSectionsReached(pid){
+  const set=new Set();if(!timer||!timer.plan)return set;
+  for(let i=0;i<=timer.planIdx&&i<timer.plan.length;i++){const b=timer.plan[i];if(b.piece===pid&&b.sectionId)set.add(b.sectionId);}
+  return set;
+}
 function carnetSheet(total){
   const seen={},pieces=[];timer.blocks.forEach(b=>{if(!seen[b.piece]){seen[b.piece]=1;pieces.push(b.piece);}});
   _carnetPieces=pieces;_mastery={};
@@ -162,7 +195,7 @@ function carnetSheet(total){
         <div class="field field-end"><label>À faire la prochaine fois</label><textarea id="cn-${i}" placeholder="Accélérer, revoir la pédale…">${todo}</textarea></div>
         ${p&&p.status==='mastered'?`<div class="field field-tight-top"><label>Cette pièce maîtrisée</label>
           <div class="seg" id="cm-${i}"><button class="on" onclick="pickMastery(${i},'mastered',this)">Toujours maîtrisée</button><button onclick="pickMastery(${i},'active',this)">À retravailler</button></div></div>`:''}
-        ${carnetSecBlock(i,p)}
+        ${carnetSecBlock(i,p,planSectionsReached(pid))}
       </div>`;}).join('')}
     <div class="field"><label>Ressenti global</label><div class="dyn" id="c-f">${FEEL_ORDER.map(f=>`<button data-f="${f}" onclick="pickFeel('${f}',this)">${f}</button>`).join('')}</div>
       <div class="muted feel-label" id="c-fl">—</div></div>
@@ -175,14 +208,15 @@ function carnetSheet(total){
     <button class="btn primary" onclick="commitSession(${total})">Enregistrer la séance</button>`);
   _feel='';
 }
-function carnetSecBlock(i,p){
+function carnetSecBlock(i,p,reached){
   if(!p||!hasDerivedProgress(p))return '';
+  reached=reached||new Set();const open=reached.size>0;
   return `<div class="field field-sec">
-    <button type="button" class="btn ghost sm btn-full" id="csec-btn-${i}" onclick="toggleCarnetSec(${i})">Sections travaillées (facultatif) ⌄</button>
-    <div id="csec-body-${i}" class="collapse">
+    <button type="button" class="btn ghost sm btn-full" id="csec-btn-${i}" onclick="toggleCarnetSec(${i})">Sections travaillées (facultatif) ${open?'⌃':'⌄'}</button>
+    <div id="csec-body-${i}" class="collapse" style="${open?'display:block;':''}">
       <div class="chips mb10" id="csec-chips-${i}">
-        ${secList(p).map(s=>`<button type="button" class="chip carnet-sec-chip" data-sid="${s.id}" onclick="toggleCarnetChip(${i},'${p.id}','${s.id}',this)">${esc(s.name)}</button>`).join('')}</div>
-      ${secList(p).map(s=>carnetSecRow(i,p,s,false)).join('')}
+        ${secList(p).map(s=>`<button type="button" class="chip carnet-sec-chip ${reached.has(s.id)?'on':''}" data-sid="${s.id}" onclick="toggleCarnetChip(${i},'${p.id}','${s.id}',this)">${esc(s.name)}</button>`).join('')}</div>
+      ${secList(p).map(s=>carnetSecRow(i,p,s,reached.has(s.id))).join('')}
       <div class="muted carnet-sec-help">Le bouton fait passer la section à l'étape suivante. Laisse le tempo vide si tu n'as rien mesuré.</div>
     </div></div>`;
 }

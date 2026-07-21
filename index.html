@@ -654,6 +654,18 @@ a{color:var(--acc);}
 .plan-block-title{font-weight:600;}
 .plan-block-min{color:var(--t2);}
 .plan-block-consigne{font-size:13px;margin-top:5px;color:var(--t2);}
+.pg-preview-h{margin-top:18px;}
+
+/* ---------- Plan guidé v2 : timeline de séance (Bêta 4.3) ---------- */
+.sess-timeline{display:flex;gap:3px;height:6px;margin:16px 0 4px;}
+.sess-tl-seg{border-radius:3px;background:transparent;border:1px solid var(--hairline-hi);transition:background var(--dur2) var(--easeout),box-shadow var(--dur2) var(--easeout);}
+.sess-tl-seg.done{background:var(--t2);border-color:var(--t2);}
+.sess-tl-seg.now{background:var(--acc);border-color:var(--acc);box-shadow:0 0 8px var(--glow-acc);}
+@media (prefers-reduced-motion:reduce){.sess-tl-seg{transition:none;}}
+.sess-blockend{margin:10px 0;padding:13px 15px;border-radius:14px;background:var(--surface2);border:1px solid var(--hairline);}
+.sess-blockend-txt{font-size:13px;color:var(--tc);margin-bottom:9px;}
+.sess-blockend-actions{gap:8px;}
+.sess-blockend-actions .btn{flex:1;}
 .concert-item{padding:10px 14px;}
 .concert-item-title{font-size:14px;}
 .concert-chips-empty{font-size:13px;}

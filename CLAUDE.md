@@ -111,7 +111,7 @@ carnet de travail, et se motiver par la gamification. Cible : iPhone (PWA instal
   (traité comme faux).
 - `journal{date:{mood,energy}}` — capturé en **fin de séance** (`carnetSheet`, bloc repliable « facultatif » sous le ressenti), pas d'écran dédié. `opusCache{composer:[works]}`.
   (`wishlist[]` **fusionnée** dans `pieces` via `status:'wishlist'` — migration auto dans `migrate()`, tableau conservé vide. Accessible uniquement via le filtre « Apprendre » du Répertoire.)
-- `challenges{week,month,log[]}`, `settings{tolerance,dailyGoal,weeklyTime,weeklyDays,monthly,revisionDays,estimates,notif{…,monthly},theme,nas{}}`. `weeklyTime`/`monthly` peuvent être `null` (« non défini » → alerte accueil).
+- `challenges{week,month,log[]}`, `settings{tolerance,dailyGoal,weeklyTime,weeklyDays,monthly,revisionDays,estimates,notif{…,monthly},theme,nas{},planPrefs{dur,n,intent}}`. `weeklyTime`/`monthly` peuvent être `null` (« non défini » → alerte accueil). `planPrefs` (V4-3) mémorise les derniers réglages de la feuille de composition du plan guidé.
 - Divers : `lastReportSeen`, `lastMonthSeen`, `lastBackup`, `opusSyncedAt`.
 - **Enregistrements audio (V3 étape 4)** : `p.recordings?[] = {id,date,dur(sec),section?,bpm?(dernier bpm connu de la section au moment de l'enregistrement),feel?(pp–ff),size(octets),mime}`, **facultatif**. Le blob audio n'est **jamais** dans `S`/localStorage : il vit à part dans IndexedDB, store `recordings`, clé = `id` (voir « Architecture »). `deleteRecording` supprime la métadonnée **et** le blob.
 
@@ -310,6 +310,27 @@ niveaux de cartes compositeurs (Bronze/Argent/Or) ont leurs propres teintes de m
     adapte la consigne à la difficulté de la section du jour (très difficile → très lent/mains
     séparées/boucles courtes ; facile → consolidation/filage) quand la pièce est sectionnée, sinon
     comportement inchangé (basé sur l'avancement global).
+  - **V4-3 (Bêta 4.3)** ✅ : plan guidé v2, `js/plan.js`. Feuille de composition (`planSheet`)
+    remplace l'ancien plan fixe sur l'objectif du jour : durée (chips 30/45/60/75/90 min), nombre
+    de pièces (stepper 1–4, défaut suggéré par la durée via `suggestPlanN`), intention (seg
+    Apprendre/Consolider/Entretenir/Équilibré) ; aperçu régénéré en direct (`regenPlanPreview`),
+    réglages mémorisés dans `S.settings.planPrefs`. `generatePlan(params)` : échauffement (~10 %,
+    plafonné 8 min) → un bloc par pièce choisie (`pickPlanPieces`, sélection selon l'intention ;
+    pour Entretenir les *n* pièces sont directement les plus en retard de `revisionList()`, pas de
+    bloc « Entretien » séparé dans ce cas) → bloc Entretien unique si intention ≠ Apprendre/
+    Entretenir et qu'une pièce due n'est pas déjà choisie → filage de clôture. Pièce sectionnée :
+    un bloc par section non « ok », triées difficulté décroissante (`planPieceBlocks`), durée
+    répartie au prorata de `DIFF_WEIGHT` (`distribute`, arrondi proportionnel + plancher) ; pièce
+    non sectionnée : un bloc unique (`changConsigne`). En séance (`js/session.js`) : timeline
+    discrète sous le chrono (`renderTimeline`, segments proportionnels aux durées — fait/courant/
+    à venir), `prefers-reduced-motion` coupe la transition. Fin de bloc **non autoritaire** :
+    `timer.blockPending` fige l'avance auto (le temps continue de courir), un encart
+    (`renderBlockEnd`) propose Prolonger (+5 min sur le bloc, `extendBlock`) ou Passer/Terminer
+    (`nextPlanBlock`, ce dernier appelle `stopSession` sur le dernier bloc). `carnetSheet` pré-coche
+    les sections dont le bloc de plan a été atteint (`planSectionsReached`, jusqu'à `planIdx`
+    inclus) dans le bloc « Sections travaillées », dépliable ouvert d'office si des sections sont
+    pré-cochées. `startRevision` (bouton « Réviser » de l'accueil) inchangé, partage juste
+    `startPlanSession` avec le nouveau flux.
 
 - **Reporté en V5+** : thème clair « Nacre » ; **sauvegarde auto vers NAS Synology** (on reste
   sur GitHub Pages quelques mois) ; synchro multi-appareils ; éventuelle migration React+TS+Vite
