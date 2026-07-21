@@ -105,13 +105,36 @@ carnet de travail, et se motiver par la gamification. Cible : iPhone (PWA instal
     entrelacée des 3 pièces les plus en retard (`startRevision`, réutilise `timer.plan/planIdx`).
   - **Fiche unifiée** `pieceDetail(id)` (feuille) = point d'entrée depuis le répertoire : stats, avancement (dérivé si sections, sinon ±10 manuel), notes, transitions de statut. Formulaire `pieceSheet` allégé (champs primaires + dépliant « Détails »). **Phase** dérivée `piecePhase(p)` (À apprendre / Déchiffrage / Consolidation / Polissage / Maîtrisé / À entretenir…). Anti-doublon `findDuplicate` (normalisé).
   - **Sections & mesures (V3 étape 2)** : `bars` (nb de mesures, facultatif) + `sections[] = {id,name,from,to,todo,status(new|wip|poli|ok),bpm:[{d,v}],diff?(1–4)}`, **entièrement facultatif** — une pièce sans section se comporte comme avant (avancement manuel ±10). Dès que `bars` et au moins une section existent, `hasDerivedProgress(p)` devient vrai et `pieceProgress(p)` **remplace** `p.progress` partout (phase, estimation, tri du plan guidé) : seules les mesures des sections `ok` comptent (`barsOk`, union par rang pour éviter les doubles comptages en cas de chevauchement — `sectionRankArr`). `hist[] = {d,m}` journalise les mesures au point (un point par jour joué ou modifié, `recordHist`) → mini-courbe (`renderHistCurve`, pas de courbe de tempo). Carte visuelle de couverture (`renderMap`/`mapSegments`, trous = `coverageGaps`). Tempo = **saisie manuelle uniquement**, stocké par section (`sec.bpm[]`), jamais de métronome. Découpage assisté = `cutSheet`/`applyCut` (raccourci en mesures régulières) ou assistant pas-à-pas `startCutWizard` (V4-1, voir « État & feuille de route »). Suggestion « à travailler aujourd'hui » = section non `ok` la moins récemment travaillée (`pickTodaySection`, dérivé de `sessions[].entries[].sections`). Rappel en séance = ligne « Pas au point : … » (`sectionsReminderLine`). Carnet de fin de séance = bloc replié « Sections travaillées » (chips + avancer d'un cran + bpm optionnel). **Difficulté ressentie (V4-1)** : `sec.diff` ∈ 1–4 (Facile/Moyen/Difficile/Très difficile, `DIFF_LABELS`/`secDiffLabel`), facultative, purement indicative en V4-1 (n'influence ni tri ni suggestions — c'est le périmètre de V4-2).
-- `sessions[]` : `{id,date,mode(chrono|minuteur|guided|concert),goal,feeling(pp|p|mf|f|ff),blocks[{piece|'__improv__',sec}],entries[{piece,worked,next}],ts,concert?,interval?}`
+- `sessions[]` : `{id,date,mode(chrono|minuteur|guided|concert|away),goal,feeling(pp|p|mf|f|ff),blocks[{piece|'__improv__'|'',sec}],entries[{piece,worked,next}],ts,concert?,interval?,awayKind?,section?}`
   — `interval` (bool, facultatif) : vrai si la séance était en pratique fractionnée 25/5 ; sert à
   `fractionedInsight()` (étape 5). Absent sur les séances antérieures et les séances a posteriori
-  (traité comme faux).
+  (traité comme faux). `mode:'away'` (V4-4, mode vacances) : séance « loin du clavier »
+  (`awayKind` ∈ `ecoute|lecture|mental`, `section` = id de section optionnel), journalisée via
+  `blocks` comme les autres pour rester compatible avec `sessionSeconds`/le Carnet, mais **comptée
+  à part** — `playSessions()` (`js/state.js`) exclut ces séances de tous les agrégats de jeu
+  (`secondsOnDay`/`totalSeconds`/`pieceSeconds`/`practiceDays`/`pieceSessionCount` et, en aval,
+  série, notes, records, achievements, stats Répertoire, rapports hebdo/mensuel) ; `awaySessions()`
+  les isole. Visibles au Carnet avec un badge dédié (`awayTitle`/`awayDetailSheet`,
+  `js/session.js`/`js/carnet.js`), hors du sous-total temps/jours de la semaine.
 - `journal{date:{mood,energy}}` — capturé en **fin de séance** (`carnetSheet`, bloc repliable « facultatif » sous le ressenti), pas d'écran dédié. `opusCache{composer:[works]}`.
   (`wishlist[]` **fusionnée** dans `pieces` via `status:'wishlist'` — migration auto dans `migrate()`, tableau conservé vide. Accessible uniquement via le filtre « Apprendre » du Répertoire.)
 - `challenges{week,month,log[]}`, `settings{tolerance,dailyGoal,weeklyTime,weeklyDays,monthly,revisionDays,estimates,notif{…,monthly},theme,nas{},planPrefs{dur,n,intent}}`. `weeklyTime`/`monthly` peuvent être `null` (« non défini » → alerte accueil). `planPrefs` (V4-3) mémorise les derniers réglages de la feuille de composition du plan guidé.
+- `vacation{on,from,until,resumedAt}` (V4-4, mode vacances) : `from`/`until` (dates, `until`
+  facultative) délimitent la période gelée — conservées après la reprise (`on:false`) pour que
+  `isVacationDay(k)` reste vraie rétroactivement sur cette période (gel de série historique,
+  `computeStreak`/`bestStreak`/`bestStreakInYear`, `js/state.js`). `resumedAt` (date) déclenche
+  l'objectif adouci ~7 jours (`todayGoal()`/`softenedGoalActive()`, facteur 0.6 arrondi au multiple
+  de 5). Pendant la pause (`vacationActive()`) : `needsRevision`/`revisionList` vides, alertes
+  d'accueil neutralisées (`homeAlertsHtml`), notifications locales coupées (`localNotify`), anneau
+  d'objectif en mode « Repos ». Cycle de vie dans `js/settings.js` : `vacationSheet`/
+  `activateVacation` (activation, aussi accessible par un lien discret en bas de l'accueil),
+  `stopVacation`/`resumeSheet` (reprise manuelle ou automatique au boot si `until` est dépassée,
+  voir `js/boot.js`) — résumé de la pause + jusqu'à 3 pièces à réviser en priorité
+  (`revisionList().slice(0,3)`, bouton vers `startRevision()`) puis `applyResumeSpread` décale
+  `revInterval` des pièces maîtrisées de la durée de la pause (évite un mur de révisions au
+  retour). Bannière d'état sur l'accueil (`vacationBannerHtml`, `js/home.js`) avec accès à la
+  feuille « Loin du clavier » (`awaySheet`, `js/session.js`) — voir `sessions[]` ci-dessous pour le
+  mode `'away'`.
 - Divers : `lastReportSeen`, `lastMonthSeen`, `lastBackup`, `opusSyncedAt`.
 - **Enregistrements audio (V3 étape 4)** : `p.recordings?[] = {id,date,dur(sec),section?,bpm?(dernier bpm connu de la section au moment de l'enregistrement),feel?(pp–ff),size(octets),mime}`, **facultatif**. Le blob audio n'est **jamais** dans `S`/localStorage : il vit à part dans IndexedDB, store `recordings`, clé = `id` (voir « Architecture »). `deleteRecording` supprime la métadonnée **et** le blob.
 
@@ -331,6 +354,18 @@ niveaux de cartes compositeurs (Bronze/Argent/Or) ont leurs propres teintes de m
     inclus) dans le bloc « Sections travaillées », dépliable ouvert d'office si des sections sont
     pré-cochées. `startRevision` (bouton « Réviser » de l'accueil) inchangé, partage juste
     `startPlanSession` avec le nouveau flux.
+  - **V4-4 (Bêta 4.4)** ✅ : mode vacances, `S.vacation` (voir « Modèle de données »). Bannière
+    d'état en tête d'accueil (`vacationBannerHtml`, `js/home.js`) pendant la pause — série gelée
+    (`isVacationDay`), anneau d'objectif en mode « Repos », alertes d'accueil neutralisées, révision
+    et notifications locales suspendues. Feuille « Loin du clavier » (`awaySheet`, `js/session.js`)
+    accessible depuis la bannière : 3 formes (écoute active/lecture de partition/travail mental),
+    pièce et section optionnelles, journalisées `mode:'away'` — comptées à part partout
+    (`playSessions()`). Activation/reprise depuis Réglages (groupe « Vacances »,
+    `js/settings.js`) ou lien discret en bas de l'accueil ; reprise manuelle ou automatique au boot
+    si la date de retour est dépassée (`js/boot.js`) ouvre `resumeSheet` (résumé de la pause,
+    jusqu'à 3 révisions prioritaires, objectif adouci 7 jours, échéances de révision décalées de la
+    durée de la pause). Rétrospective annuelle : ligne « + Xh loin du clavier » séparée du temps
+    joué quand des séances `away` existent sur l'année (`js/stats.js`).
 
 - **Reporté en V5+** : thème clair « Nacre » ; **sauvegarde auto vers NAS Synology** (on reste
   sur GitHub Pages quelques mois) ; synchro multi-appareils ; éventuelle migration React+TS+Vite

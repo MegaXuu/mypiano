@@ -12,11 +12,11 @@ function pieceChips(sel,fn,exclude){
   return activePieces().filter(p=>!exclude||!exclude.has(p.id)).map(p=>`<button class="chip ${p.id===sel?'on':''}" onclick="${fn}('${p.id}',this)">${esc(chipLabel(p))}</button>`).join('')
     +`<button class="chip ${sel===IMPROV?'on':''}" onclick="${fn}('${IMPROV}',this)">Improvisation</button>`;
 }
-function recentPieces(n){const seen=new Set(),out=[];
-  for(let i=S.sessions.length-1;i>=0&&out.length<n;i--){const bl=S.sessions[i].blocks;
+function recentPieces(n){const seen=new Set(),out=[],ps=playSessions();
+  for(let i=ps.length-1;i>=0&&out.length<n;i--){const bl=ps[i].blocks;
     for(let j=bl.length-1;j>=0;j--){const pid=bl[j].piece;if(pid===IMPROV||seen.has(pid))continue;const p=pieceById(pid);if(!p||p.status==='archived'||p.status==='abandoned')continue;seen.add(pid);out.push(pid);if(out.length>=n)break;}}
   return out;}
-function pieceLastPlayed(id){let d='';S.sessions.forEach(s=>{if(s.date>d&&s.blocks.some(b=>b.piece===id))d=s.date;});return d;}
+function pieceLastPlayed(id){let d='';playSessions().forEach(s=>{if(s.date>d&&s.blocks.some(b=>b.piece===id))d=s.date;});return d;}
 function sessPreview(s){if(s.entries&&s.entries.length){const e=s.entries.find(x=>x.worked||x.next);return e?(e.worked||e.next):'';}return s.worked||'';}
 function filterStartPieces(q){q=(q||'').toLowerCase();const box=document.getElementById('sc');if(!box)return;
   let list=activePieces().filter(p=>!q||p.title.toLowerCase().includes(q)||(p.composer||'').toLowerCase().includes(q));
@@ -441,4 +441,44 @@ function saveApost(id){
   save();closeSheet();renderCarnet();toast('Séance enregistrée');
 }
 function deleteSession(id){confirmSheet('Supprimer cette séance ?','Supprimer',()=>{S.sessions=S.sessions.filter(s=>s.id!==id);save();closeSheet();renderCarnet();toast('Séance supprimée');});}
+
+/* ---------- Loin du clavier (mode vacances, V4-4) ---------- */
+// Trois formes de pratique sans piano, journalisées à part (mode:'away') : ni série de jeu,
+// ni temps joué, ni records, ni objectifs (voir playSessions() dans state.js).
+let _away=null;
+function awaySheet(){
+  _away={kind:'ecoute',piece:'',section:'',min:15};
+  openSheet(`<h3>Loin du clavier</h3>
+    <p class="muted sheet-sub">Une pratique qui compte, sans le piano — journalisée à part.</p>
+    <div class="field"><label>Forme</label><div class="seg" id="aw-kind">${Object.keys(AWAY_KINDS).map((k,i)=>`<button class="${i===0?'on':''}" onclick="awPickKind('${k}',this)">${AWAY_KINDS[k]}</button>`).join('')}</div></div>
+    <div class="field"><label>Morceau (optionnel)</label><div class="chips" id="aw-pieces">
+      <button class="chip on" onclick="awPickPiece('',this)">Aucun</button>
+      ${activePieces().map(p=>`<button class="chip" onclick="awPickPiece('${p.id}',this)">${esc(chipLabel(p))}</button>`).join('')}
+    </div></div>
+    <div id="aw-secs"></div>
+    <div class="field"><label>Durée</label><div class="stepper sess-stepper"><button onclick="awStep(-5)">–</button><div class="v" id="aw-min">15 min</div><button onclick="awStep(5)">+</button></div></div>
+    <button class="btn primary" onclick="saveAway()">Enregistrer</button>`);
+}
+function awPickKind(k,el){_away.kind=k;document.querySelectorAll('#aw-kind button').forEach(b=>b.classList.remove('on'));el.classList.add('on');}
+function awPickPiece(id,el){_away.piece=id;_away.section='';document.querySelectorAll('#aw-pieces .chip').forEach(b=>b.classList.remove('on'));el.classList.add('on');
+  const box=document.getElementById('aw-secs');if(!box)return;
+  const p=id?pieceById(id):null,secs=p?secList(p):[];
+  box.innerHTML=secs.length?`<div class="field"><label>Section (optionnel)</label><div class="chips" id="aw-secs-c">
+    <button class="chip on" onclick="awPickSec('',this)">Toute la pièce</button>
+    ${secs.map(s=>`<button class="chip" onclick="awPickSec('${s.id}',this)">${esc(s.name)}</button>`).join('')}
+  </div></div>`:'';
+}
+function awPickSec(id,el){_away.section=id;document.querySelectorAll('#aw-secs-c .chip').forEach(b=>b.classList.remove('on'));el.classList.add('on');}
+function awStep(n){_away.min=Math.max(5,_away.min+n);document.getElementById('aw-min').textContent=fmtMinLong(_away.min);}
+function saveAway(){
+  const a=_away;if(!a)return;
+  S.sessions.push({id:uid(),date:dkey(),mode:'away',awayKind:a.kind,blocks:[{piece:a.piece||'',sec:a.min*60}],section:a.section||'',entries:[],feeling:'',ts:Date.now()});
+  save();closeSheet();_away=null;refreshScreen();toast('Séance loin du clavier enregistrée');
+}
+function awayTitle(s){
+  const p=s.blocks[0]&&s.blocks[0].piece?pieceById(s.blocks[0].piece):null;
+  const sec=p&&s.section?secName(p,s.section):'';
+  const kind=AWAY_KINDS[s.awayKind]||'Loin du clavier';
+  return kind+(p?' · '+p.title+(sec?' — '+sec:''):'');
+}
 

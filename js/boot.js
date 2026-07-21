@@ -8,6 +8,8 @@ async function boot(){
   renderHome();
   try{maybeNotifyReport();}catch(e){}
   try{maybeNotifyMonth();}catch(e){}
+  // Retour de vacances automatique : la date prévue est dépassée dès le premier lancement suivant.
+  try{if(S.vacation&&S.vacation.on&&S.vacation.until&&dkey()>S.vacation.until)stopVacation(true);}catch(e){}
 }
 try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();}catch(e){}
 const READY=boot();

@@ -15,6 +15,12 @@ function renderSettings(){
     <div class="eyebrow set-group-label">Série</div><div class="card">
       <div class="seg"><button class="${S.settings.tolerance===0?'on':''}" onclick="setTol(0)">Aucun</button><button class="${S.settings.tolerance===1?'on':''}" onclick="setTol(1)">1 jour</button><button class="${S.settings.tolerance===2?'on':''}" onclick="setTol(2)">2 jours</button></div>
       <p class="muted set-hint">Jours off autorisés par semaine sans casser la série.</p></div>
+    <div class="eyebrow set-group-label">Vacances</div><div class="card set-card">
+      ${S.vacation&&S.vacation.on?`<p class="muted set-hint">En pause depuis le ${frShort(S.vacation.from)}${S.vacation.until?' · retour prévu le '+frShort(S.vacation.until):''} — série gelée, rappels suspendus.</p>
+        <button class="btn ghost sm btn-full mt10" onclick="stopVacation()">Je reprends</button>`
+      :`<p class="muted set-hint">Une pause est un choix : série gelée, pas d'alertes, pas de rappels.</p>
+        <button class="btn ghost sm btn-full mt10" onclick="vacationSheet()">Activer le mode vacances</button>`}
+    </div>
     <div class="eyebrow set-group-label">Révision &amp; estimations</div><div class="card set-card">
       ${setLine('Entretien après',(S.settings.revisionDays||18)+' j',"editNum('revisionDays','Entretien (jours)')")}
       <div class="set-tog-line"><span>Estimations de maîtrise</span><div class="toggle ${S.settings.estimates!==false?'on':''}" onclick="togEstimates(this)"></div></div>
@@ -65,4 +71,52 @@ function doImport(e){const f=e.target.files[0];if(!f)return;const r=new FileRead
     confirmSheet('Remplacer toutes tes données par ce fichier ?','Remplacer',()=>{S=migrate(d);saveNow().then(()=>{renderSettings();toast('Données importées');});});
   };
   r.readAsText(f);}
+
+/* ---------- Mode vacances (V4-4) ---------- */
+function vacationSheet(){
+  openSheet(`<h3>Mode vacances</h3>
+    <p class="muted sheet-sub">Une pause est un choix : série gelée, rappels suspendus, aucune alerte.</p>
+    <div class="field"><label>Départ</label><input type="date" id="vac-from" value="${dkey()}" max="${dkey()}"></div>
+    <div class="field"><label>Retour prévu (optionnel)</label><input type="date" id="vac-until" min="${dkey()}"></div>
+    <button class="btn primary" onclick="activateVacation()">Activer la pause</button>`);
+}
+function activateVacation(){
+  const from=document.getElementById('vac-from').value||dkey();
+  const until=document.getElementById('vac-until').value||null;
+  S.vacation={on:true,from,until,resumedAt:null};
+  save();closeSheet();refreshScreen();toast('Mode vacances activé');
+}
+function vacationDaysCount(){
+  const v=S.vacation;if(!v||!v.from)return 0;
+  const until=v.until||dkey();
+  return Math.max(1,Math.round((new Date(until+'T00:00')-new Date(v.from+'T00:00'))/86400000)+1);
+}
+// Arrête la pause (manuellement ou automatiquement si la date de retour est dépassée) et ouvre la feuille de reprise.
+function stopVacation(auto){
+  if(!S.vacation||!S.vacation.on)return;
+  S.vacation.until=S.vacation.until||dkey();
+  S.vacation.on=false;
+  S.vacation.resumedAt=dkey();
+  save();
+  resumeSheet(auto);
+}
+// Décale les échéances d'entretien de la durée de la pause : évite un mur de révisions au retour.
+function applyResumeSpread(days){
+  S.pieces.forEach(p=>{if(p.status==='mastered')p.revInterval=Math.min(120,(p.revInterval||S.settings.revisionDays||18)+days);});
+  save();
+}
+function resumeSheet(auto){
+  const v=S.vacation,days=vacationDaysCount();
+  const awayCount=awaySessions().filter(s=>s.date>=v.from&&s.date<=v.until).length;
+  const revs=revisionList().slice(0,3);
+  applyResumeSpread(days);
+  openSheet(`<h3>Retour de pause</h3>
+    <p class="muted sheet-sub">${auto?'Ta date de retour est passée — bienvenue à nouveau. ':''}${days} jour${days>1?'s':''} de pause${awayCount?' · '+awayCount+' séance'+(awayCount>1?'s':'')+' loin du clavier':''}.</p>
+    <p class="muted">Objectif du jour adouci pendant une semaine, le temps de reprendre tes marques.</p>
+    ${revs.length?`<div class="field"><label>Pour reprendre en douceur</label>
+      ${revs.map(p=>`<div class="between resume-rev-row"><span>${esc(p.title)}</span><span class="muted">${esc(p.composer||'')}</span></div>`).join('')}
+      </div><button class="btn primary btn-full" onclick="closeSheet();startRevision();">Séance de reprise</button>`:''}
+    <button class="btn ghost sm btn-full mt10" onclick="closeSheet();refreshScreen();">Plus tard</button>`);
+  refreshScreen();
+}
 

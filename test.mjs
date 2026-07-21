@@ -189,6 +189,37 @@ call('carnetSheet+commitSession(sections)', () => {
   win.commitSession(0);
 });
 
+// 3quater) Mode vacances (V4-4) : activation/bannière, séance loin du clavier, gel de série, reprise.
+call('vacation : activation + bannière accueil', () => {
+  win.vacationSheet();
+  win.document.getElementById('vac-from').value = win.dkey(win.addDays(new Date(), -30));
+  win.document.getElementById('vac-until').value = win.dkey(win.addDays(new Date(), 30));
+  win.activateVacation();
+  if (!S.vacation.on) throw new Error('vacation non activée');
+  win.go('home'); // doit peindre la bannière sans throw
+  win.renderSettings(); // doit peindre le groupe « Vacances » en état actif
+});
+call('vacation : séance loin du clavier comptée à part', () => {
+  const before = win.totalSeconds(), beforeCount = S.sessions.length;
+  win.awaySheet();
+  const chip = win.document.querySelector('#aw-pieces .chip');
+  if (chip) chip.click();
+  win.saveAway();
+  if (S.sessions.length !== beforeCount + 1) throw new Error('séance away non créée');
+  const away = S.sessions[S.sessions.length - 1];
+  if (away.mode !== 'away') throw new Error('mode away non appliqué');
+  if (win.totalSeconds() !== before) throw new Error('la séance away a été comptée dans le temps joué');
+  win.go('carnet'); // doit peindre le badge « loin du clavier » sans throw
+});
+call('vacation : reprise (feuille + objectif adouci)', () => {
+  win.stopVacation();
+  if (S.vacation.on) throw new Error('vacation toujours active après stopVacation');
+  if (!S.vacation.resumedAt) throw new Error('resumedAt non renseigné après la reprise');
+  if (!win.softenedGoalActive()) throw new Error('objectif adouci non actif juste après la reprise');
+  win.closeSheet();
+  win.go('home');
+});
+
 // 3ter) Écriture immédiate (utilisée par l'import JSON et la mise en arrière-plan).
 if (typeof win.__flush === 'function') {
   try { await win.__flush(); } catch (e) { onError('saveNow (flush)', e); }

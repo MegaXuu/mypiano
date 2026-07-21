@@ -8,8 +8,8 @@ function renderCarnet(){
     <div id="carnet-body"></div>`;
   renderCarnetBody();
 }
-function carnetPieces(){const seen=new Set(),out=[];
-  for(let i=S.sessions.length-1;i>=0&&out.length<10;i--){const bl=S.sessions[i].blocks;
+function carnetPieces(){const seen=new Set(),out=[],ps=playSessions();
+  for(let i=ps.length-1;i>=0&&out.length<10;i--){const bl=ps[i].blocks;
     for(let j=bl.length-1;j>=0;j--){const pid=bl[j].piece;if(seen.has(pid))continue;seen.add(pid);out.push(pid);if(out.length>=10)break;}}
   return out;}
 function setCarnetFilter(id){carnetFilter=carnetFilter===id?'':id;carnetShown=60;renderCarnetBody();}
@@ -36,7 +36,15 @@ function renderCarnetBody(){
   shown.forEach(s=>{
     const wk=weekKey(new Date(s.date+'T00:00'));
     if(wk!==gWk){flush();gWk=wk;gSec=0;gDays=new Set();gItems=[];}
-    gSec+=sessionSeconds(s);gDays.add(s.date);
+    const away=s.mode==='away';
+    if(!away){gSec+=sessionSeconds(s);gDays.add(s.date);}
+    if(away){
+      gItems.push(`<div class="carnet-entry" onclick='awayDetailSheet(${JSON.stringify(s).replace(/'/g,"&#39;")})'>
+        <div class="carnet-entry-body"><div class="carnet-entry-title"><span class="tag away-badge">Loin du clavier</span> ${esc(awayTitle(s))}</div>
+        <div class="carnet-entry-meta">${frShort(s.date)} · ${dur(sessionSeconds(s))}</div></div>
+        <div class="carnet-entry-chevron muted">›</div></div>`);
+      return;
+    }
     const names=[...new Set(s.blocks.map(b=>pieceName(b.piece)))].join(' · ');
     const prev=sessPreview(s);
     gItems.push(`<div class="carnet-entry" onclick='aposterioriSheet(${JSON.stringify(s).replace(/'/g,"&#39;")})'>
@@ -50,6 +58,12 @@ function renderCarnetBody(){
   el.innerHTML=`<button class="btn ghost sm btn-full carnet-add-btn" onclick="aposterioriSheet()">+ Ajouter une séance oubliée</button>`+
     chipsHtml+
     (shown.length?groups+more:emptyState(carnetFilter?'Aucune séance pour ce morceau.':'Aucune séance.<br>Lance-toi, ou ajoute une séance oubliée.','stand'));
+}
+function awayDetailSheet(s){
+  openSheet(`<h3>Loin du clavier</h3>
+    <p class="muted sheet-sub">${frShort(s.date)} · ${dur(sessionSeconds(s))}</p>
+    <div class="card">${esc(awayTitle(s))}</div>
+    <button class="btn ghost sm btn-full mt10 danger-outline" onclick="deleteSession('${s.id}')">Supprimer</button>`);
 }
 function dynScale(label,val,field){const idx=FEEL_ORDER.indexOf(val);
   return `<div class="dyn-scale"><div class="sub dyn-scale-head"><span>${label}</span><span>${val?esc(feelLabel(val)):'—'}</span></div>

@@ -6,21 +6,21 @@ function weekKey(d){return dkey(weekStart(d));}
 function monthKey(d){d=d?new Date(d):new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
 function thisWeekDays(){let n=0;const ws=weekStart();for(let i=0;i<7;i++)if(secondsOnDay(dkey(addDays(ws,i)))>0)n++;return n;}
 function thisWeekHours(){let t=0;const ws=weekStart();for(let i=0;i<7;i++)t+=secondsOnDay(dkey(addDays(ws,i)));return t/3600;}
-function monthSessions(){const mk=monthKey();return S.sessions.filter(s=>monthKey(new Date(s.date+'T00:00'))===mk);}
+function monthSessions(){const mk=monthKey();return playSessions().filter(s=>monthKey(new Date(s.date+'T00:00'))===mk);}
 function thisMonthDays(){const set=new Set();monthSessions().forEach(s=>set.add(s.date));return set.size;}
 function thisMonthHours(){return monthSessions().reduce((a,s)=>a+sessionSeconds(s),0)/3600;}
 function thisMonthComposers(){const set=new Set();monthSessions().forEach(s=>s.blocks.forEach(b=>{if(b.piece===IMPROV)return;const p=pieceById(b.piece);if(p&&p.composer)set.add(p.composer.toLowerCase());}));return set.size;}
 
 function achievements(){
   const streak=bestStreak(),comps=new Set(),epochs=new Set();
-  S.sessions.forEach(s=>s.blocks.forEach(b=>{if(b.piece===IMPROV)return;const p=pieceById(b.piece);if(p){if(p.composer)comps.add(p.composer.toLowerCase());if(p.epoch)epochs.add(p.epoch);}}));
+  playSessions().forEach(s=>s.blocks.forEach(b=>{if(b.piece===IMPROV)return;const p=pieceById(b.piece);if(p){if(p.composer)comps.add(p.composer.toLowerCase());if(p.epoch)epochs.add(p.epoch);}}));
   const hours=totalSeconds()/3600;
   const noteCount=S.pieces.reduce((a,p)=>a+((p.notes||[]).length),0);
   const journalDays=Object.values(S.journal).filter(j=>j&&(j.mood||j.energy)).length;
-  const improv=S.sessions.some(s=>s.blocks.some(b=>b.piece===IMPROV));
+  const improv=playSessions().some(s=>s.blocks.some(b=>b.piece===IMPROV));
   const chopin=S.pieces.filter(p=>p.status==='mastered'&&/chopin/i.test(p.composer||'')).length;
   const ensDone=S.pieces.filter(p=>p.isEnsemble&&ensembleCompleted(p)).length;
-  const longSession=S.sessions.reduce((m,s)=>Math.max(m,sessionSeconds(s)),0);
+  const longSession=playSessions().reduce((m,s)=>Math.max(m,sessionSeconds(s)),0);
   let monthHours=0;for(let i=0;i<31;i++)monthHours+=secondsOnDay(dkey(addDays(new Date(),-i)));monthHours/=3600;
   const cc=completedChallenges().length,bn=baseNotes();
   const A=(id,fam,label,desc,on,reward)=>({id,fam,label,desc,on:!!on,reward});
@@ -250,13 +250,13 @@ function celebrate(kind,title,sub){
   (window.requestAnimationFrame||window.setTimeout)(()=>{inner.classList.add('show');});
 }
 function hourHeat(){
-  const hrs=new Array(24).fill(0);S.sessions.forEach(s=>{const t=s.ts||Date.parse(s.date+'T12:00');const h=new Date(t).getHours();hrs[h]+=sessionSeconds(s);});
+  const hrs=new Array(24).fill(0);playSessions().forEach(s=>{const t=s.ts||Date.parse(s.date+'T12:00');const h=new Date(t).getHours();hrs[h]+=sessionSeconds(s);});
   const max=Math.max(1,...hrs);const best=hrs.map((v,i)=>[i,v]).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]).slice(0,2).map(x=>x[0]+'h');
   return `<div class="card"><div class="between stat-card-head"><span class="stat-card-title">Heure de la journée</span>${best.length?`<span class="muted stat-card-sub">meilleur : ${best.join(', ')}</span>`:''}</div>
     <div class="stat-hourheat">${hrs.map((v,i)=>`<div class="stat-hourheat-bar" style="background:${v?'var(--acc)':'var(--surface2)'};height:${v?Math.max(7,Math.round(v/max*100)):4}%;opacity:${v?(0.45+0.55*v/max).toFixed(2):1};"></div>`).join('')}</div>
     <div class="sub stat-hourheat-labels"><span>0h</span><span>12h</span><span>23h</span></div></div>`;
 }
-function revisionList(){const now=Date.now();
+function revisionList(){if(vacationActive())return [];const now=Date.now();
   return S.pieces.filter(p=>!p.isEnsemble&&p.status==='mastered').map(p=>{const days=p.revInterval||S.settings.revisionDays||18;const lp=pieceLastPlayed(p.id);const d=lp?Math.floor((now-new Date(lp+'T00:00'))/86400000):9999;return {p,d,days};}).filter(x=>x.d>=x.days).sort((a,b)=>b.d-a.d).map(x=>x.p);}
 function estimateText(p){if(S.settings.estimates===false||!p||!p.createdAt)return '';
   const pr=pieceProgress(p);if(pr>=100)return '';

@@ -188,7 +188,7 @@ function saveConcert(){
 function lastWeekReport(){
   const ws=addDays(weekStart(),-7);let sec=0,days=0,sessions=0;const pieceMap={};
   for(let i=0;i<7;i++){const s=secondsOnDay(dkey(addDays(ws,i)));if(s>0)days++;sec+=s;}
-  S.sessions.forEach(s=>{const d=new Date(s.date+'T00:00');if(d>=ws&&d<addDays(ws,7)){sessions++;s.blocks.forEach(b=>{if(b.piece!==IMPROV)pieceMap[b.piece]=(pieceMap[b.piece]||0)+b.sec;});}});
+  playSessions().forEach(s=>{const d=new Date(s.date+'T00:00');if(d>=ws&&d<addDays(ws,7)){sessions++;s.blocks.forEach(b=>{if(b.piece!==IMPROV)pieceMap[b.piece]=(pieceMap[b.piece]||0)+b.sec;});}});
   return {ws,sec,days,sessions,top:Object.entries(pieceMap).sort((a,b)=>b[1]-a[1]).slice(0,3)};
 }
 function reportReady(){return S.sessions.length&&S.lastReportSeen!==weekKey(addDays(weekStart(),-7));}
@@ -202,6 +202,7 @@ function reportSheet(){const r=lastWeekReport();S.lastReportSeen=weekKey(addDays
 }
 // Notifications locales (pas de push serveur — voir CLAUDE.md pour l'option VAPID écartée).
 function localNotify(title,body,tag){
+  if(vacationActive())return;
   if(typeof Notification==='undefined'||Notification.permission!=='granted')return;
   try{
     const n=new Notification(title,{body,tag,icon:'icon-192.png',badge:'icon-192.png'});
@@ -216,7 +217,7 @@ function enableNotifs(){if(typeof Notification==='undefined'){toast('Notificatio
 function prevMonthDate(){const d=new Date();d.setDate(1);d.setMonth(d.getMonth()-1);return d;}
 function lastMonthReport(){
   const md=prevMonthDate(),mk=monthKey(md);
-  const sessions=S.sessions.filter(s=>monthKey(new Date(s.date+'T00:00'))===mk);
+  const sessions=playSessions().filter(s=>monthKey(new Date(s.date+'T00:00'))===mk);
   let sec=0;const days=new Set(),pieceMap={};
   sessions.forEach(s=>{sec+=sessionSeconds(s);days.add(s.date);s.blocks.forEach(b=>{if(b.piece!==IMPROV)pieceMap[b.piece]=(pieceMap[b.piece]||0)+b.sec;});});
   return {mk,md,sec,days:days.size,sessions:sessions.length,top:Object.entries(pieceMap).sort((a,b)=>b[1]-a[1]).slice(0,3)};

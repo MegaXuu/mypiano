@@ -8,7 +8,7 @@
 
 const KEY = 'pianoV2';
 const IMPROV = '__improv__';
-const APP_VERSION = 'Bêta 4.3'; // à synchroniser avec CACHE dans sw.js à chaque release
+const APP_VERSION = 'Bêta 4.4'; // à synchroniser avec CACHE dans sw.js à chaque release
 
 const STONES = [
   {n:'Apprenti',h:10,c:'#E0A83B'},{n:'Élève',h:20,c:'#C9CDDA'},{n:'Musicien',h:30,c:'#9BA0AE'},
@@ -35,12 +35,14 @@ const LS_MIRROR = true; // filet de secours pendant la période de rodage d'Inde
 
 function defaults(){
   return {pieces:[],sessions:[],wishlist:[],journal:{},opusCache:{},challenges:{week:null,month:null,log:[]},
+    vacation:{on:false,from:null,until:null,resumedAt:null},
     settings:{tolerance:1,dailyGoal:30,weeklyTime:null,weeklyDays:5,monthly:null,
       notif:{daily:true,dailyTime:'17:00',streak:true,weekly:true,palier:true,monthly:true},theme:'dark',nas:{enabled:false,ip:'',last:''},
       planPrefs:{dur:60,n:2,intent:'equilibre'}}};
 }
 function migrate(r){r.pieces=r.pieces||[];r.sessions=r.sessions||[];r.wishlist=r.wishlist||[];r.journal=r.journal||{};
   r.opusCache=r.opusCache||{};r.challenges=r.challenges||{week:null,month:null,log:[]};r.challenges.log=r.challenges.log||[];
+  r.vacation=Object.assign({on:false,from:null,until:null,resumedAt:null},r.vacation||{});
   // Fusion : la wishlist devient un statut du répertoire ('à apprendre').
   if(r.wishlist.length){r.wishlist.forEach(w=>{r.pieces.push({id:w.id||(Date.now().toString(36)+Math.random().toString(36).slice(2,6)),title:w.title||'',composer:w.composer||'',epoch:w.epoch||'',opus:'',genre:'',key:'',diff:0,bpm:'',status:'wishlist',progress:0,tags:[],notes:[],todo:'',createdAt:Date.now()});});r.wishlist=[];}
   r.settings=Object.assign({tolerance:1,dailyGoal:30,weeklyTime:null,weeklyDays:5,monthly:null,
@@ -196,13 +198,22 @@ function rankGlyph(st){return glyphFor(STONES.indexOf(st));}
 function pieceById(id){return S.pieces.find(p=>p.id===id);}
 function pieceName(id){if(id===IMPROV)return 'Improvisation';const p=pieceById(id);return p?p.title:'—';}
 function sessionSeconds(se){return se.blocks.reduce((a,b)=>a+b.sec,0);}
-function secondsOnDay(k){return S.sessions.filter(s=>s.date===k).reduce((a,s)=>a+sessionSeconds(s),0);}
-function totalSeconds(){return S.sessions.reduce((a,s)=>a+sessionSeconds(s),0);}
-function pieceSeconds(id){let t=0;S.sessions.forEach(s=>s.blocks.forEach(b=>{if(b.piece===id)t+=b.sec;}));return t;}
-function practiceDays(){return new Set(S.sessions.map(s=>s.date));}
+// Séances « loin du clavier » (mode vacances, V4-4) : journalisées mais comptées à part —
+// ni série de jeu, ni temps joué, ni records, ni objectifs. playSessions() = séances jouées seules.
+function playSessions(){return S.sessions.filter(s=>s.mode!=='away');}
+function awaySessions(){return S.sessions.filter(s=>s.mode==='away');}
+const AWAY_KINDS={ecoute:'Écoute active',lecture:'Lecture de partition',mental:'Travail mental'};
+function secondsOnDay(k){return playSessions().filter(s=>s.date===k).reduce((a,s)=>a+sessionSeconds(s),0);}
+function totalSeconds(){return playSessions().reduce((a,s)=>a+sessionSeconds(s),0);}
+function pieceSeconds(id){let t=0;playSessions().forEach(s=>s.blocks.forEach(b=>{if(b.piece===id)t+=b.sec;}));return t;}
+function practiceDays(){return new Set(playSessions().map(s=>s.date));}
 function masteredCount(){return S.pieces.filter(p=>p.status==='mastered').length;}
-function pieceSessionCount(id){return S.sessions.filter(s=>s.blocks.some(b=>b.piece===id)).length;}
-function needsRevision(p){if(!p||p.status!=='mastered')return false;const days=p.revInterval||S.settings.revisionDays||18;const lp=pieceLastPlayed(p.id);if(!lp)return false;return Math.floor((Date.now()-new Date(lp+'T00:00'))/86400000)>=days;}
+function pieceSessionCount(id){return playSessions().filter(s=>s.blocks.some(b=>b.piece===id)).length;}
+/* ---------- Mode vacances (V4-4) ---------- */
+function vacationActive(){return !!(S.vacation&&S.vacation.on);}
+// Un jour donné est-il couvert par la (dernière) période de vacances enregistrée, active ou passée ?
+function isVacationDay(k){const v=S.vacation;if(!v||!v.from)return false;return k>=v.from&&k<=(v.until||dkey());}
+function needsRevision(p){if(!p||p.status!=='mastered')return false;if(vacationActive())return false;const days=p.revInterval||S.settings.revisionDays||18;const lp=pieceLastPlayed(p.id);if(!lp)return false;return Math.floor((Date.now()-new Date(lp+'T00:00'))/86400000)>=days;}
 // Phase de travail dérivée (jamais stockée) — statut + avancement.
 // Échelle chromatique partagée par piecePhase() et SEC_STATUS : mêmes teintes pour un même degré d'avancement.
 const PHASE_COL={dechiffrage:'#D2694A',consolidation:'#7FC9C4',polissage:'#9FC93C'};
@@ -294,18 +305,35 @@ function sectionsReminderLine(p){
 function normStr(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,'');}
 function findDuplicate(title,composer,exceptId){const nt=normStr(title),nc=normStr(composer);if(!nt)return null;
   return S.pieces.find(p=>!p.isEnsemble&&p.id!==exceptId&&normStr(p.title)===nt&&normStr(p.composer)===nc)||null;}
+// Les jours de vacances sont gelés : ils ne comptent ni pour la série (pas d'incrément),
+// ni pour une rupture (pas d'incrément du compteur de jours manqués).
 function computeStreak(){const days=practiceDays();const tol=S.settings.tolerance||0;let st=0,miss=0,d=new Date();
-  for(let i=0;i<800;i++){const k=dkey(d);if(days.has(k)){st++;miss=0;}else if(i>0){miss++;if(miss>tol)break;}d=addDays(d,-1);}return st;}
+  for(let i=0;i<800;i++){const k=dkey(d);
+    if(days.has(k)){st++;miss=0;}else if(isVacationDay(k)){/* gelé */}else if(i>0){miss++;if(miss>tol)break;}
+    d=addDays(d,-1);}return st;}
 function bestStreak(){const set=practiceDays();const arr=[...set].sort();if(!arr.length)return 0;const tol=S.settings.tolerance||0;
   let best=0,cur=0,miss=0,d=new Date(arr[0]),end=new Date();
-  while(d<=end){if(set.has(dkey(d))){cur++;miss=0;best=Math.max(best,cur);}else{miss++;if(miss>tol){cur=0;miss=0;}}d=addDays(d,1);}return best;}
+  while(d<=end){const k=dkey(d);
+    if(set.has(k)){cur++;miss=0;best=Math.max(best,cur);}else if(isVacationDay(k)){/* gelé */}else{miss++;if(miss>tol){cur=0;miss=0;}}
+    d=addDays(d,1);}return best;}
 function bestStreakInYear(y){const set=new Set([...practiceDays()].filter(k=>k.slice(0,4)===String(y)));
   if(!set.size)return 0;const tol=S.settings.tolerance||0;const arr=[...set].sort();
   let best=0,cur=0,miss=0,d=new Date(arr[0]),end=new Date(y,11,31),today=new Date();if(end>today)end=today;
-  while(d<=end){if(set.has(dkey(d))){cur++;miss=0;best=Math.max(best,cur);}else{miss++;if(miss>tol){cur=0;miss=0;}}d=addDays(d,1);}return best;}
+  while(d<=end){const k=dkey(d);
+    if(set.has(k)){cur++;miss=0;best=Math.max(best,cur);}else if(isVacationDay(k)){/* gelé */}else{miss++;if(miss>tol){cur=0;miss=0;}}
+    d=addDays(d,1);}return best;}
 function weekSeconds(){let t=0;for(let i=0;i<7;i++)t+=secondsOnDay(dkey(addDays(new Date(),-i)));return t;}
 function weekDays(){let n=0;for(let i=0;i<7;i++)if(secondsOnDay(dkey(addDays(new Date(),-i)))>0)n++;return n;}
-function todayGoal(){return S.settings.dailyGoal||30;}
+// Objectif adouci ~7 jours après une reprise de vacances (facteur 0.6, arrondi au multiple de 5).
+function todayGoal(){
+  const base=S.settings.dailyGoal||30;
+  const ra=S.vacation&&S.vacation.resumedAt;
+  if(ra){const days=Math.floor((Date.now()-new Date(ra+'T00:00'))/86400000);
+    if(days>=0&&days<7)return Math.max(5,Math.round(base*0.6/5)*5);}
+  return base;
+}
+function softenedGoalActive(){const ra=S.vacation&&S.vacation.resumedAt;if(!ra)return false;
+  const days=Math.floor((Date.now()-new Date(ra+'T00:00'))/86400000);return days>=0&&days<7;}
 function goalsUnset(){return S.settings.weeklyTime==null||S.settings.monthly==null;}
 function ensembleCompleted(e){const subs=S.pieces.filter(p=>p.parentId===e.id);return subs.length&&subs.every(s=>s.status==='mastered');}
 function baseNotes(){let n=Math.round(totalSeconds()/60)+200*masteredCount();

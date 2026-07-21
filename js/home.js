@@ -2,11 +2,12 @@
    ACCUEIL
    ========================================================================== */
 function renderHome(){
+  const vac=vacationActive();
   const st=currentStone(),streak=computeStreak(),goal=todayGoal();
-  const done=secondsOnDay(dkey())/60, pct=goal>0?done/goal:0;
+  const done=secondsOnDay(dkey())/60, pct=vac?0:(goal>0?done/goal:0);
   const q=QUOTES[new Date().getDate()%QUOTES.length];
-  const circ=528, off=circ*(1-Math.min(pct,1));
-  const reached=pct>=1;
+  const circ=528, off=vac?circ:circ*(1-Math.min(pct,1));
+  const reached=!vac&&pct>=1;
   const todos=S.pieces.filter(p=>p.todo&&p.todo.trim());
   const wkSeconds=weekSeconds(), wkDays=weekDays(), rev=revisionList();
   document.getElementById('s-home').innerHTML=`
@@ -16,6 +17,7 @@ function renderHome(){
         <svg viewBox="0 0 24 24" class="ic"><circle cx="12" cy="12" r="3.2"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2l-.3-2.6h-4l-.3 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 0 0 5 12a7 7 0 0 0 .1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 2 1.2l.3 2.6h4l.3-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6A7 7 0 0 0 19 12Z"/></svg>
       </button>
     </div>
+    ${vac?vacationBannerHtml():''}
     ${st?`<div class="tag home-rank-tag cur">${noteIcon(st.c,17,rankGlyph(st))}<span class="home-rank-name">${st.n}</span><span class="muted">· ${Math.floor(totalSeconds()/3600)} h</span></div>`:`<div class="tag home-rank-tag">Début du voyage</div>`}
     <h1 class="home-title">Bonjour Florian</h1>
     <div class="filet"></div>
@@ -34,15 +36,15 @@ function renderHome(){
             </linearGradient></defs>
             <circle cx="100" cy="100" r="84" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="13"/>
             <circle id="home-ring-prog" class="home-ring-prog" cx="100" cy="100" r="84" fill="none"
-              stroke="${reached?'var(--gold)':'url(#home-ring-grad)'}" stroke-width="13" stroke-linecap="round"
+              stroke="${vac?'transparent':(reached?'var(--gold)':'url(#home-ring-grad)')}" stroke-width="13" stroke-linecap="round"
               stroke-dasharray="${circ}" stroke-dashoffset="${circ}" transform="rotate(-90 100 100)"
               style="filter:drop-shadow(0 0 ${reached?'10px rgba(228,197,138,.45)':'8px rgba(158,147,242,.35)'});"/>
           </svg>
-          <div class="c"><b class="num it" id="home-ring-v">0</b><span>/ ${goalLabel(goal)}</span></div>
+          <div class="c">${vac?'<b class="serif home-ring-rest">Repos</b>':`<b class="num it" id="home-ring-v">0</b><span>/ ${goalLabel(goal)}</span>`}</div>
         </div>
         <div class="home-goal-info">
-          <span class="muted home-goal-label">Objectif du jour</span>
-          <div><button class="btn ghost sm home-goal-btn" onclick="goalSheet()">Modifier</button></div>
+          <span class="muted home-goal-label">${vac?'Objectif en pause':'Objectif du jour'}</span>
+          ${vac?'':`<div><button class="btn ghost sm home-goal-btn" onclick="goalSheet()">Modifier</button></div>${softenedGoalActive()?'<div class="muted home-goal-soft">Objectif adouci · reprise en douceur</div>':''}`}
         </div>
       </div>
     </div>
@@ -70,6 +72,7 @@ function renderHome(){
       <p class="muted home-revision-intro">Maîtrisés, mais pas rejoués depuis un moment :</p>
       ${rev.slice(0,3).map(p=>`<div class="between home-revision-item"><div class="home-revision-info"><div class="home-revision-title">${esc(p.title)}</div><div class="muted home-revision-composer">${esc(p.composer||'')}</div></div><button class="btn ghost sm" onclick="quickStart('${p.id}')">Jouer</button></div>`).join('')}</div>`:''}
 
+    ${vac?'':`<button class="btn ghost sm home-vacation-link" onclick="vacationSheet()">Mode vacances</button>`}
     <p class="num it home-quote">« ${q[0]} » — ${q[1]}</p>`;
 
   countUp(document.getElementById('home-streak-v'),streak,v=>Math.round(v).toString(),400);
@@ -83,7 +86,25 @@ function renderHome(){
     raf(()=>raf(()=>{ring.style.strokeDashoffset=off;}));
   }
 }
+function vacationBannerHtml(){
+  const v=S.vacation;
+  const label=v.until?'En pause jusqu’au '+frShort(v.until):'En pause depuis le '+frShort(v.from);
+  return `<div class="card vac-banner">
+    <div class="row vac-banner-row">
+      <div class="vac-banner-ic">${EMPTY_ICONS.stand}</div>
+      <div class="vac-banner-body">
+        <div class="vac-banner-title">${esc(label)}</div>
+        <div class="muted vac-banner-sub">Ta série est gelée, tes rappels sont suspendus.</div>
+      </div>
+    </div>
+    <div class="row vac-banner-actions">
+      <button class="btn ghost sm" onclick="awaySheet()">Loin du clavier</button>
+      <button class="btn ghost sm" onclick="stopVacation()">Je reprends</button>
+    </div>
+  </div>`;
+}
 function homeAlerts(){
+  if(vacationActive())return [];
   const items=[];
   if(reportReady())items.push({label:'Rapport de la semaine prêt',action:"reportSheet()",cta:'Voir'});
   if(monthReportReady())items.push({label:'Rapport du mois prêt',action:"monthReportSheet()",cta:'Voir'});

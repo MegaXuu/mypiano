@@ -50,7 +50,7 @@ function renderStatsRep(){
     ${renderInsights()}`;
 }
 function renderStatsRecords(){
-  let longest=0;S.sessions.forEach(s=>longest=Math.max(longest,sessionSeconds(s)));
+  let longest=0;playSessions().forEach(s=>longest=Math.max(longest,sessionSeconds(s)));
   let bestDay=0;practiceDays().forEach(k=>bestDay=Math.max(bestDay,secondsOnDay(k)));
   let bestWk=0;if(S.sessions.length){const first=new Date([...practiceDays()].sort()[0]);for(let d=new Date(first);d<=new Date();d=addDays(d,7)){let t=0;for(let i=0;i<7;i++)t+=secondsOnDay(dkey(addDays(d,i)));bestWk=Math.max(bestWk,t);}}
   return `
@@ -85,6 +85,7 @@ function weekCurve(){
   const weeks=[];let max=1;
   for(let i=7;i>=0;i--){const ws=addDays(weekStart(),-7*i);let t=0;for(let d=0;d<7;d++)t+=secondsOnDay(dkey(addDays(ws,d)));weeks.push(t);max=Math.max(max,t);}
   const cur=weeks[7],prev=weeks[6],diff=cur-prev;
+  const showDiff=prev>0&&!vacationActive(); // pas de comparaison culpabilisante pendant une pause en cours
   const w=300,h=90,padL=4,padR=4,padT=10,padB=18,innerW=w-padL-padR,innerH=h-padT-padB;
   const pts=weeks.map((t,i)=>[padL+i/(weeks.length-1)*innerW,padT+innerH-(t/max*innerH)]);
   const lineD=smoothLinePath(pts);
@@ -94,7 +95,7 @@ function weekCurve(){
   const labels=weeks.map((t,i)=>i===7?'cette':'S-'+(7-i));
   return `<div class="card">
     <div class="between stat-card-head"><span class="stat-card-title">8 dernières semaines</span>
-      <span class="muted stat-card-sub">${dur(cur)}${prev>0?' · '+(diff>=0?'+':'−')+dur(Math.abs(diff))+' vs S-1':''}</span></div>
+      <span class="muted stat-card-sub">${dur(cur)}${showDiff?' · '+(diff>=0?'+':'−')+dur(Math.abs(diff))+' vs S-1':''}</span></div>
     <svg viewBox="0 0 ${w} ${h}" width="100%" class="stat-curve-svg">
       <defs><linearGradient id="statWkGrad" x1="0" y1="0" x2="0" y2="1">
         <stop offset="0%" stop-color="var(--acc)" stop-opacity=".3"/>
@@ -108,13 +109,13 @@ function weekCurve(){
   </div>`;
 }
 function byPiece(){
-  const map={};S.sessions.forEach(s=>s.blocks.forEach(b=>map[b.piece]=(map[b.piece]||0)+b.sec));
+  const map={};playSessions().forEach(s=>s.blocks.forEach(b=>map[b.piece]=(map[b.piece]||0)+b.sec));
   const arr=Object.entries(map).sort((a,b)=>b[1]-a[1]).slice(0,8);if(!arr.length)return emptyState('Pas encore de données.','staff');
   const mx=arr[0][1];
   return arr.map(([id,s])=>`<div class="stat-piece-row"><div class="sub stat-piece-head"><span class="clair">${esc(pieceName(id))}</span><span>${dur(s)}</span></div><div class="bar"><i style="width:${Math.round(s/mx*100)}%"></i></div></div>`).join('');
 }
 function splitView(){
-  const map={};S.sessions.forEach(s=>s.blocks.forEach(b=>{let k;if(b.piece===IMPROV){k='Improvisation';}else{const p=pieceById(b.piece);if(!p)return;k=statSplit==='composer'?(p.composer||'—'):(p.epoch||'—');}map[k]=(map[k]||0)+b.sec;}));
+  const map={};playSessions().forEach(s=>s.blocks.forEach(b=>{let k;if(b.piece===IMPROV){k='Improvisation';}else{const p=pieceById(b.piece);if(!p)return;k=statSplit==='composer'?(p.composer||'—'):(p.epoch||'—');}map[k]=(map[k]||0)+b.sec;}));
   const arr=Object.entries(map).sort((a,b)=>b[1]-a[1]);if(!arr.length)return emptyState('Renseigne compositeur/époque de tes morceaux.','staff');
   const total=arr.reduce((a,b)=>a+b[1],0);const cols=['#9E93F2','#E4C58A','#6FD3E0','#8DB600','#C65B34','#2FB6B0','#B07A2A'];
   let acc=0;const seg=arr.map(([k,v],i)=>{const from=acc/total*100;acc+=v;const to=acc/total*100;return `${cols[i%cols.length]} ${from}% ${to}%`;}).join(',');
@@ -173,9 +174,11 @@ function renderInsights(){
 /* ---------- Rétrospective annuelle (V3 étape 5) ---------- */
 function retroYears(){return [...new Set(S.sessions.map(s=>s.date.slice(0,4)))].sort((a,b)=>b-a);}
 function yearRetroSheet(year){
-  const sessions=S.sessions.filter(s=>s.date.slice(0,4)===String(year));
+  const all=S.sessions.filter(s=>s.date.slice(0,4)===String(year));
+  const sessions=all.filter(s=>s.mode!=='away');
   if(!sessions.length){toast('Aucune séance en '+year);return;}
   const totalSec=sessions.reduce((a,s)=>a+sessionSeconds(s),0);
+  const awaySec=all.filter(s=>s.mode==='away').reduce((a,s)=>a+sessionSeconds(s),0);
   const pieceMap={},composerMap={};
   sessions.forEach(s=>s.blocks.forEach(b=>{
     if(b.piece===IMPROV)return;
@@ -193,6 +196,7 @@ function yearRetroSheet(year){
     <div class="grid2 mb10">
       ${rec('Plus longue série',bestStreakInYear(year)+' j')}${rec('Compositeur dominant',topComposer?esc(topComposer[0]):'—')}
     </div>
+    ${awaySec?`<p class="muted stat-retro-away">+ ${durH(awaySec)} loin du clavier</p>`:''}
     ${topPiece?`<div class="card stat-insight-card"><div class="stat-insight-rule gold"></div><span class="muted stat-retro-piece-label">Pièce de l'année</span><div class="stat-retro-piece-title">${esc(topPiece.title)}</div><div class="muted stat-retro-piece-sub">${dur(topPieceEntry[1])} joués</div></div>`:''}
     <button class="btn primary mt16" onclick="closeSheet()">Fermer</button>`);
 }
