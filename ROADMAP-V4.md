@@ -38,7 +38,7 @@
 | ✅ V4-2 | Bêta 4.2 | Exploitation de la difficulté partout (suggestions, tri, estimation, consignes) |
 | ✅ V4-3 | Bêta 4.3 | Plan guidé v2 : générateur paramétré + timeline de séance |
 | ✅ V4-4 | Bêta 4.4 | Mode vacances : protection, pratique sans piano, plan de reprise |
-| ☐ V4-5 | Bêta 4.5 | Polish transversal, QA, dettes (retrait `LS_MIRROR`, checklist iPhone) |
+| ✅ V4-5 | Bêta 4.5 | Polish transversal, QA, dettes (retrait `LS_MIRROR`, checklist iPhone) |
 
 ---
 

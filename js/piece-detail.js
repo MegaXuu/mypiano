@@ -236,9 +236,9 @@ function cwNextSectionDraft(){
 }
 function renderCutStepper(){
   const idx=_cw.phase==='bars'?0:_cw.phase==='section'?1:2,labels=['Mesures','Sections','Récapitulatif'];
-  return `<div class="stepper">${labels.map((l,i)=>`<div class="stepper-step${i===idx?' on':''}${i<idx?' done':''}">
-      <span class="stepper-dot"></span><span class="stepper-lbl">${l}</span></div>`).join('')}</div>
-    ${_cw.phase==='section'?`<div class="muted stepper-sub">section ${_cw.sections.length+1}</div>`:''}`;
+  return `<div class="cutw-steps">${labels.map((l,i)=>`<div class="cutw-step${i===idx?' on':''}${i<idx?' done':''}">
+      <span class="cutw-step-dot"></span><span class="cutw-step-lbl">${l}</span></div>`).join('')}</div>
+    ${_cw.phase==='section'?`<div class="muted cutw-step-sub">section ${_cw.sections.length+1}</div>`:''}`;
 }
 function renderCutWizard(){
   const p=pieceById(_cw.pid);if(!p)return;

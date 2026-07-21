@@ -8,7 +8,7 @@
 
 const KEY = 'pianoV2';
 const IMPROV = '__improv__';
-const APP_VERSION = 'Bêta 4.4'; // à synchroniser avec CACHE dans sw.js à chaque release
+const APP_VERSION = 'Bêta 4.5'; // à synchroniser avec CACHE dans sw.js à chaque release
 
 const STONES = [
   {n:'Apprenti',h:10,c:'#E0A83B'},{n:'Élève',h:20,c:'#C9CDDA'},{n:'Musicien',h:30,c:'#9BA0AE'},
@@ -31,7 +31,6 @@ function feelLabel(f){return f&&FEEL[f]?f+' · '+FEEL[f]:(f||'');}
 /* ---------- State ---------- */
 const IDB_NAME = 'pianoV2';
 const IDB_VERSION = 1;
-const LS_MIRROR = true; // filet de secours pendant la période de rodage d'IndexedDB (retiré à l'étape 4)
 
 function defaults(){
   return {pieces:[],sessions:[],wishlist:[],journal:{},opusCache:{},challenges:{week:null,month:null,log:[]},
@@ -148,7 +147,9 @@ async function loadState(){
 }
 
 let _dirty=false,_writing=false,_saveTimer=null;
-function mirrorLS(){try{if(LS_MIRROR)localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
+// Plus de miroir continu (rodage IndexedDB terminé, Bêta 4.5) : localStorage ne sert
+// désormais que de repli quand IndexedDB est indisponible (mode privé, quota…).
+function mirrorLS(){if(_db)return;try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
 async function writeState(){
   if(!_db)return;
   let ok=await idbSet('S',JSON.stringify(S));

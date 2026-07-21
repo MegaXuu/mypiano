@@ -11,8 +11,9 @@ carnet de travail, et se motiver par la gamification. Cible : iPhone (PWA instal
 - **PWA en JavaScript pur** (pas de framework, **pas d'étape de build**). Fichiers statiques.
 - Stockage **local** : **IndexedDB** (base `pianoV2`, stores `state` et `recordings`), clé `'S'` du
   store `state` = JSON de tout l'état, via `loadState()` / `save()` / `saveNow()`.
-  `localStorage['pianoV2']` reste un **miroir** best-effort (filet de sécurité pendant le rodage,
-  `LS_MIRROR` — à retirer une fois le rodage jugé suffisant, aucune échéance fixée). Voir « Architecture ».
+  `localStorage['pianoV2']` ne sert plus de miroir continu (retiré Bêta 4.5, rodage IndexedDB
+  jugé suffisant) : il reste seulement la migration one-shot au boot et le repli complet si
+  IndexedDB est indisponible. Voir « Architecture ».
 - Langue de l'interface : **français**. Ton sobre, haut de gamme.
 - Versionnage affiché : **Bêta 3.N** (cycle V3) puis **Bêta 4.N** (`piano-b4-N`) dès le premier
   lot du cycle V4, synchronisé avec `CACHE` dans `sw.js`.
@@ -60,8 +61,10 @@ carnet de travail, et se motiver par la gamification. Cible : iPhone (PWA instal
 
 ## Architecture (conventions)
 - État global unique `S` (objet) → IndexedDB. `save()` après chaque mutation (signature inchangée,
-  42 sites d'appel) : mirror synchrone dans `localStorage`, puis écriture IndexedDB **débouncée
-  150 ms** (coalesce les rafales, un seul write en vol à la fois). `saveNow()` (async, attend le
+  42 sites d'appel) : écriture IndexedDB **débouncée 150 ms** (coalesce les rafales, un seul write
+  en vol à la fois). Plus de miroir `localStorage` continu depuis la Bêta 4.5 (rodage IndexedDB
+  jugé suffisant) : `mirrorLS()` n'écrit dans `localStorage` que si IndexedDB est indisponible
+  (mode privé, quota…), auquel cas c'est lui qui fait autorité. `saveNow()` (async, attend le
   disque) pour les moments critiques : import JSON, `visibilitychange→hidden`, `pagehide` (iOS peut
   tuer une PWA en arrière-plan sans avertir).
 - Boot asynchrone : `S` vaut `defaults()` en mémoire dès le parse (jamais `null`), `boot()` charge
@@ -211,7 +214,7 @@ niveaux de cartes compositeurs (Bronze/Argent/Or) ont leurs propres teintes de m
      saisie manuelle du bpm stable par section, JAMAIS de métronome** (refus explicite).
   3. ✅ **Migration IndexedDB** (socle pour l'audio) : `S` en mémoire, persistance async débouncée
      (`save()`/`saveNow()`), boot async (`loadState()`/`READY`), migration one-shot depuis
-     localStorage (miroir conservé, `LS_MIRROR`), export/import JSON adapté (`saveNow()` avant le
+     localStorage (miroir conservé le temps du rodage, retiré depuis en Bêta 4.5), export/import JSON adapté (`saveNow()` avant le
      toast), store `recordings` créé vide (prêt pour l'étape 4). `test.mjs` adapté (`fake-indexeddb`,
      `window.__ready`/`__flush`). Nommage de version : **Bêta 3.N**.
   4. ✅ **Enregistrement audio** (dépendait de 3) : bouton ● en séance (`toggleRecording`, masqué si
@@ -287,9 +290,9 @@ niveaux de cartes compositeurs (Bronze/Argent/Or) ont leurs propres teintes de m
     confettis).
   - **Lot E** : dettes V3 existantes. ✅ **Découpage `app.js`** (Bêta 3.11) : monolithe scindé en 14
     modules `<script>` classiques dans `js/` (voir « Fichiers » — découpe byte-identique vérifiée par
-    `diff`, `node --check` par fichier, `npm test` et chargement réel navigateur). **Restent** :
-    revérifier sur iPhone le correctif écran-verrouillé de la Bêta 3.12 (audio validé par ailleurs),
-    retrait `LS_MIRROR`.
+    `diff`, `node --check` par fichier, `npm test` et chargement réel navigateur). Retrait de
+    `LS_MIRROR` fait au Lot V4-5 (voir cycle V4 ci-dessous). **Reste** : revérifier sur iPhone le
+    correctif écran-verrouillé de la Bêta 3.12 (audio validé par ailleurs).
 
 - **Cycle V3 — Overhaul graphique « Récital » (validé 2026-07-16) — ✅ TERMINÉ (Bêta 3.19)** :
   direction « programme de concert imprimé × lumière de scène » — continuité améthyste/or + typos
@@ -302,8 +305,8 @@ niveaux de cartes compositeurs (Bronze/Argent/Or) ont leurs propres teintes de m
   l'accueil, voir `ROADMAP-RECITAL.md`). Les styles inline des `renderX()` ont migré vers des
   classes lot par lot ; ce qui reste est légitimement dynamique (couleurs/largeurs calculées).
 
-- **Cycle V4 « Compagnon » (validé 2026-07-20) — EN COURS** : périmètre « pratique pure »
-  (aucun chantier technique lourd). 5 lots = Bêta 4.1 → 4.5, **détail + prompts dans
+- **Cycle V4 « Compagnon » (validé 2026-07-20) — ✅ TERMINÉ (Bêta 4.5)** : périmètre « pratique
+  pure » (aucun chantier technique lourd). 5 lots = Bêta 4.1 → 4.5, **détail + prompts dans
   `ROADMAP-V4.md`** : V4-1 difficulté par section (`sec.diff` 1–4, facultatif) + assistant de
   découpage pas-à-pas ; V4-2 exploitation de la difficulté (suggestions/tri/estimation/consignes,
   travail « du plus dur au plus facile ») ; V4-3 plan guidé v2 (générateur durée 30–90 min +
@@ -311,7 +314,7 @@ niveaux de cartes compositeurs (Bronze/Argent/Or) ont leurs propres teintes de m
   séances « loin du clavier » `mode:'away'` comptées à part, plan de reprise) ; V4-5 polish +
   QA + dettes (retrait `LS_MIRROR`, checklist iPhone). UI : tokens et discipline chromatique
   Récital inchangés ; 3 composants nouveaux seulement (stepper, timeline de séance, bannière
-  d'état). Maquette à valider avant de coder pour V4-1 et V4-3.
+  d'état). Maquette validée avant de coder pour V4-1 et V4-3.
   - **V4-1 (Bêta 4.1)** ✅ : `sec.diff` (1–4, facultatif) + `DIFF_LABELS`/`secDiffLabel` (`js/state.js`).
     Assistant de découpage pas-à-pas (`startCutWizard`, `js/piece-detail.js`) — remplace l'entrée
     « à la main » de `cutSheet` (les chips 8/16/32 mes. restent un raccourci) : étape mesures
@@ -366,6 +369,20 @@ niveaux de cartes compositeurs (Bronze/Argent/Or) ont leurs propres teintes de m
     jusqu'à 3 révisions prioritaires, objectif adouci 7 jours, échéances de révision décalées de la
     durée de la pause). Rétrospective annuelle : ligne « + Xh loin du clavier » séparée du temps
     joué quand des séances `away` existent sur l'année (`js/stats.js`).
+  - **V4-5 (Bêta 4.5)** ✅ : polish transversal + QA + dettes, aucune fonctionnalité nouvelle.
+    Bug corrigé : collision de classe CSS — l'indicateur d'étapes de l'assistant de découpage
+    (V4-1) réutilisait le nom `.stepper` déjà pris par le composant numérique existant (objectif
+    du jour, durée de séance/minuteur, nombre de pièces du plan, durée « loin du clavier ») ;
+    la règle CSS du wizard, chargée après, écrasait silencieusement `display`/`justify-content`
+    et ajoutait une hairline parasite sur tous les steppers numériques. Renommé en `.cutw-steps`/
+    `.cutw-step*` (`js/piece-detail.js`, `index.html`), aucun changement fonctionnel. Reste du
+    cycle passé en revue (chips de difficulté, timeline de séance, bannière/reprise vacances) :
+    tokens Récital et discipline chromatique respectés, cibles tactiles et `:focus-visible` déjà
+    couverts par les classes partagées (`.chip`, `button`), `prefers-reduced-motion` déjà câblé
+    sur la timeline — rien d'autre à corriger. Textes du cycle relus (sobres, cohérents). Retrait
+    du miroir `localStorage` continu (`LS_MIRROR`, voir « Architecture ») ; audit `style="..."`
+    et classes CSS mortes du cycle : rien de significatif à résorber (les rares `style=` restants
+    sont des largeurs/couleurs calculées, cohérents avec le reste de l'app).
 
 - **Reporté en V5+** : thème clair « Nacre » ; **sauvegarde auto vers NAS Synology** (on reste
   sur GitHub Pages quelques mois) ; synchro multi-appareils ; éventuelle migration React+TS+Vite
