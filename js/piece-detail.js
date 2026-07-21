@@ -52,8 +52,12 @@ function renderProgressCard(p){
 }
 function renderMap(p){
   const segs=mapSegments(p);if(!segs.length)return '';
-  return `<div class="map">${segs.map(s=>`<i class="${s.gap?'map-gap':''}" style="flex:${s.count};${s.gap?'':'background:'+s.col+';'}"></i>`).join('')}</div>
+  return `<div class="map">${segs.map(s=>`<i class="${s.gap?'map-gap':''}${s.hard?' map-hard':''}" style="flex:${s.count};${s.gap?'':'background:'+s.col+';'}"></i>`).join('')}</div>
     <div class="sub map-sub"><span class="num">mes. 1</span><span class="num">${p.bars}</span></div>`;
+}
+function renderDiffMark(diff){
+  if(!diff)return '';
+  return `<span class="sec-diffmark" title="${esc(DIFF_LABELS[diff])}">${[1,2,3,4].map(i=>`<i class="${i<=diff?'on':''}"></i>`).join('')}</span>`;
 }
 function mapLegend(){
   return `<div class="row map-legend">
@@ -121,6 +125,7 @@ function renderSecRow(p,s){
       <span class="sec-dot" style="background:${info.col};"></span>
       ${open?`<input class="sec-n" id="sec-n-${s.id}" value="${esc(s.name)}">`:`<span class="sec-n">${esc(s.name)}</span>`}
       <span class="sec-r num it">${s.from}–${s.to}</span>
+      ${!open?renderDiffMark(s.diff):''}
       <span class="sec-car" onclick="toggleSec('${p.id}','${s.id}')">${open?'⌃':'⌄'}</span>
     </div>
     ${!open&&s.todo?`<div class="sec-todo" onclick="toggleSec('${p.id}','${s.id}')">${esc(s.todo)}</div>`:''}
@@ -140,6 +145,8 @@ function renderSecBody(p,s){
       <span class="muted sec-range-count">${Math.max(0,s.to-s.from+1)} mes.</span>
     </div>
     <div class="field"><div class="seg">${SEC_STATUS.map(st=>`<button class="${s.status===st.k?'on':''}" onclick="setSecStatus('${p.id}','${s.id}','${st.k}')">${st.label}</button>`).join('')}</div></div>
+    <div class="field"><label>Difficulté ressentie</label>
+      <div class="diff-seg">${[1,2,3,4].map(lv=>`<button class="diff-chip${s.diff===lv?' on':''}" data-lv="${lv}" onclick="setSecDiff('${p.id}','${s.id}',${lv})">${DIFF_LABELS[lv]}</button>`).join('')}</div></div>
     <div class="field"><label>À faire sur cette section</label>
       <textarea id="sec-todo-${s.id}" placeholder="Main gauche seule, pédale aux temps faibles…">${esc(s.todo||'')}</textarea></div>
     <div class="field field-end"><label>Tempo stable du jour</label>
@@ -168,6 +175,10 @@ function setSecRange(pid,sid){const p=pieceById(pid);const s=secList(p).find(x=>
   s.from=Math.max(1,from);s.to=Math.max(s.from,to);sortSections(p);recordHist(p);save();pieceDetail(pid);}
 function setSecStatus(pid,sid,st){commitOpenSec(pid);const p=pieceById(pid);const s=secList(p).find(x=>x.id===sid);if(!s)return;
   s.status=st;recordHist(p);save();refreshScreen();pieceDetail(pid);}
+function setSecDiff(pid,sid,lv){commitOpenSec(pid);const p=pieceById(pid);const s=secList(p).find(x=>x.id===sid);if(!s)return;
+  const prev=s.diff;s.diff=lv;save();
+  if(prev&&lv<prev)toast('Beau progrès — passée à '+DIFF_LABELS[lv].toLowerCase());
+  pieceDetail(pid);}
 function secBpmStep(sid,d){_secBpm[sid]=Math.max(20,(_secBpm[sid]||92)+d);paintSecBpm(sid);}
 function paintSecBpm(sid){const el=document.getElementById('sec-bpmv-'+sid);if(el)el.innerHTML=_secBpm[sid]+'<span class="sec-bpm-unit"> bpm</span>';}
 function noteSecBpm(pid,sid){const p=pieceById(pid);const s=secList(p).find(x=>x.id===sid);if(!s)return;
@@ -186,10 +197,10 @@ function cutSheet(pid){const p=pieceById(pid);if(!p)return;_cutSize=16;
       <div class="seg" id="cut-seg">
         <button onclick="pickCutSize(8,this)">8 mes.</button>
         <button class="on" onclick="pickCutSize(16,this)">16 mes.</button>
-        <button onclick="pickCutSize(32,this)">32 mes.</button>
-        <button onclick="pickCutSize('manual',this)">À la main</button></div></div>
+        <button onclick="pickCutSize(32,this)">32 mes.</button></div></div>
     <div class="card cut-preview" id="cut-preview"></div>
-    <button class="btn primary mt16" onclick="applyCut('${pid}')">Créer les sections</button>`);
+    <button class="btn primary mt16" onclick="applyCut('${pid}')">Créer les sections</button>
+    <button class="btn ghost sm btn-full mt10" onclick="startCutWizard('${pid}')">Découper pas à pas</button>`);
   paintCutPreview();
 }
 function pickCutSize(v,el){_cutSize=v;document.querySelectorAll('#cut-seg button').forEach(b=>b.classList.remove('on'));el.classList.add('on');paintCutPreview();}
@@ -197,7 +208,6 @@ function paintCutPreview(){
   const bars=parseInt((document.getElementById('cut-bars')||{}).value)||0;
   const el=document.getElementById('cut-preview');if(!el)return;
   if(!bars){el.innerHTML='<div class="muted cut-hint">Indique le nombre de mesures.</div>';return;}
-  if(_cutSize==='manual'){el.innerHTML=`<div class="muted cut-hint">${bars} mesures enregistrées. Ajoute les sections une par une depuis la fiche.</div>`;return;}
   const step=_cutSize,ranges=[];for(let f=1;f<=bars;f+=step)ranges.push([f,Math.min(bars,f+step-1)]);
   el.innerHTML=`<div class="muted cut-preview-count">Aperçu · ${ranges.length} section${ranges.length>1?'s':''}, renommables ensuite</div>
     <div class="map cut-preview-map">${ranges.map(r=>`<i style="flex:${r[1]-r[0]+1};background:${PHASE_COL.dechiffrage};"></i>`).join('')}</div>
@@ -206,8 +216,107 @@ function paintCutPreview(){
 function applyCut(pid){
   const bars=parseInt((document.getElementById('cut-bars')||{}).value)||0;if(bars<1){toast('Indique le nombre de mesures',{danger:true});return;}
   const p=pieceById(pid);p.bars=bars;p.sections=p.sections||[];
-  if(_cutSize!=='manual'){const step=_cutSize;for(let f=1;f<=bars;f+=step)p.sections.push({id:uid(),name:'Section '+(p.sections.length+1),from:f,to:Math.min(bars,f+step-1),todo:'',status:'new',bpm:[]});}
+  const step=_cutSize;for(let f=1;f<=bars;f+=step)p.sections.push({id:uid(),name:'Section '+(p.sections.length+1),from:f,to:Math.min(bars,f+step-1),todo:'',status:'new',bpm:[]});
   recordHist(p);save();closeSheet();refreshScreen();pieceDetail(pid);
+}
+
+/* ---------- Assistant de découpage pas-à-pas (V4-1) ---------- */
+let _cw=null;
+function startCutWizard(pid){
+  const p=pieceById(pid);if(!p)return;
+  _cw={pid,hasBarsStep:!p.bars,phase:p.bars?'section':'bars',bars:p.bars||'',sections:[],cur:null};
+  if(_cw.phase==='section')_cw.cur=cwNextSectionDraft();
+  renderCutWizard();
+}
+function cwNextSectionDraft(){
+  const n=_cw.sections.length+1,lastTo=_cw.sections.length?_cw.sections[_cw.sections.length-1].to:0;
+  const bars=parseInt(_cw.bars)||0;
+  return{name:'Section '+n,from:lastTo+1,to:Math.min(bars||lastTo+8,lastTo+8),diff:0};
+}
+function renderCutStepper(){
+  const idx=_cw.phase==='bars'?0:_cw.phase==='section'?1:2,labels=['Mesures','Sections','Récapitulatif'];
+  return `<div class="stepper">${labels.map((l,i)=>`<div class="stepper-step${i===idx?' on':''}${i<idx?' done':''}">
+      <span class="stepper-dot"></span><span class="stepper-lbl">${l}</span></div>`).join('')}</div>
+    ${_cw.phase==='section'?`<div class="muted stepper-sub">section ${_cw.sections.length+1}</div>`:''}`;
+}
+function renderCutWizard(){
+  const p=pieceById(_cw.pid);if(!p)return;
+  const body=_cw.phase==='bars'?cwBarsStep():_cw.phase==='section'?cwSectionStep():cwRecapStep();
+  openSheet(`<h3>Découper — pas à pas</h3>${renderCutStepper()}${body}`);
+}
+function cwBarsStep(){
+  return `<p class="muted cut-intro">Indique le nombre de mesures du morceau pour suivre ta couverture précisément.</p>
+    <div class="field"><label>Combien de mesures ?</label>
+      <input id="cw-bars" class="num cut-bars-input" inputmode="numeric" value="${_cw.bars||''}" placeholder="57"></div>
+    <button class="btn primary btn-full cutw-actions" onclick="cwBarsNext()">Suivant</button>`;
+}
+function cwBarsNext(){
+  const v=parseInt((document.getElementById('cw-bars')||{}).value)||0;
+  if(v<1){toast('Indique le nombre de mesures',{danger:true});return;}
+  _cw.bars=v;_cw.phase='section';_cw.cur=cwNextSectionDraft();renderCutWizard();
+}
+function cwSectionStep(){
+  const c=_cw.cur;
+  return `<div class="field"><label>Nom de la section</label><input id="cw-name" value="${esc(c.name)}"></div>
+    <div class="row sec-range-row">
+      <span class="muted sec-range-lbl">Mesures</span>
+      <input class="num sec-range-input" inputmode="numeric" id="cw-from" value="${c.from}">
+      <span class="muted">→</span>
+      <input class="num sec-range-input" inputmode="numeric" id="cw-to" value="${c.to}"></div>
+    <div class="field"><label>Difficulté ressentie (facultatif)</label>
+      <div class="diff-seg">${[1,2,3,4].map(lv=>`<button class="diff-chip${c.diff===lv?' on':''}" data-lv="${lv}" onclick="cwPickDiff(${lv},this)">${DIFF_LABELS[lv]}</button>`).join('')}</div></div>
+    <div class="grid2 cutw-actions">
+      <button class="btn ghost" onclick="cwSectionPrev()">Précédent</button>
+      <button class="btn ghost" onclick="cwAddSection()">+ Ajouter une section</button></div>
+    <button class="btn primary btn-full mt10" onclick="cwFinishSections()">Terminer</button>`;
+}
+function cwPickDiff(lv,el){_cw.cur.diff=lv;el.parentElement.querySelectorAll('.diff-chip').forEach(b=>b.classList.remove('on'));el.classList.add('on');}
+function cwReadCur(){
+  const name=(document.getElementById('cw-name')||{}).value,from=parseInt((document.getElementById('cw-from')||{}).value),to=parseInt((document.getElementById('cw-to')||{}).value);
+  _cw.cur.name=(name||'').trim()||_cw.cur.name;
+  _cw.cur.from=isNaN(from)?_cw.cur.from:Math.max(1,from);
+  _cw.cur.to=isNaN(to)?_cw.cur.to:Math.max(_cw.cur.from,to);
+}
+function cwSectionToObj(){
+  const c=_cw.cur,sec={id:uid(),name:c.name,from:c.from,to:c.to,todo:'',status:'new',bpm:[]};
+  if(c.diff)sec.diff=c.diff;
+  return sec;
+}
+function cwAddSection(){
+  cwReadCur();
+  if(_cw.cur.from>_cw.cur.to){toast('Mesure de fin avant le début',{danger:true});return;}
+  _cw.sections.push(cwSectionToObj());_cw.cur=cwNextSectionDraft();renderCutWizard();
+}
+function cwFinishSections(){
+  cwReadCur();
+  if(_cw.cur.from>_cw.cur.to){toast('Mesure de fin avant le début',{danger:true});return;}
+  _cw.sections.push(cwSectionToObj());_cw.cur=null;_cw.phase='recap';renderCutWizard();
+}
+function cwSectionPrev(){
+  if(_cw.sections.length){_cw.cur=_cw.sections.pop();renderCutWizard();}
+  else if(_cw.hasBarsStep){_cw.phase='bars';_cw.cur=null;renderCutWizard();}
+  else cutSheet(_cw.pid);
+}
+function cwRecapStep(){
+  const draft={bars:_cw.bars,sections:_cw.sections},gaps=coverageGaps(draft);
+  return `<p class="muted cut-intro">${_cw.sections.length} section${_cw.sections.length>1?'s':''} sur ${_cw.bars} mesures.</p>
+    ${renderMap(draft)}${mapLegend()}
+    <div class="mt14">${_cw.sections.map(s=>`<div class="cutw-recap-row">
+        <span class="cutw-recap-name">${esc(s.name)}</span>
+        <span class="num it muted">${s.from}–${s.to}</span>
+        ${renderDiffMark(s.diff)}</div>`).join('')}</div>
+    ${gaps.length?`<div class="mt10">${gaps.map(g=>`<div class="cutw-gap-row">mes. ${g.from}–${g.to} · pas encore couvertes</div>`).join('')}</div>`:''}
+    <div class="grid2 cutw-actions">
+      <button class="btn ghost" onclick="cwRecapPrev()">Précédent</button>
+      <button class="btn primary" onclick="cwValidate()">Valider le découpage</button></div>`;
+}
+function cwRecapPrev(){_cw.cur=_cw.sections.pop();_cw.phase='section';renderCutWizard();}
+function cwValidate(){
+  const p=pieceById(_cw.pid);if(!p)return;
+  p.bars=_cw.bars;p.sections=_cw.sections;
+  sortSections(p);recordHist(p);save();
+  const pid=_cw.pid;_cw=null;
+  closeSheet();refreshScreen();pieceDetail(pid);
 }
 function nudgeProgress(id,d){const p=pieceById(id);if(!p)return;p.progress=Math.max(0,Math.min(100,(p.progress||0)+d));
   if(p.progress>=100&&p.status!=='mastered'){markMastered(id);return;}save();pieceDetail(id);}

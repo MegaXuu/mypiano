@@ -464,6 +464,35 @@ a{color:var(--acc);}
 .work-row-input{flex:1;}
 .work-row-remove{width:auto;padding:0 12px;}
 
+/* ---------- Difficulté de section + assistant de découpage pas-à-pas (V4-1) ---------- */
+.diff-seg{display:flex;gap:6px;}
+.diff-chip{flex:1;padding:9px 4px;border-radius:10px;font-size:12px;font-weight:600;text-align:center;
+  background:transparent;border:1px solid var(--hairline);color:var(--t2);transition:.15s;}
+.diff-chip[data-lv="2"]{background:var(--surface);border-color:var(--hairline-hi);color:var(--tc);}
+.diff-chip[data-lv="3"]{background:var(--surface2);border-color:var(--border);color:var(--tp);}
+.diff-chip[data-lv="4"]{background:var(--surface2);border-color:var(--border);color:var(--tp);
+  box-shadow:inset 0 1px 0 var(--hairline-hi);}
+.diff-chip.on{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc);color:var(--tp);}
+.sec-diffmark{display:inline-flex;gap:2px;align-items:flex-end;flex:0 0 auto;margin-right:2px;}
+.sec-diffmark i{width:3px;height:8px;border-radius:1px;background:var(--hairline-hi);}
+.sec-diffmark i.on{background:var(--t2);}
+.map i.map-hard{box-shadow:inset 0 0 0 1px rgba(255,255,255,.16),inset 0 3px 0 rgba(255,255,255,.3);}
+.stepper{position:relative;display:flex;justify-content:space-between;margin:2px 0 20px;}
+.stepper:before{content:"";position:absolute;left:14px;right:14px;top:5px;height:1px;background:var(--hairline);}
+.stepper-step{position:relative;display:flex;flex-direction:column;align-items:center;gap:7px;flex:1;}
+.stepper-dot{width:11px;height:11px;border-radius:50%;background:var(--surface2);border:1px solid var(--hairline-hi);}
+.stepper-step.done .stepper-dot{background:var(--t2);border-color:var(--t2);}
+.stepper-step.on .stepper-dot{background:var(--acc);border-color:var(--acc);
+  box-shadow:0 0 0 3px color-mix(in srgb, var(--acc) 22%, transparent);}
+.stepper-lbl{font-size:11px;color:var(--t2);text-transform:uppercase;letter-spacing:.06em;}
+.stepper-step.on .stepper-lbl{color:var(--tp);}
+.stepper-sub{font-size:12px;margin:-12px 0 16px;text-align:center;}
+.cutw-actions{margin-top:18px;}
+.cutw-recap-row{display:flex;align-items:center;gap:10px;padding:10px 2px;border-bottom:1px solid var(--hairline);font-size:13px;}
+.cutw-recap-row:last-child{border-bottom:none;}
+.cutw-recap-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.cutw-gap-row{font-size:12px;color:var(--t2);padding:6px 2px;}
+
 /* ---------- Voyage (Lot R5) ---------- */
 .voy-tabs{margin:16px 0;}
 .voy-tabs button{font-size:12px;}

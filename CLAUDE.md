@@ -14,7 +14,8 @@ carnet de travail, et se motiver par la gamification. Cible : iPhone (PWA instal
   `localStorage['pianoV2']` reste un **miroir** best-effort (filet de sécurité pendant le rodage,
   `LS_MIRROR` — à retirer une fois le rodage jugé suffisant, aucune échéance fixée). Voir « Architecture ».
 - Langue de l'interface : **français**. Ton sobre, haut de gamme.
-- Versionnage affiché : **Bêta 3.N** (cycle V3 de la feuille de route), synchronisé avec `CACHE` dans `sw.js`.
+- Versionnage affiché : **Bêta 3.N** (cycle V3) puis **Bêta 4.N** (`piano-b4-N`) dès le premier
+  lot du cycle V4, synchronisé avec `CACHE` dans `sw.js`.
 
 ## Fichiers
 - `index.html` — squelette + **tous les styles CSS** (`<style>`) + conteneurs d'écrans (`#s-*`) + tab bar + fonts Google.
@@ -103,7 +104,7 @@ carnet de travail, et se motiver par la gamification. Cible : iPhone (PWA instal
     `revisionList` l'utilisent au lieu de l'intervalle fixe. Bouton « Réviser » (accueil) = séance
     entrelacée des 3 pièces les plus en retard (`startRevision`, réutilise `timer.plan/planIdx`).
   - **Fiche unifiée** `pieceDetail(id)` (feuille) = point d'entrée depuis le répertoire : stats, avancement (dérivé si sections, sinon ±10 manuel), notes, transitions de statut. Formulaire `pieceSheet` allégé (champs primaires + dépliant « Détails »). **Phase** dérivée `piecePhase(p)` (À apprendre / Déchiffrage / Consolidation / Polissage / Maîtrisé / À entretenir…). Anti-doublon `findDuplicate` (normalisé).
-  - **Sections & mesures (V3 étape 2)** : `bars` (nb de mesures, facultatif) + `sections[] = {id,name,from,to,todo,status(new|wip|poli|ok),bpm:[{d,v}]}`, **entièrement facultatif** — une pièce sans section se comporte comme avant (avancement manuel ±10). Dès que `bars` et au moins une section existent, `hasDerivedProgress(p)` devient vrai et `pieceProgress(p)` **remplace** `p.progress` partout (phase, estimation, tri du plan guidé) : seules les mesures des sections `ok` comptent (`barsOk`, union par rang pour éviter les doubles comptages en cas de chevauchement — `sectionRankArr`). `hist[] = {d,m}` journalise les mesures au point (un point par jour joué ou modifié, `recordHist`) → mini-courbe (`renderHistCurve`, pas de courbe de tempo). Carte visuelle de couverture (`renderMap`/`mapSegments`, trous = `coverageGaps`). Tempo = **saisie manuelle uniquement**, stocké par section (`sec.bpm[]`), jamais de métronome. Découpage assisté = `cutSheet`/`applyCut` (mesures régulières ou « à la main »). Suggestion « à travailler aujourd'hui » = section non `ok` la moins récemment travaillée (`pickTodaySection`, dérivé de `sessions[].entries[].sections`). Rappel en séance = ligne « Pas au point : … » (`sectionsReminderLine`). Carnet de fin de séance = bloc replié « Sections travaillées » (chips + avancer d'un cran + bpm optionnel).
+  - **Sections & mesures (V3 étape 2)** : `bars` (nb de mesures, facultatif) + `sections[] = {id,name,from,to,todo,status(new|wip|poli|ok),bpm:[{d,v}],diff?(1–4)}`, **entièrement facultatif** — une pièce sans section se comporte comme avant (avancement manuel ±10). Dès que `bars` et au moins une section existent, `hasDerivedProgress(p)` devient vrai et `pieceProgress(p)` **remplace** `p.progress` partout (phase, estimation, tri du plan guidé) : seules les mesures des sections `ok` comptent (`barsOk`, union par rang pour éviter les doubles comptages en cas de chevauchement — `sectionRankArr`). `hist[] = {d,m}` journalise les mesures au point (un point par jour joué ou modifié, `recordHist`) → mini-courbe (`renderHistCurve`, pas de courbe de tempo). Carte visuelle de couverture (`renderMap`/`mapSegments`, trous = `coverageGaps`). Tempo = **saisie manuelle uniquement**, stocké par section (`sec.bpm[]`), jamais de métronome. Découpage assisté = `cutSheet`/`applyCut` (raccourci en mesures régulières) ou assistant pas-à-pas `startCutWizard` (V4-1, voir « État & feuille de route »). Suggestion « à travailler aujourd'hui » = section non `ok` la moins récemment travaillée (`pickTodaySection`, dérivé de `sessions[].entries[].sections`). Rappel en séance = ligne « Pas au point : … » (`sectionsReminderLine`). Carnet de fin de séance = bloc replié « Sections travaillées » (chips + avancer d'un cran + bpm optionnel). **Difficulté ressentie (V4-1)** : `sec.diff` ∈ 1–4 (Facile/Moyen/Difficile/Très difficile, `DIFF_LABELS`/`secDiffLabel`), facultative, purement indicative en V4-1 (n'influence ni tri ni suggestions — c'est le périmètre de V4-2).
 - `sessions[]` : `{id,date,mode(chrono|minuteur|guided|concert),goal,feeling(pp|p|mf|f|ff),blocks[{piece|'__improv__',sec}],entries[{piece,worked,next}],ts,concert?,interval?}`
   — `interval` (bool, facultatif) : vrai si la séance était en pratique fractionnée 25/5 ; sert à
   `fractionedInsight()` (étape 5). Absent sur les séances antérieures et les séances a posteriori
@@ -278,8 +279,31 @@ niveaux de cartes compositeurs (Bronze/Argent/Or) ont leurs propres teintes de m
   l'accueil, voir `ROADMAP-RECITAL.md`). Les styles inline des `renderX()` ont migré vers des
   classes lot par lot ; ce qui reste est légitimement dynamique (couleurs/largeurs calculées).
 
-- **Reporté en V4** : **sauvegarde auto vers NAS Synology** (on reste sur GitHub Pages quelques
-  mois) ; synchro multi-appareils ; éventuelle migration React+TS+Vite ou app SwiftUI native.
+- **Cycle V4 « Compagnon » (validé 2026-07-20) — EN COURS** : périmètre « pratique pure »
+  (aucun chantier technique lourd). 5 lots = Bêta 4.1 → 4.5, **détail + prompts dans
+  `ROADMAP-V4.md`** : V4-1 difficulté par section (`sec.diff` 1–4, facultatif) + assistant de
+  découpage pas-à-pas ; V4-2 exploitation de la difficulté (suggestions/tri/estimation/consignes,
+  travail « du plus dur au plus facile ») ; V4-3 plan guidé v2 (générateur durée 30–90 min +
+  nb de pièces + intention, timeline de blocs en séance) ; V4-4 mode vacances (série gelée,
+  séances « loin du clavier » `mode:'away'` comptées à part, plan de reprise) ; V4-5 polish +
+  QA + dettes (retrait `LS_MIRROR`, checklist iPhone). UI : tokens et discipline chromatique
+  Récital inchangés ; 3 composants nouveaux seulement (stepper, timeline de séance, bannière
+  d'état). Maquette à valider avant de coder pour V4-1 et V4-3.
+  - **V4-1 (Bêta 4.1)** ✅ : `sec.diff` (1–4, facultatif) + `DIFF_LABELS`/`secDiffLabel` (`js/state.js`).
+    Assistant de découpage pas-à-pas (`startCutWizard`, `js/piece-detail.js`) — remplace l'entrée
+    « à la main » de `cutSheet` (les chips 8/16/32 mes. restent un raccourci) : étape mesures
+    (si `p.bars` absent), étapes section par section (nom, mesures pré-remplies, chips de
+    difficulté), récapitulatif (`renderMap`/`coverageGaps` sur le brouillon) qui écrit
+    `p.bars`+`p.sections` d'un coup. Chips de difficulté (`.diff-chip`, 4 niveaux d'intensité
+    neutre croissante + anneau améthyste de sélection, aucune couleur catégorielle) éditables
+    aussi depuis `renderSecBody` (`setSecDiff`, toast sobre si la difficulté est abaissée).
+    Marqueur discret (4 traits, `renderDiffMark`) sur la ligne de section repliée et double-hairline
+    (`.map-hard`) sur les segments difficiles/très difficiles de la carte de couverture — jamais
+    d'aplat coloré, le canal couleur reste au statut (`SEC_STATUS`).
+
+- **Reporté en V5+** : thème clair « Nacre » ; **sauvegarde auto vers NAS Synology** (on reste
+  sur GitHub Pages quelques mois) ; synchro multi-appareils ; éventuelle migration React+TS+Vite
+  ou app SwiftUI native ; push iOS réel (serveur VAPID).
 
 ## Stratégie de modèles (économie de crédit)
 - **Sonnet 5 par défaut** pour coder au quotidien.

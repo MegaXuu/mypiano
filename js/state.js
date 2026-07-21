@@ -8,7 +8,7 @@
 
 const KEY = 'pianoV2';
 const IMPROV = '__improv__';
-const APP_VERSION = 'Bêta 3.19'; // à synchroniser avec CACHE dans sw.js à chaque release
+const APP_VERSION = 'Bêta 4.1'; // à synchroniser avec CACHE dans sw.js à chaque release
 
 const STONES = [
   {n:'Apprenti',h:10,c:'#E0A83B'},{n:'Élève',h:20,c:'#C9CDDA'},{n:'Musicien',h:30,c:'#9BA0AE'},
@@ -217,6 +217,9 @@ function phaseChip(p){const ph=piecePhase(p);if(!ph)return '';return `<span clas
 /* ---------- Sections & mesures (V3 étape 2) ---------- */
 const SEC_STATUS=[{k:'new',label:'Déchiffrage',col:PHASE_COL.dechiffrage},{k:'wip',label:'Travail',col:PHASE_COL.consolidation},{k:'poli',label:'Polissage',col:PHASE_COL.polissage},{k:'ok',label:'Au point',col:'var(--ok)'}];
 function secStatusInfo(k){return SEC_STATUS.find(s=>s.k===k)||SEC_STATUS[0];}
+// Difficulté ressentie par section (V4-1) — facultative, absente = comportement neutre.
+const DIFF_LABELS={1:'Facile',2:'Moyen',3:'Difficile',4:'Très difficile'};
+function secDiffLabel(sec){return sec&&sec.diff?DIFF_LABELS[sec.diff]||'':'';}
 function secList(p){return (p&&p.sections)||[];}
 function sortSections(p){if(p.sections)p.sections.sort((a,b)=>(a.from|0)-(b.from|0));}
 function hasDerivedProgress(p){return !!(p&&p.bars&&secList(p).length);}
@@ -231,12 +234,23 @@ function sectionRankArr(p){
 }
 function barsOk(p){return sectionRankArr(p).filter(r=>r===3).length;}
 function pieceProgress(p){return hasDerivedProgress(p)?Math.round(barsOk(p)/p.bars*100):(p.progress||0);}
+// Difficulté max par mesure (0 = aucune section difficile dessus) — pour le marqueur discret de la carte.
+function sectionDiffRankArr(p){
+  const bars=p.bars|0;if(!bars)return[];
+  const arr=new Array(bars).fill(0);
+  secList(p).forEach(s=>{const d=s.diff|0;if(d<1)return;
+    const from=Math.max(1,s.from|0||1),to=Math.min(bars,s.to|0||0);
+    for(let i=from;i<=to;i++)if(d>arr[i-1])arr[i-1]=d;});
+  return arr;
+}
 function mapSegments(p){
   const arr=sectionRankArr(p);if(!arr.length)return[];
-  const segs=[];let cur=arr[0],n=0;
-  arr.forEach(r=>{if(r===cur){n++;}else{segs.push({rank:cur,count:n});cur=r;n=1;}});
-  segs.push({rank:cur,count:n});
-  return segs.map(s=>({count:s.count,col:s.rank===-1?null:SEC_STATUS[s.rank].col,gap:s.rank===-1}));
+  const diffArr=sectionDiffRankArr(p);
+  const segs=[];let cur=arr[0],curHard=diffArr[0]>=3,n=0;
+  arr.forEach((r,i)=>{const hard=diffArr[i]>=3;
+    if(r===cur&&hard===curHard){n++;}else{segs.push({rank:cur,count:n,hard:curHard});cur=r;curHard=hard;n=1;}});
+  segs.push({rank:cur,count:n,hard:curHard});
+  return segs.map(s=>({count:s.count,col:s.rank===-1?null:SEC_STATUS[s.rank].col,gap:s.rank===-1,hard:s.hard}));
 }
 function coverageGaps(p){
   const arr=sectionRankArr(p),gaps=[];let start=null;
