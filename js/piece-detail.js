@@ -99,11 +99,12 @@ function renderTodaySec(p){
   const pick=pickTodaySection(p);if(!pick)return '';
   const days=pick.d?Math.floor((Date.now()-new Date(pick.d+'T00:00'))/86400000):null;
   const sub=pick.d?(days<=0?"travaillée aujourd'hui":`pas ouverte depuis ${days} j`):'jamais travaillée';
+  const diffLbl=secDiffLabel(pick.s);
   return `<div class="card today-sec-card">
     <div class="between"><div class="today-sec-info">
         <span class="muted today-sec-eyebrow">À travailler aujourd'hui</span>
         <div class="today-sec-title">${esc(pick.s.name)} · mes. ${pick.s.from}–${pick.s.to}</div>
-        <div class="muted today-sec-sub">${sub}</div></div>
+        <div class="muted today-sec-sub">${sub}${diffLbl?' · '+diffLbl.toLowerCase():''}</div></div>
       <button class="btn ghost sm today-sec-btn" onclick="toggleSec('${p.id}','${pick.s.id}')">Ouvrir</button></div></div>`;
 }
 function renderSections(p){

@@ -300,6 +300,16 @@ niveaux de cartes compositeurs (Bronze/Argent/Or) ont leurs propres teintes de m
     Marqueur discret (4 traits, `renderDiffMark`) sur la ligne de section repliée et double-hairline
     (`.map-hard`) sur les segments difficiles/très difficiles de la carte de couverture — jamais
     d'aplat coloré, le canal couleur reste au statut (`SEC_STATUS`).
+  - **V4-2 (Bêta 4.2)** ✅ : exploitation de `sec.diff` (V4-1), aucun nouvel écran. `pickTodaySection`
+    départage à fraîcheur égale par la difficulté (la plus difficile d'abord, diff absente = neutre,
+    en dernier) ; sa difficulté s'affiche dans la carte « À travailler aujourd'hui » de `pieceDetail`.
+    `estimateText` (temps restant estimé) pondère les mesures non « ok » par `DIFF_WEIGHT` (0.7 / 1 /
+    1.5 / 2, `js/state.js`) au lieu du pourcentage brut — identique à l'ancienne formule si aucune
+    diff n'est renseignée. `sectionsReminderLine` (rappel en séance) cite la section non « ok » la
+    plus difficile en premier, avec son libellé entre parenthèses. `changConsigne` (plan guidé)
+    adapte la consigne à la difficulté de la section du jour (très difficile → très lent/mains
+    séparées/boucles courtes ; facile → consolidation/filage) quand la pièce est sectionnée, sinon
+    comportement inchangé (basé sur l'avancement global).
 
 - **Reporté en V5+** : thème clair « Nacre » ; **sauvegarde auto vers NAS Synology** (on reste
   sur GitHub Pages quelques mois) ; synchro multi-appareils ; éventuelle migration React+TS+Vite

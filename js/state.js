@@ -8,7 +8,7 @@
 
 const KEY = 'pianoV2';
 const IMPROV = '__improv__';
-const APP_VERSION = 'Bêta 4.1'; // à synchroniser avec CACHE dans sw.js à chaque release
+const APP_VERSION = 'Bêta 4.2'; // à synchroniser avec CACHE dans sw.js à chaque release
 
 const STONES = [
   {n:'Apprenti',h:10,c:'#E0A83B'},{n:'Élève',h:20,c:'#C9CDDA'},{n:'Musicien',h:30,c:'#9BA0AE'},
@@ -252,6 +252,14 @@ function mapSegments(p){
   segs.push({rank:cur,count:n,hard:curHard});
   return segs.map(s=>({count:s.count,col:s.rank===-1?null:SEC_STATUS[s.rank].col,gap:s.rank===-1,hard:s.hard}));
 }
+// Barème V4-2 pour l'estimation pondérée : facile 0.7, moyen 1 (neutre = même poids qu'une mesure sans diff), difficile 1.5, très difficile 2.
+const DIFF_WEIGHT={1:0.7,2:1,3:1.5,4:2};
+function weightedRemainingBars(p){
+  const bars=p.bars|0;if(!bars)return 0;
+  const rankArr=sectionRankArr(p),diffArr=sectionDiffRankArr(p);
+  let rem=0;for(let i=0;i<bars;i++){if(rankArr[i]===3)continue;rem+=diffArr[i]?DIFF_WEIGHT[diffArr[i]]:1;}
+  return rem;
+}
 function coverageGaps(p){
   const arr=sectionRankArr(p),gaps=[];let start=null;
   arr.forEach((r,i)=>{const m=i+1;if(r===-1){if(start==null)start=m;}else if(start!=null){gaps.push({from:start,to:m-1});start=null;}});
@@ -266,12 +274,17 @@ function secLastWorked(p,sec){let last=null;S.sessions.forEach(s=>{(s.entries||[
 function pickTodaySection(p){
   const secs=secList(p).filter(s=>s.status!=='ok');if(!secs.length)return null;
   const withDate=secs.map(s=>({s,d:secLastWorked(p,s)}));
-  withDate.sort((a,b)=>{const ad=a.d||'',bd=b.d||'';if(ad!==bd)return ad<bd?-1:1;return(a.s.from|0)-(b.s.from|0);});
+  // Fraîcheur d'abord (jamais/moins récemment travaillée) ; à date égale, la plus difficile passe en tête (diff absente = neutre, en dernier).
+  withDate.sort((a,b)=>{const ad=a.d||'',bd=b.d||'';if(ad!==bd)return ad<bd?-1:1;
+    const adiff=a.s.diff||0,bdiff=b.s.diff||0;if(adiff!==bdiff)return bdiff-adiff;
+    return(a.s.from|0)-(b.s.from|0);});
   return withDate[0];
 }
 function sectionsReminderLine(p){
   if(!p||!hasDerivedProgress(p))return '';
-  const names=secList(p).filter(s=>s.status!=='ok').map(s=>s.name);
+  // La section non « ok » la plus difficile est citée en premier ; diff absente = comportement inchangé (ordre stable).
+  const names=secList(p).filter(s=>s.status!=='ok').slice().sort((a,b)=>(b.diff||0)-(a.diff||0))
+    .map(s=>s.name+(s.diff?' ('+secDiffLabel(s).toLowerCase()+')':''));
   coverageGaps(p).forEach(g=>names.push('mes. '+g.from+'–'+g.to));
   return names.length?'Pas au point : '+names.join(' · '):'';
 }

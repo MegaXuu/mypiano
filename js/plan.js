@@ -2,7 +2,13 @@
    LOT 2 partie 2 — plan guidé (Chang), simulation de concert, rapport hebdo
    ========================================================================== */
 let _plan=null;
-function changConsigne(p){const pr=pieceProgress(p);if(pr<30)return "Passage le plus difficile d'abord, mains séparées, très lent.";if(pr<70)return "Mains ensemble, monte le tempo par petits paliers.";return "Peaufine les nuances et joue de mémoire.";}
+function changConsigne(p){
+  if(hasDerivedProgress(p)){
+    const pick=pickTodaySection(p),d=pick&&pick.s.diff;
+    if(d>=3)return "Section difficile : très lent, mains séparées, en boucles courtes.";
+    if(d===1)return "Section facile : consolide et enchaîne sans t'arrêter.";
+  }
+  const pr=pieceProgress(p);if(pr<30)return "Passage le plus difficile d'abord, mains séparées, très lent.";if(pr<70)return "Mains ensemble, monte le tempo par petits paliers.";return "Peaufine les nuances et joue de mémoire.";}
 function generatePlan(){
   const goal=todayGoal();const active=S.pieces.filter(p=>!p.isEnsemble&&p.status==='active');const rev=revisionList();
   const blocks=[];const warm=Math.max(5,Math.round(goal*0.12));

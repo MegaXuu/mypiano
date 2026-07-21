@@ -261,5 +261,9 @@ function revisionList(){const now=Date.now();
 function estimateText(p){if(S.settings.estimates===false||!p||!p.createdAt)return '';
   const pr=pieceProgress(p);if(pr>=100)return '';
   const days=(Date.now()-p.createdAt)/86400000;if(days<3||!pr)return '';const rate=pr/days;if(rate<=0)return '';
-  const rem=(100-pr)/rate;if(rem>3650)return '';return 'Maîtrise estimée dans ~'+(rem<14?Math.round(rem)+' j':Math.round(rem/7)+' sem.');}
+  // Pièce sectionnée : le temps restant est pondéré par la difficulté des sections non « ok »
+  // (DIFF_WEIGHT), pas seulement par le pourcentage de mesures manquantes. Sans diff renseignée,
+  // le poids reste neutre (1) et le résultat est identique à l'ancienne formule (100-pr)/rate.
+  const rem=hasDerivedProgress(p)?weightedRemainingBars(p)*100/(rate*p.bars):(100-pr)/rate;
+  if(rem>3650)return '';return 'Maîtrise estimée dans ~'+(rem<14?Math.round(rem)+' j':Math.round(rem/7)+' sem.');}
 
