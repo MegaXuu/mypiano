@@ -5,14 +5,14 @@ let _plan=null,_planDraft=null,_planTouchedN=false;
 function changConsigne(p){
   if(hasDerivedProgress(p)){
     const pick=pickTodaySection(p),d=pick&&pick.s.diff;
-    if(d>=3)return "Section difficile : très lent, mains séparées, en boucles courtes.";
+    if(d>=3)return "Section difficile : mains séparées, courtes boucles, du lent au tempo cible.";
     if(d===1)return "Section facile : consolide et enchaîne sans t'arrêter.";
   }
-  const pr=pieceProgress(p);if(pr<30)return "Passage le plus difficile d'abord, mains séparées, très lent.";if(pr<70)return "Mains ensemble, monte le tempo par petits paliers.";return "Peaufine les nuances et joue de mémoire.";}
+  const pr=pieceProgress(p);if(pr<30)return "Le plus dur d'abord : mains séparées, courts segments au tempo cible.";if(pr<70)return "Mains ensemble par courts segments, vise directement le tempo cible.";return "Peaufine les nuances et joue de mémoire.";}
 function sectionConsigne(s){const d=s.diff||0;
-  if(d>=3)return "Section difficile : très lent, mains séparées, en boucles courtes.";
+  if(d>=3)return "Section difficile : mains séparées, courtes boucles, du lent au tempo cible.";
   if(d===1)return "Section facile : consolide et enchaîne sans t'arrêter.";
-  return "Mains ensemble, monte le tempo par petits paliers.";}
+  return "Mains ensemble par courts segments, vise directement le tempo cible.";}
 
 /* ---------- Plan guidé v2 (générateur paramétré, Bêta 4.3) ---------- */
 const PLAN_INTENTS=[{k:'apprendre',label:'Apprendre'},{k:'consolider',label:'Consolider'},{k:'entretenir',label:'Entretenir'},{k:'equilibre',label:'Équilibré'}];
@@ -187,7 +187,8 @@ function saveConcert(){
 // Rapport hebdomadaire
 function lastWeekReport(){
   const ws=addDays(weekStart(),-7);let sec=0,days=0,sessions=0;const pieceMap={};
-  for(let i=0;i<7;i++){const s=secondsOnDay(dkey(addDays(ws,i)));if(s>0)days++;sec+=s;}
+  const byDay=secondsByDay();
+  for(let i=0;i<7;i++){const s=byDay[dkey(addDays(ws,i))]||0;if(s>0)days++;sec+=s;}
   playSessions().forEach(s=>{const d=new Date(s.date+'T00:00');if(d>=ws&&d<addDays(ws,7)){sessions++;s.blocks.forEach(b=>{if(b.piece!==IMPROV)pieceMap[b.piece]=(pieceMap[b.piece]||0)+b.sec;});}});
   return {ws,sec,days,sessions,top:Object.entries(pieceMap).sort((a,b)=>b[1]-a[1]).slice(0,3)};
 }

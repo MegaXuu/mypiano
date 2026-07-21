@@ -383,6 +383,19 @@ niveaux de cartes compositeurs (Bronze/Argent/Or) ont leurs propres teintes de m
     du miroir `localStorage` continu (`LS_MIRROR`, voir « Architecture ») ; audit `style="..."`
     et classes CSS mortes du cycle : rien de significatif à résorber (les rares `style=` restants
     sont des largeurs/couleurs calculées, cohérents avec le reste de l'app).
+  - **Patch (Bêta 4.6)** ✅ : conformité Chang des consignes du plan guidé + micro-optimisation.
+    Consignes `changConsigne`/`sectionConsigne` (`js/plan.js`) : la consigne « mains ensemble,
+    monte le tempo par petits paliers » (montée graduelle du tempo) était **l'exact anti-pattern
+    que Chang déconseille** (« the most frequent abuse of the metronome is to use it to ramp up
+    speed ») → remplacée par « mains ensemble par courts segments, vise directement le tempo cible »
+    (acquisition de vitesse par courts segments HS, pas par paliers) ; consigne « difficile »
+    précisée en « mains séparées, courtes boucles, du lent au tempo cible » (cyclage lent↔cible,
+    évite le piège du *slow-play only* que Chang signale aussi). Reste des consignes déjà conforme
+    (difficile d'abord, mains séparées, continuité, filage « comme en concert », mémoire) ; le refus
+    du métronome dans l'app est cohérent avec Chang. Optimisation : `secondsByDay()` (`js/state.js`),
+    agrégat jours→secondes en **un seul balayage** des séances ; `weekSeconds`/`weekDays`/
+    `lastWeekReport` ne refiltrent plus toutes les séances 7× (14 balayages complets sur l'accueil
+    → 2). Aucun changement de comportement (mêmes valeurs), couvert par `npm test`.
 
 - **Reporté en V5+** : thème clair « Nacre » ; **sauvegarde auto vers NAS Synology** (on reste
   sur GitHub Pages quelques mois) ; synchro multi-appareils ; éventuelle migration React+TS+Vite

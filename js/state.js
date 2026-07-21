@@ -8,7 +8,7 @@
 
 const KEY = 'pianoV2';
 const IMPROV = '__improv__';
-const APP_VERSION = 'Bêta 4.5'; // à synchroniser avec CACHE dans sw.js à chaque release
+const APP_VERSION = 'Bêta 4.6'; // à synchroniser avec CACHE dans sw.js à chaque release
 
 const STONES = [
   {n:'Apprenti',h:10,c:'#E0A83B'},{n:'Élève',h:20,c:'#C9CDDA'},{n:'Musicien',h:30,c:'#9BA0AE'},
@@ -323,8 +323,10 @@ function bestStreakInYear(y){const set=new Set([...practiceDays()].filter(k=>k.s
   while(d<=end){const k=dkey(d);
     if(set.has(k)){cur++;miss=0;best=Math.max(best,cur);}else if(isVacationDay(k)){/* gelé */}else{miss++;if(miss>tol){cur=0;miss=0;}}
     d=addDays(d,1);}return best;}
-function weekSeconds(){let t=0;for(let i=0;i<7;i++)t+=secondsOnDay(dkey(addDays(new Date(),-i)));return t;}
-function weekDays(){let n=0;for(let i=0;i<7;i++)if(secondsOnDay(dkey(addDays(new Date(),-i)))>0)n++;return n;}
+// Secondes jouées par jour, un seul balayage des séances (évite N filtres complets dans les boucles).
+function secondsByDay(){const m={};playSessions().forEach(s=>{m[s.date]=(m[s.date]||0)+sessionSeconds(s);});return m;}
+function weekSeconds(){const m=secondsByDay();let t=0;for(let i=0;i<7;i++)t+=m[dkey(addDays(new Date(),-i))]||0;return t;}
+function weekDays(){const m=secondsByDay();let n=0;for(let i=0;i<7;i++)if((m[dkey(addDays(new Date(),-i))]||0)>0)n++;return n;}
 // Objectif adouci ~7 jours après une reprise de vacances (facteur 0.6, arrondi au multiple de 5).
 function todayGoal(){
   const base=S.settings.dailyGoal||30;
