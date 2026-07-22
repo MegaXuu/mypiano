@@ -10,6 +10,48 @@ async function boot(){
   try{maybeNotifyMonth();}catch(e){}
   // Retour de vacances automatique : la date prévue est dépassée dès le premier lancement suivant.
   try{if(S.vacation&&S.vacation.on&&S.vacation.until&&dkey()>S.vacation.until)stopVacation(true);}catch(e){}
+  try{maybeWelcome();}catch(e){}
+}
+
+/* ---------- Premier lancement (V5-3) ----------
+   Feuille de bienvenue sobre, seulement sur état vierge et jamais revue ensuite
+   (marqueur S.onboarded). Trois écrans dans la même feuille. */
+let _wName='',_wGoal=20;
+function maybeWelcome(){
+  if(S.onboarded)return;
+  if(S.pieces.length||S.sessions.length)return; // sécurité : état déjà rempli
+  _wName='';_wGoal=20;
+  welcomeStep(1);
+}
+function welcomeStep(n){
+  const ni=document.getElementById('w-name');if(ni)_wName=ni.value; // garde la saisie entre les écrans
+  if(n===1){
+    openSheet(`<h3>Bienvenue</h3>
+      <p class="muted sheet-sub">Un carnet pour ta pratique du piano : chronométrer tes séances, noter ton travail, garder le fil de tes progrès.</p>
+      <p class="muted">Tout reste sur cet appareil — rien n'est envoyé sur un serveur.</p>
+      <button class="btn primary btn-full mt18" onclick="welcomeStep(2)">Continuer</button>`);
+  }else if(n===2){
+    openSheet(`<h3>Faisons connaissance</h3>
+      <div class="field"><label>Ton prénom (facultatif)</label><input id="w-name" type="text" value="${esc(_wName)}"></div>
+      <p class="muted sheet-sub">Objectif du jour — une durée à viser, tu peux la dépasser.</p>
+      <div class="stepper"><button onclick="wGoalStep(-5)">–</button><div class="v"><span id="w-goal">${_wGoal}</span> min</div><button onclick="wGoalStep(5)">+</button></div>
+      <button class="btn primary btn-full mt18" onclick="welcomeStep(3)">Continuer</button>`);
+  }else{
+    openSheet(`<h3>Ton premier morceau</h3>
+      <p class="muted sheet-sub">Ajoute une pièce que tu travailles, ou explore l'app d'abord à ton rythme.</p>
+      <button class="btn primary btn-full mt18" onclick="finishWelcome(true)">Ajouter un morceau</button>
+      <button class="btn ghost sm btn-full mt10" onclick="finishWelcome(false)">Explorer d'abord</button>`);
+  }
+}
+function wGoalStep(d){_wGoal=Math.max(5,_wGoal+d);const e=document.getElementById('w-goal');if(e)e.textContent=_wGoal;}
+function finishWelcome(addPiece){
+  const ni=document.getElementById('w-name');if(ni)_wName=ni.value;
+  const nm=(_wName||'').trim();
+  S.settings.userName=nm||null;
+  S.settings.dailyGoal=_wGoal;
+  S.onboarded=true;
+  save();closeSheet();renderHome();
+  if(addPiece)addChoiceSheet();
 }
 try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();}catch(e){}
 const READY=boot();

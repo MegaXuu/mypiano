@@ -41,8 +41,10 @@ carnet de travail, et se motiver par la gamification. Cible : iPhone (PWA instal
     = liste/filtres/ajout ; `piece-detail.js` = fiche `pieceDetail` + sections/mesures + découpage ;
     `parcours.js` = écran unifié Parcours (rang + défis + activité + dépliants) + Stats/aperçus/
     rétrospective (fusion Voyage+Stats, V5-2) ; `settings.js` =
-    réglages + export/import ; `gamification.js` = notes/succès (~98)/défis + cartes/célébrations +
-    révision ; `plan.js` = plan guidé + concert + rapports + notifications ; `boot.js` = démarrage.
+    réglages + profil (`userName`) + export/import + partage/à propos/réinitialisation (V5-3) ;
+    `gamification.js` = notes/succès (~98)/défis + cartes/célébrations +
+    révision ; `plan.js` = plan guidé + concert + rapports + notifications ; `boot.js` = démarrage
+    + premier lancement (`maybeWelcome`, feuille de bienvenue sur état vierge, V5-3).
 - `opus.js` — base de compositeurs (7 favoris avec id, ~100 en tout) + helpers API Open Opus. **Dans `js/`.**
 - `sw.js` — service worker (cache hors-ligne), **à la racine** (portée = son emplacement). **Incrémenter
   `CACHE` à chaque release** (`piano-b3-N`) ; `ASSETS` liste les 13 fichiers `./js/*.js`.
@@ -124,7 +126,8 @@ carnet de travail, et se motiver par la gamification. Cible : iPhone (PWA instal
   `js/session.js`/`js/carnet.js`), hors du sous-total temps/jours de la semaine.
 - `journal{date:{mood,energy}}` — capturé en **fin de séance** (`carnetSheet`, bloc repliable « facultatif » sous le ressenti), pas d'écran dédié. `opusCache{composer:[works]}`.
   (`wishlist[]` **fusionnée** dans `pieces` via `status:'wishlist'` — migration auto dans `migrate()`, tableau conservé vide. Accessible uniquement via le filtre « Apprendre » du Répertoire.)
-- `challenges{week,month,log[]}`, `settings{tolerance,dailyGoal,weeklyTime,weeklyDays,monthly,revisionDays,estimates,notif{…,monthly},theme,nas{},planPrefs{dur,n,intent}}`. `weeklyTime`/`monthly` peuvent être `null` (« non défini » → alerte accueil). `planPrefs` (V4-3) mémorise les derniers réglages de la feuille de composition du plan guidé.
+- `challenges{week,month,log[]}`, `settings{userName,tolerance,dailyGoal,weeklyTime,weeklyDays,monthly,revisionDays,estimates,notif{…,monthly},theme,nas{},planPrefs{dur,n,intent}}`. `weeklyTime`/`monthly` peuvent être `null` (« non défini » → alerte accueil). `planPrefs` (V4-3) mémorise les derniers réglages de la feuille de composition du plan guidé. `userName` (V5-3, défaut `null`) = prénom du salut d'accueil, éditable dans Réglages → Profil (jamais de prénom en dur). `nas` (`{enabled,ip,last}`) est un **champ mort** depuis V5-3 : conservé pour la compat des exports, **plus aucune UI** (bloc « Sauvegarde NAS » retiré).
+- `onboarded` (bool, racine de `S`, V5-3) : marqueur de premier lancement. `false` par défaut ; la feuille de bienvenue (`maybeWelcome`, `js/boot.js`) ne s'ouvre que si `!onboarded` **et** aucune pièce ni séance, puis le passe à `true` (jamais revue ensuite). Migration : `true` d'office dès qu'il existe des données, pour ne pas l'imposer à l'installation actuelle. `doReset` (`js/settings.js`) le remet à `false` → re-bienvenue.
 - `vacation{on,from,until,resumedAt}` (V4-4, mode vacances) : `from`/`until` (dates, `until`
   facultative) délimitent la période gelée — conservées après la reprise (`on:false`) pour que
   `isVacationDay(k)` reste vraie rétroactivement sur cette période (gel de série historique,
@@ -434,11 +437,20 @@ niveaux de cartes compositeurs (Bronze/Argent/Or) ont leurs propres teintes de m
   Trois listes miroir à jour (`index.html`, `sw.js` → 13 js, `test.mjs`). Étendu au passage :
   catalogue de succès **25 → 98** (16 familles, `tier` Facile/Moyen/Difficile + `desc` permanente,
   ids historiques conservés) — voir « Gamification ».
-  - **À venir** : V5-3 réglages & partage (`settings.userName` — le
-  « Bonjour Florian » de `js/home.js` est codé en dur —, feuille de bienvenue sur état vierge
-  avec marqueur `S.onboarded`, retrait de l'UI NAS morte, partage de l'URL, à propos,
-  réinitialisation ; les données étant par appareil, rien à cloisonner pour un second
-  utilisateur) ; V5-4 élagage résiduel + polish + QA. Décisions cadrées : priorités =
+  - **V5-3 (Bêta 5.3)** ✅ : réglages & partage, app donnable à un ami telle quelle.
+  Profil `settings.userName` (défaut `null`, migré) → salut d'accueil `userName ? 'Bonjour '
+  +nom : 'Bonjour'` (`js/home.js`, plus de « Bonjour Florian » en dur) ; groupe **Profil** en
+  tête des Réglages (`editName`/`saveName`, vide autorisé). Premier lancement `maybeWelcome`/
+  `welcomeStep`/`finishWelcome` (`js/boot.js`) : feuille de bienvenue en 3 écrans (présentation +
+  données locales / prénom + objectif / premier morceau ou explorer), **seulement sur état
+  vierge** (aucune pièce ni séance), marqueur `S.onboarded` (jamais revue ensuite ; migration
+  `true` si données présentes). Réglages nettoyés : bloc « Sauvegarde NAS » retiré (`settings.nas`
+  reste en base, plus d'UI, `toggleNas` supprimé) ; groupe Données enrichi — `shareApp`
+  (`navigator.share` de `location.origin+pathname`, repli presse-papier, aucune donnée perso),
+  `aboutSheet` (données 100 % locales + conseil d'export + version), `resetSheet`/`doReset`
+  (feuille en deux temps : export d'abord, puis danger → `S=defaults()` + `idbClearRecordings()`
+  + `saveNow()` → accueil vierge → re-bienvenue).
+  - **À venir** : V5-4 élagage résiduel + polish + QA. Décisions cadrées : priorités =
   démarrage + navigation + réglages/partage (carnet de fin et refonte accueil hors périmètre,
   candidats V6) ; élagage au cas par cas (seuls Jardin, fractionné et UI NAS retirés,
   défis/cartes/concert/vacances conservés) ; maquette à valider avant de coder pour V5-1 et V5-2.

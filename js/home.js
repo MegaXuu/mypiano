@@ -19,7 +19,7 @@ function renderHome(){
     </div>
     ${vac?vacationBannerHtml():''}
     ${st?`<div class="tag home-rank-tag cur">${noteIcon(st.c,17,rankGlyph(st))}<span class="home-rank-name">${st.n}</span><span class="muted">· ${Math.floor(totalSeconds()/3600)} h</span></div>`:`<div class="tag home-rank-tag">Début du voyage</div>`}
-    <h1 class="home-title">Bonjour Florian</h1>
+    <h1 class="home-title">${S.settings.userName?'Bonjour '+esc(S.settings.userName):'Bonjour'}</h1>
     <div class="filet"></div>
 
     <div class="home-chips">

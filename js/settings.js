@@ -6,6 +6,9 @@ function renderSettings(){
   document.getElementById('s-settings').innerHTML=`
     <button class="btn ghost sm set-back" onclick="go('home')">‹ Accueil</button>
     <h1>Réglages</h1>
+    <div class="eyebrow set-group-label">Profil</div><div class="card set-card">
+      ${setLine('Prénom',S.settings.userName?esc(S.settings.userName):'Non défini',"editName()")}
+    </div>
     <div class="eyebrow set-group-label">Objectifs</div><div class="card set-card">
       ${setLine('Objectif du jour',S.settings.dailyGoal+' min',"editNum('dailyGoal','Objectif du jour (min)')")}
       ${setLine('Hebdo · temps',S.settings.weeklyTime==null?'Non défini':Math.round(S.settings.weeklyTime/60*10)/10+' h',"editNum('weeklyTime','Objectif hebdo (min)',true)")}
@@ -38,10 +41,9 @@ function renderSettings(){
       ${setLine('Exporter tout (JSON)',S.lastBackup?'le '+new Date(S.lastBackup).toLocaleDateString('fr-FR'):'jamais',"exportJSON()")}
       ${setLine('Importer un JSON','',"importJSON()")}
       ${setLine('Enrichir la base d’œuvres',Object.values(S.opusCache||{}).reduce((a,x)=>a+x.length,0)?Object.values(S.opusCache).reduce((a,x)=>a+x.length,0)+' œuvres':'hors-ligne',"syncOpus(true)")}
-    </div>
-    <div class="card mt14">
-      <div class="between"><span class="fw600">Sauvegarde NAS</span><div class="toggle ${S.settings.nas.enabled?'on':''}" onclick="toggleNas()"></div></div>
-      <p class="muted set-hint">${S.settings.nas.enabled?'Prépare l\'envoi des sauvegardes vers ton NAS (configuration en étape B).':'Désactivé. Ton NAS pourra recevoir des sauvegardes automatiques plus tard.'}</p>
+      ${setLine('Partager l’app','',"shareApp()")}
+      ${setLine('À propos','',"aboutSheet()")}
+      ${setLine('Réinitialiser l’app','',"resetSheet()")}
     </div>
     <p class="muted num it set-version">MyPiano · ${APP_VERSION}</p>
     <input type="file" id="imp" accept="application/json" style="display:none" onchange="doImport(event)">`;
@@ -53,8 +55,45 @@ function setTol(t){S.settings.tolerance=t;save();renderSettings();toast('Toléra
 function editNum(field,label,clearable){openSheet(`<h3>${label}</h3><div class="field"><input id="en" type="number" inputmode="numeric" value="${S.settings[field]==null?'':S.settings[field]}"></div><button class="btn primary" onclick="saveNum('${field}')">Valider</button>${clearable?`<button class="btn ghost sm btn-full mt10" onclick="clearNum('${field}')">Non défini</button>`:''}`);}
 function saveNum(field){const v=parseInt(document.getElementById('en').value);if(v>0){S.settings[field]=v;save();}closeSheet();renderSettings();}
 function clearNum(field){S.settings[field]=null;save();closeSheet();renderSettings();}
-function toggleNas(){S.settings.nas.enabled=!S.settings.nas.enabled;save();renderSettings();}
 function togEstimates(el){S.settings.estimates=S.settings.estimates===false?true:false;el.classList.toggle('on');save();}
+
+/* ---------- Profil / partage / à propos / réinitialisation (V5-3) ---------- */
+function editName(){
+  openSheet(`<h3>Ton prénom</h3>
+    <p class="muted sheet-sub">Sert à te saluer sur l'accueil. Peut rester vide.</p>
+    <div class="field"><input id="un" type="text" value="${esc(S.settings.userName||'')}"></div>
+    <button class="btn primary" onclick="saveName()">Valider</button>`);
+}
+function saveName(){const v=(document.getElementById('un').value||'').trim();S.settings.userName=v||null;save();closeSheet();renderSettings();}
+function shareApp(){
+  const url=location.origin+location.pathname;
+  if(navigator.share){navigator.share({title:'MyPiano',url:url}).catch(()=>{});return;}
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(url).then(()=>toast('Lien copié')).catch(()=>toast('Copie impossible',{danger:true}));return;}
+  toast('Partage indisponible',{danger:true});
+}
+function aboutSheet(){
+  openSheet(`<h3>À propos</h3>
+    <p class="muted sheet-sub">MyPiano — un carnet de pratique du piano : séances chronométrées, journal de travail, suivi des progrès.</p>
+    <p class="muted">Tes données vivent à 100 % sur cet appareil. Rien n'est envoyé sur un serveur, personne d'autre n'y a accès.</p>
+    <p class="muted">Pense à exporter un JSON de temps en temps, et surtout avant de changer d'appareil ou d'adresse : le stockage est lié à cette adresse.</p>
+    <p class="muted num it set-version">MyPiano · ${APP_VERSION}</p>
+    <button class="btn ghost sm btn-full mt10" onclick="closeSheet()">Fermer</button>`);
+}
+function resetSheet(){
+  openSheet(`<h3>Réinitialiser l'app</h3>
+    <p class="muted sheet-sub">Efface toutes tes données de cet appareil — morceaux, séances, enregistrements, réglages. Sans retour possible.</p>
+    <button class="btn ghost btn-full mt18" onclick="exportJSON()">Exporter mes données d'abord</button>
+    <button class="btn danger btn-full mt10" onclick="doReset()">Tout effacer</button>
+    <button class="btn ghost sm btn-full mt10" onclick="closeSheet()">Annuler</button>`);
+}
+async function doReset(){
+  S=defaults();
+  try{await idbClearRecordings();}catch(e){}
+  await saveNow();
+  closeSheet();go('home');
+  try{maybeWelcome();}catch(e){}
+}
 
 /* ---------- Export / Import ---------- */
 function download(name,text,type){const b=new Blob([text],{type});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),800);}

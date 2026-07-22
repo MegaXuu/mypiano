@@ -8,7 +8,7 @@
 
 const KEY = 'pianoV2';
 const IMPROV = '__improv__';
-const APP_VERSION = 'Bêta 5.2a'; // à synchroniser avec CACHE dans sw.js à chaque release
+const APP_VERSION = 'Bêta 5.3'; // à synchroniser avec CACHE dans sw.js à chaque release
 
 const STONES = [
   {n:'Apprenti',h:10,c:'#E0A83B'},{n:'Élève',h:20,c:'#C9CDDA'},{n:'Musicien',h:30,c:'#9BA0AE'},
@@ -34,8 +34,8 @@ const IDB_VERSION = 1;
 
 function defaults(){
   return {pieces:[],sessions:[],wishlist:[],journal:{},opusCache:{},challenges:{week:null,month:null,log:[]},
-    vacation:{on:false,from:null,until:null,resumedAt:null},
-    settings:{tolerance:1,dailyGoal:30,weeklyTime:null,weeklyDays:5,monthly:null,
+    vacation:{on:false,from:null,until:null,resumedAt:null},onboarded:false,
+    settings:{userName:null,tolerance:1,dailyGoal:30,weeklyTime:null,weeklyDays:5,monthly:null,
       notif:{daily:true,dailyTime:'17:00',streak:true,weekly:true,palier:true,monthly:true},theme:'dark',nas:{enabled:false,ip:'',last:''},
       planPrefs:{dur:60,n:2,intent:'equilibre'}}};
 }
@@ -44,11 +44,13 @@ function migrate(r){r.pieces=r.pieces||[];r.sessions=r.sessions||[];r.wishlist=r
   r.vacation=Object.assign({on:false,from:null,until:null,resumedAt:null},r.vacation||{});
   // Fusion : la wishlist devient un statut du répertoire ('à apprendre').
   if(r.wishlist.length){r.wishlist.forEach(w=>{r.pieces.push({id:w.id||(Date.now().toString(36)+Math.random().toString(36).slice(2,6)),title:w.title||'',composer:w.composer||'',epoch:w.epoch||'',opus:'',genre:'',key:'',diff:0,bpm:'',status:'wishlist',progress:0,tags:[],notes:[],todo:'',createdAt:Date.now()});});r.wishlist=[];}
-  r.settings=Object.assign({tolerance:1,dailyGoal:30,weeklyTime:null,weeklyDays:5,monthly:null,
+  r.settings=Object.assign({userName:null,tolerance:1,dailyGoal:30,weeklyTime:null,weeklyDays:5,monthly:null,
     notif:{daily:true,dailyTime:'17:00',streak:true,weekly:true,palier:true,monthly:true},theme:'dark',nas:{enabled:false,ip:'',last:''},
     planPrefs:{dur:60,n:2,intent:'equilibre'}},r.settings||{});
   r.settings.planPrefs=Object.assign({dur:60,n:2,intent:'equilibre'},r.settings.planPrefs||{});
   r.pieces.forEach(p=>{if(p.status==='mastered'&&!p.revInterval)p.revInterval=r.settings.revisionDays||18;});
+  // Premier lancement (V5-3) : jamais imposé à une installation qui a déjà des données.
+  if(r.onboarded===undefined)r.onboarded=!!(r.pieces.length||r.sessions.length);
   return r;}
 
 let S = defaults();
@@ -117,6 +119,18 @@ function idbDelBlob(id){
     try{
       const tx=_db.transaction('recordings','readwrite');
       tx.objectStore('recordings').delete(id);
+      tx.oncomplete=()=>resolve(true);
+      tx.onerror=()=>resolve(false);
+    }catch(e){resolve(false);}
+  });
+}
+// Vide tous les enregistrements audio (réinitialisation de l'app, V5-3).
+function idbClearRecordings(){
+  return new Promise(resolve=>{
+    if(!_db){resolve(false);return;}
+    try{
+      const tx=_db.transaction('recordings','readwrite');
+      tx.objectStore('recordings').clear();
       tx.oncomplete=()=>resolve(true);
       tx.onerror=()=>resolve(false);
     }catch(e){resolve(false);}

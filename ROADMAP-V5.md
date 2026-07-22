@@ -43,7 +43,7 @@
 |------|---------|---------|
 | ☑ V5-1 | Bêta 5.1 | Programme du jour : un seul « Jouer », feuille de confirmation, retrait du fractionné |
 | ☑ V5-2 | Bêta 5.2 | Navigation : 4 onglets, écran « Parcours » (fusion Voyage+Stats), retrait du Jardin |
-| ☐ V5-3 | Bêta 5.3 | Réglages & partage : profil, premier lancement, à propos, réinitialisation, retrait NAS |
+| ☑ V5-3 | Bêta 5.3 | Réglages & partage : profil, premier lancement, à propos, réinitialisation, retrait NAS |
 | ☐ V5-4 | Bêta 5.4 | Élagage résiduel, polish transversal, QA, checklist iPhone |
 
 ---
@@ -182,13 +182,31 @@ Jardin). Termine par un commit (message français).
 
 ---
 
-## Lot V5-3 — Réglages & partage (Bêta 5.3)
+## Lot V5-3 — Réglages & partage (Bêta 5.3) ✅
 
 **But** : l'app devient donnable à un ami telle quelle — on se présente au premier
 lancement, rien dans l'interface ne suppose Florian, et les Réglages expliquent où
 vivent les données.
 
-**Prompt à coller :**
+**Livré (Bêta 5.3)** : profil `S.settings.userName` (défaut `null`, migré) — le salut
+de l'accueil devient `userName ? 'Bonjour '+nom : 'Bonjour'` (js/home.js), jamais de
+prénom inventé ; groupe **Profil** en tête des Réglages (ligne « Prénom », feuille
+`editName`/`saveName`, vide autorisé). Premier lancement (js/boot.js, `maybeWelcome` +
+`welcomeStep`/`finishWelcome`) : feuille de bienvenue en 3 écrans (présentation + données
+locales / prénom + objectif du jour / premier morceau ou explorer), **seulement sur état
+vierge** (aucune pièce ni séance) et jamais revue ensuite — marqueur `S.onboarded`
+(migration : `true` dès qu'il existe des données, pour ne pas l'imposer à l'installation
+actuelle). Réglages nettoyés (js/settings.js) : bloc « Sauvegarde NAS » **retiré**
+(toggle mort ; `settings.nas` conservé en base pour la compat des exports, plus aucune UI ;
+`toggleNas` supprimé). Groupe **Données** enrichi : « Partager l'app » (`shareApp` —
+`navigator.share` de `location.origin+pathname`, repli presse-papier + toast, aucune donnée
+perso dans l'URL), « À propos » (`aboutSheet` — données 100 % locales, conseil d'export,
+version), « Réinitialiser l'app » (`resetSheet`/`doReset` — feuille en deux temps : export
+d'abord, puis bouton danger → `S=defaults()`, `idbClearRecordings()`, `saveNow()`, retour
+accueil vierge → re-bienvenue). Portabilité vérifiée par grep : seul le salut de l'accueil
+supposait Florian (« MyPiano » est un nom d'app générique, conservé).
+
+**Prompt (archive) :**
 
 ```
 Lot V5-3 du cycle « Épure » (voir ROADMAP-V5.md, V5-1 et V5-2 livrés) — Bêta 5.3.
