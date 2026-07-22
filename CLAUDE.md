@@ -397,7 +397,25 @@ niveaux de cartes compositeurs (Bronze/Argent/Or) ont leurs propres teintes de m
     `lastWeekReport` ne refiltrent plus toutes les séances 7× (14 balayages complets sur l'accueil
     → 2). Aucun changement de comportement (mêmes valeurs), couvert par `npm test`.
 
-- **Reporté en V5+** : thème clair « Nacre » ; **sauvegarde auto vers NAS Synology** (on reste
+- **Cycle V5 « Épure » (validé 2026-07-21) — À VENIR** : rendre l'app la plus simple et
+  intuitive possible, principe « l'app propose, tu valides » (= moins de décisions), et
+  donnable à un ami telle quelle. 4 lots = Bêta 5.1 → 5.4, **détail + prompts dans
+  `ROADMAP-V5.md`** : V5-1 programme du jour (un seul CTA « Jouer » → feuille de confirmation
+  avec plan déjà composé via `generatePlan`/`planPrefs`, dépliant « Ajuster », lien
+  « Autrement… » vers séance libre/concert/séance oubliée ; retrait complet du fractionné
+  25/5) ; V5-2 navigation (tab bar à 4 onglets Accueil·Carnet·Répertoire·Parcours, fusion
+  Voyage+Stats en un écran défilant sans sous-onglets, retrait complet du Jardin, fusion
+  `voyage.js`+`stats.js` → `parcours.js`) ; V5-3 réglages & partage (`settings.userName` — le
+  « Bonjour Florian » de `js/home.js` est codé en dur —, feuille de bienvenue sur état vierge
+  avec marqueur `S.onboarded`, retrait de l'UI NAS morte, partage de l'URL, à propos,
+  réinitialisation ; les données étant par appareil, rien à cloisonner pour un second
+  utilisateur) ; V5-4 élagage résiduel + polish + QA. Décisions cadrées : priorités =
+  démarrage + navigation + réglages/partage (carnet de fin et refonte accueil hors périmètre,
+  candidats V6) ; élagage au cas par cas (seuls Jardin, fractionné et UI NAS retirés,
+  défis/cartes/concert/vacances conservés) ; maquette à valider avant de coder pour V5-1 et V5-2.
+
+- **Reporté en V6+** : carnet de fin de séance allégé (deux temps) ; refonte complète de
+  l'accueil ; thème clair « Nacre » ; **sauvegarde auto vers NAS Synology** (on reste
   sur GitHub Pages quelques mois) ; synchro multi-appareils ; éventuelle migration React+TS+Vite
   ou app SwiftUI native ; push iOS réel (serveur VAPID).
 
