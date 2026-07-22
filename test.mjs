@@ -24,7 +24,7 @@ const read = f => readFileSync(root + f, 'utf8');
 // pour rester robuste, puis on ajoute les accesseurs (même scope lexical).
 const FILES = [
   'js/opus.js', 'js/state.js', 'js/ui.js', 'js/home.js', 'js/session.js', 'js/carnet.js',
-  'js/repertoire.js', 'js/piece-detail.js', 'js/voyage.js', 'js/stats.js', 'js/settings.js',
+  'js/repertoire.js', 'js/piece-detail.js', 'js/parcours.js', 'js/settings.js',
   'js/gamification.js', 'js/plan.js', 'js/boot.js',
 ];
 const bundle = FILES.map(read).join('\n');
@@ -125,9 +125,11 @@ try {
 // 3) Batterie d'appels : chaque fonction ne doit pas throw.
 const call = (label, fn) => { try { fn(); } catch (e) { onError(label, e); } };
 
-['home', 'carnet', 'rep', 'voyage', 'stats', 'settings'].forEach(scr =>
+['home', 'carnet', 'rep', 'parcours', 'settings'].forEach(scr =>
   call(`go('${scr}')`, () => win.go(scr))
 );
+// Alias hérités Voyage/Stats → Parcours (V5-2).
+call("go('voyage'/'stats') alias", () => { win.go('voyage'); win.go('stats'); });
 call("renderRep('active')", () => win.setRep('active'));
 call("renderRep('mastered')", () => win.setRep('mastered'));
 call("renderRep('wishlist')", () => win.setRep('wishlist'));
@@ -137,7 +139,8 @@ call('piecePhase(tous)', () => S && S.pieces.forEach(p => win.piecePhase(p)));
 call('findDuplicate', () => { if (!win.findDuplicate('nocturne op.9 no2', 'CHOPIN')) throw new Error('doublon non détecté'); });
 call('addPieceSheet', () => win.addPieceSheet());
 call('startSheet', () => win.startSheet());
-call('setVoyage(sous-onglets)', () => ['voyage', 'jardin', 'succes'].forEach(t => win.setVoyage && win.setVoyage(t)));
+call('parcours dépliants', () => { win.go('parcours'); ['succes', 'rep', 'cartes', 'records'].forEach(k => { win.toggleParc(k); win.toggleParc(k); }); win.toggleVoyageRanks(); win.toggleVoyageRanks(); });
+call('succesGrid/succesCount', () => { if (!win.succesGrid()) throw new Error('succesGrid vide'); win.succesCount(); });
 call('lastMonthReport', () => win.lastMonthReport());
 
 // 3bis) Sections & mesures (V3 étape 2).

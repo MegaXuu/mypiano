@@ -1,7 +1,7 @@
-const CACHE = 'piano-b5-1';
+const CACHE = 'piano-b5-2';
 const ASSETS = ['./','./index.html',
   './js/opus.js','./js/state.js','./js/ui.js','./js/home.js','./js/session.js','./js/carnet.js',
-  './js/repertoire.js','./js/piece-detail.js','./js/voyage.js','./js/stats.js','./js/settings.js',
+  './js/repertoire.js','./js/piece-detail.js','./js/parcours.js','./js/settings.js',
   './js/gamification.js','./js/plan.js','./js/boot.js',
   './manifest.webmanifest','./icon-180.png','./icon-192.png','./icon-512.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting())); });

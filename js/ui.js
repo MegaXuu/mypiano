@@ -4,13 +4,14 @@
    ========================================================================== */
 const FULL = {session:1,settings:1};
 function go(name){
+  if(name==='voyage'||name==='stats')name='parcours'; // alias hérités (V5-2 : Voyage+Stats fusionnés)
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   const el=document.getElementById('s-'+name);
   el.classList.add('active');
   document.getElementById('tabbar').style.display = FULL[name]?'none':'flex';
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.s===name));
   window.scrollTo(0,0);
-  ({home:renderHome,carnet:renderCarnet,rep:renderRep,voyage:renderVoyage,stats:renderStats,settings:renderSettings}[name]||(()=>{}))();
+  ({home:renderHome,carnet:renderCarnet,rep:renderRep,parcours:renderParcours,settings:renderSettings}[name]||(()=>{}))();
   staggerScreen(el);
 }
 function reduceMotion(){return !!(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches);}

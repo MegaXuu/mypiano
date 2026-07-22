@@ -506,8 +506,11 @@ a{color:var(--acc);}
 .cutw-gap-row{font-size:12px;color:var(--t2);padding:6px 2px;}
 
 /* ---------- Voyage (Lot R5) ---------- */
-.voy-tabs{margin:16px 0;}
-.voy-tabs button{font-size:12px;}
+.parc-fold{width:100%;display:flex;align-items:center;gap:12px;padding:16px 2px;margin-top:12px;background:none;border:none;border-top:1px solid var(--hairline);color:var(--tp);font-family:var(--serif);font-size:21px;text-align:left;cursor:pointer;}
+.parc-fold-title{flex:1;min-width:0;}
+.parc-fold-meta{font-family:var(--sans);font-size:12px;color:var(--t2);}
+.parc-fold-caret{font-family:var(--sans);font-size:20px;color:var(--t2);width:18px;text-align:center;flex:0 0 auto;line-height:1;}
+.parc-fold-body{padding-top:2px;}
 .voy-rank-card{padding:26px 20px 22px;text-align:center;}
 .voy-rank-medal{position:relative;width:88px;height:88px;margin:0 auto 14px;}
 .voy-rank-medal-glow{position:absolute;inset:-14px;border-radius:50%;background:radial-gradient(circle,rgba(228,197,138,.24),transparent 70%);}
@@ -536,12 +539,7 @@ a{color:var(--acc);}
 .voy-rank-row.current .voy-rank-row-name{color:var(--tp);}
 .voy-rank-row-tag{padding:2px 8px;}
 .voy-ranks-toggle{width:100%;margin-top:14px;}
-
-.voy-jardin-frame{padding:0;overflow:hidden;}
-.voy-jardin-foot{padding:14px 16px 16px;text-align:center;}
-.voy-jardin-title{font-size:19px;color:var(--gold);}
-.voy-jardin-sub{font-size:13px;margin-top:5px;color:var(--t2);}
-.voy-jardin-note{font-size:12px;text-align:center;margin-top:10px;line-height:1.5;}
+.voy-defi-card:first-of-type{margin-top:2px;}
 
 .voy-defi-card{margin-bottom:12px;}
 .voy-defi-card.done{box-shadow:inset 0 0 0 1px rgba(228,197,138,.3);}
@@ -563,8 +561,12 @@ a{color:var(--acc);}
 .voy-ach-glyph{font-size:22px;line-height:1;}
 .voy-ach-glyph.on{color:var(--gold);}
 .voy-ach-glyph.off{color:var(--t2);}
+.voy-ach-card{display:flex;flex-direction:column;}
 .voy-ach-label{font-size:12px;font-weight:600;margin-top:7px;line-height:1.2;}
-.voy-ach-reward{font-size:10px;margin-top:3px;}
+.voy-ach-desc{font-size:10px;margin-top:4px;line-height:1.3;flex:1;}
+.voy-ach-foot{margin-top:7px;font-size:10px;gap:6px;}
+.voy-ach-tier{color:var(--t2);}
+.voy-ach-reward{font-size:10px;color:var(--t2);}
 
 .voy-cartes-intro{font-size:13px;margin:0 0 12px;}
 .voy-card-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
@@ -608,8 +610,6 @@ a{color:var(--acc);}
 
 /* ---------- Statistiques (Lot R5) ---------- */
 .stat-hero-grid{margin-top:16px;}
-.stat-tabs{margin:16px 0 4px;}
-.stat-tabs button{font-size:12px;}
 .stat-card-head{margin-bottom:6px;}
 .stat-card-title{font-weight:600;}
 .stat-card-sub{font-size:13px;color:var(--t2);}
@@ -708,8 +708,7 @@ a{color:var(--acc);}
   <section id="s-session" class="screen"></section>
   <section id="s-carnet" class="screen"></section>
   <section id="s-rep" class="screen"></section>
-  <section id="s-voyage" class="screen"></section>
-  <section id="s-stats" class="screen"></section>
+  <section id="s-parcours" class="screen"></section>
   <section id="s-settings" class="screen"></section>
 </div>
 
@@ -720,10 +719,8 @@ a{color:var(--acc);}
     <svg viewBox="0 0 24 24"><rect x="5" y="3.5" width="14" height="17" rx="2"/><path d="M8.5 8h7M8.5 12h7M8.5 16h4"/></svg>Carnet</button>
   <button class="tab" data-s="rep" onclick="go('rep')">
     <svg viewBox="0 0 24 24"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.4"/><circle cx="16.5" cy="16" r="2.4"/></svg>Répertoire</button>
-  <button class="tab" data-s="voyage" onclick="go('voyage')">
-    <svg viewBox="0 0 24 24"><path d="M4 17c3-6 5-6 8-3M12 6c2 3 4 3 8 1"/><circle cx="18" cy="15" r="2"/><path d="M20 15V8"/></svg>Voyage</button>
-  <button class="tab" data-s="stats" onclick="go('stats')">
-    <svg viewBox="0 0 24 24"><path d="M4 15l5-5 4 4 7-8"/><path d="M4 20h16"/></svg>Stats</button>
+  <button class="tab" data-s="parcours" onclick="go('parcours')">
+    <svg viewBox="0 0 24 24"><path d="M4 17c3-6 5-6 8-3M12 6c2 3 4 3 8 1"/><circle cx="18" cy="15" r="2"/><path d="M20 15V8"/></svg>Parcours</button>
 </nav>
 
 <div class="sheet-bg" id="sheet-bg"><div class="sheet" id="sheet"></div></div>
@@ -742,8 +739,7 @@ a{color:var(--acc);}
 <script src="js/carnet.js"></script>
 <script src="js/repertoire.js"></script>
 <script src="js/piece-detail.js"></script>
-<script src="js/voyage.js"></script>
-<script src="js/stats.js"></script>
+<script src="js/parcours.js"></script>
 <script src="js/settings.js"></script>
 <script src="js/gamification.js"></script>
 <script src="js/plan.js"></script>

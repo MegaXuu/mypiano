@@ -232,6 +232,6 @@ function togglePMore(){const m=document.getElementById('p-more'),b=document.getE
   const open=m.classList.contains('show');m.classList.toggle('show');if(b)b.textContent=open?'Détails (facultatif) ⌄':'Masquer les détails ⌃';}
 function setPieceStatus(id,st){pieceById(id).status=st;save();closeSheet();renderRep();toast(st==='archived'?'Archivé':'Abandonné');}
 function refreshScreen(){const a=document.querySelector('.screen.active');if(!a)return;const n=a.id.replace('s-','');
-  ({home:renderHome,carnet:renderCarnet,rep:renderRep,voyage:renderVoyage,stats:renderStats,settings:renderSettings}[n]||(()=>{}))();}
+  ({home:renderHome,carnet:renderCarnet,rep:renderRep,parcours:renderParcours,settings:renderSettings}[n]||(()=>{}))();}
 
 /* ---------- Fiche morceau unifiée ---------- */

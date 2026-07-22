@@ -24,8 +24,9 @@ carnet de travail, et se motiver par la gamification. Cible : iPhone (PWA instal
   modules, pas de build). L'ancien `app.js` monolithique (~2130 lignes) a été scindé par domaine
   (Lot E). **Ordre de chargement impératif** (déclaré dans `index.html`, miroir dans `sw.js` et
   `test.mjs`) : `opus.js` → `state.js` → `ui.js` → `home.js` → `session.js` → `carnet.js` →
-  `repertoire.js` → `piece-detail.js` → `voyage.js` → `stats.js` → `settings.js` → `gamification.js`
-  → `plan.js` → **`boot.js` (toujours en dernier)**.
+  `repertoire.js` → `piece-detail.js` → `parcours.js` → `settings.js` → `gamification.js`
+  → `plan.js` → **`boot.js` (toujours en dernier)**. (13 modules `js/*.js` depuis la Bêta 5.2 :
+  `voyage.js` + `stats.js` fusionnés en `parcours.js`.)
   - Les scripts classiques **partagent une portée globale unique** : `function foo()` devient
     `window.foo` (appelable depuis `onclick=` et depuis tout autre fichier) ; `let`/`const` racine
     (dont `let S`, `const READY`) sont des bindings globaux partagés et mutables entre fichiers.
@@ -38,12 +39,13 @@ carnet de travail, et se motiver par la gamification. Cible : iPhone (PWA instal
     purs/dérivés ; `ui.js` = navigation `go`/toast/feuilles ; `home.js` = accueil ; `session.js` =
     séance + audio + carnet de fin ; `carnet.js` = écran Carnet + notes + wishlist ; `repertoire.js`
     = liste/filtres/ajout ; `piece-detail.js` = fiche `pieceDetail` + sections/mesures + découpage ;
-    `voyage.js` = écran Voyage ; `stats.js` = Stats + aperçus + rétrospective ; `settings.js` =
-    réglages + export/import ; `gamification.js` = notes/succès/défis + cartes/Jardin/célébrations +
+    `parcours.js` = écran unifié Parcours (rang + défis + activité + dépliants) + Stats/aperçus/
+    rétrospective (fusion Voyage+Stats, V5-2) ; `settings.js` =
+    réglages + export/import ; `gamification.js` = notes/succès (~98)/défis + cartes/célébrations +
     révision ; `plan.js` = plan guidé + concert + rapports + notifications ; `boot.js` = démarrage.
 - `opus.js` — base de compositeurs (7 favoris avec id, ~100 en tout) + helpers API Open Opus. **Dans `js/`.**
 - `sw.js` — service worker (cache hors-ligne), **à la racine** (portée = son emplacement). **Incrémenter
-  `CACHE` à chaque release** (`piano-b3-N`) ; `ASSETS` liste les 14 fichiers `./js/*.js`.
+  `CACHE` à chaque release** (`piano-b3-N`) ; `ASSETS` liste les 13 fichiers `./js/*.js`.
 - `manifest.webmanifest`, `icon-180/192/512.png`.
 
 ## Lancer / tester
@@ -51,7 +53,7 @@ carnet de travail, et se motiver par la gamification. Cible : iPhone (PWA instal
   persistant, IndexedDB) exigent du **HTTPS** (ou `localhost`) — une IP `http://` ne suffit pas.
 - **Vérif syntaxe** : `node --check js/<fichier>.js` (par fichier ; chaque module doit parser seul).
 - **Test fumée** (recommandé après chaque changement) : `npm test` — charge `index.html` sous `jsdom`
-  (avec `fake-indexeddb` injecté, `jsdom` n'a pas IndexedDB nativement) en inlinant les 14 fichiers
+  (avec `fake-indexeddb` injecté, `jsdom` n'a pas IndexedDB nativement) en inlinant les 13 fichiers
   `js/*.js` **concaténés dans l'ordre de chargement** (voir `FILES` dans `test.mjs`) en un seul
   `<script>`, attend la fin du boot asynchrone (`await window.__ready()`), exécute les fonctions clés
   (`go`, `startSheet`/`beginSession`/`commitSession`, `renderRep`, etc.), vérifie la migration
@@ -83,8 +85,9 @@ carnet de travail, et se motiver par la gamification. Cible : iPhone (PWA instal
   (`playRecording`, un blob chargé à la demande, jamais tous d'un coup) ; URLs objet révoquées à la
   fermeture de feuille (`closeSheet`/`_recUrls`).
 - Chaque écran a une fonction `renderX()` qui construit `innerHTML` de `#s-x`.
-- Navigation : `go(name)` — écrans : `home, session, carnet, rep, voyage, stats, settings`.
-  `FULL={session,settings}` masquent la tab bar.
+- Navigation : `go(name)` — écrans : `home, session, carnet, rep, parcours, settings`.
+  Tab bar à **4 onglets** (Accueil · Carnet · Répertoire · Parcours, V5-2). Alias hérités
+  `go('voyage')`/`go('stats')` → `'parcours'`. `FULL={session,settings}` masquent la tab bar.
 - Feuilles (modales bas d'écran) : `openSheet(html)` / `closeSheet()`. Fermeture aussi par tap en
   dehors, ou par glisser vers le bas depuis la poignée (`.handle`, zone tactile pleine largeur ×
   44px même si la barre visible reste 38×4px) — Pointer Events **capturés sur la poignée elle-même**
@@ -172,9 +175,16 @@ niveaux de cartes compositeurs (Bronze/Argent/Or) ont leurs propres teintes de m
 ## Gamification (repères)
 - **Grand Voyage** : `STONES[]` = 18 rangs honorifiques (Apprenti → Maestro Assoluto) + couleur, seuils 10 h → 10 000 h. Icônes notes `glyphFor(i)` (♩♪♫♬𝄞). Palier via `currentStone()`.
 - **Notes ♪** = prestige (pas de boutique). `baseNotes()` + succès = `notesTotal()`.
-- **Succès** : `achievements()` (6 familles + Notes). **Défis** hebdo/mensuel : `WEEK_POOL/MONTH_POOL`, `checkChallenges()`.
-- **Jardin** : `renderJardin()` (arbre SVG). **Cartes compositeurs** : `renderCartes()` (Bronze/Argent/Or 10/20/30).
-- Écran Voyage = 4 sous-onglets : Voyage / Jardin / Défis / Cartes.
+- **Succès** : `achievements()` — **~98 succès sur 16 familles** (V5-2), chacun avec `tier`
+  (1 Facile / 2 Moyen / 3 Difficile, libellés `ACH_TIERS`) et une courte `desc` toujours affichée.
+  Les 25 ids historiques sont conservés (pas de re-verrouillage). Les récompenses ♪ n'entrent
+  **pas** dans les seuils « Notes » (`n5`/`n20`/… lisent `baseNotes()`, pas le total des succès).
+  Rendu = `succesGrid()`/`succesCount()`. **Défis** hebdo/mensuel : `WEEK_POOL/MONTH_POOL`,
+  `checkChallenges()`, cartes via `defisCards()`.
+- **Cartes compositeurs** : `renderCartes()` (Bronze/Argent/Or 2/5/10). **Jardin retiré** (V5-2).
+- Tout vit dans l'écran **Parcours** (`renderParcours`, `js/parcours.js`) : un seul écran défilant,
+  sans sous-onglets — rang (`rankCardHtml`) + défis + activité visibles, puis dépliants
+  (`parcFold`/`toggleParc`) Succès / Répertoire & aperçus / Cartes / Records & rétrospective.
 
 ## Base de pièces (Open Opus)
 - `opus.js` : `OPUS.COMPOSERS` (7 favoris avec id), `OPUS.ALL` (~100, hors-ligne), `OPUS.WORKS` (curated),
@@ -414,9 +424,17 @@ niveaux de cartes compositeurs (Bronze/Argent/Or) ont leurs propres teintes de m
     (`toggleInterval`, `timer.interval`, phases work/break, `fractionedInsight`) ; champ
     `interval` des anciennes séances laissé mort, sans migration. Répertoire vide ou vacances →
     `playSheet` ouvre directement `altSheet`. `planSheet` supprimé.
-  - **À venir** : V5-2 navigation (tab bar à 4 onglets Accueil·Carnet·Répertoire·Parcours, fusion
-  Voyage+Stats en un écran défilant sans sous-onglets, retrait complet du Jardin, fusion
-  `voyage.js`+`stats.js` → `parcours.js`) ; V5-3 réglages & partage (`settings.userName` — le
+  - **V5-2 (Bêta 5.2)** ✅ : navigation aplatie. Tab bar à **4 onglets** (Accueil · Carnet ·
+  Répertoire · **Parcours**). Écran **Parcours** = un seul écran défilant sans sous-onglets
+  (`renderParcours`, `js/parcours.js` = fusion de `voyage.js` + `stats.js`) : héros → rang
+  (dépliant ±3 / 18 rangs) → **Défis en cours** → **Activité** visibles d'emblée, puis quatre
+  dépliants sobres repliés (`parcFold`/`toggleParc`) : Succès / Répertoire & aperçus / Cartes /
+  Records & rétrospective. Alias `go('voyage')`/`go('stats')` → `'parcours'`. **Jardin retiré**
+  (`renderJardin` + SVG + `hashStr` + CSS `.voy-jardin-*`, aucune donnée : l'arbre était dérivé).
+  Trois listes miroir à jour (`index.html`, `sw.js` → 13 js, `test.mjs`). Étendu au passage :
+  catalogue de succès **25 → 98** (16 familles, `tier` Facile/Moyen/Difficile + `desc` permanente,
+  ids historiques conservés) — voir « Gamification ».
+  - **À venir** : V5-3 réglages & partage (`settings.userName` — le
   « Bonjour Florian » de `js/home.js` est codé en dur —, feuille de bienvenue sur état vierge
   avec marqueur `S.onboarded`, retrait de l'UI NAS morte, partage de l'URL, à propos,
   réinitialisation ; les données étant par appareil, rien à cloisonner pour un second

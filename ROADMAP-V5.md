@@ -42,7 +42,7 @@
 | Lot | Release | Contenu |
 |------|---------|---------|
 | ☑ V5-1 | Bêta 5.1 | Programme du jour : un seul « Jouer », feuille de confirmation, retrait du fractionné |
-| ☐ V5-2 | Bêta 5.2 | Navigation : 4 onglets, écran « Parcours » (fusion Voyage+Stats), retrait du Jardin |
+| ☑ V5-2 | Bêta 5.2 | Navigation : 4 onglets, écran « Parcours » (fusion Voyage+Stats), retrait du Jardin |
 | ☐ V5-3 | Bêta 5.3 | Réglages & partage : profil, premier lancement, à propos, réinitialisation, retrait NAS |
 | ☐ V5-4 | Bêta 5.4 | Élagage résiduel, polish transversal, QA, checklist iPhone |
 
@@ -123,10 +123,24 @@ des commits existants).
 
 ---
 
-## Lot V5-2 — Navigation : 4 onglets, écran « Parcours » (Bêta 5.2)
+## Lot V5-2 — Navigation : 4 onglets, écran « Parcours » (Bêta 5.2) ✅
 
 **But** : un concept = un endroit. Plus aucun sous-onglet dans l'app ; la gamification et
 les statistiques racontent une seule histoire, celle du chemin parcouru.
+
+**Livré (Bêta 5.2)** : tab bar à **4 onglets** (Accueil · Carnet · Répertoire · **Parcours**).
+Écran **Parcours** = un seul écran défilant, sans sous-onglets (`renderParcours`,
+`js/parcours.js` = fusion de `voyage.js` + `stats.js`). Ordre : héros (temps total / séances) →
+carte du rang courant (dépliant ±3 / 18 rangs) → **Défis en cours** → **Activité** (7 jours,
+comparaison des semaines, régularité 12 sem., meilleurs moments) — tout cela visible d'emblée —
+puis quatre **dépliants sobres** repliés par défaut (`parcFold`/`toggleParc`) : **Succès**,
+**Répertoire & aperçus**, **Cartes compositeurs**, **Records & rétrospective**. Alias
+`go('voyage')`/`go('stats')` → `'parcours'` conservés. **Jardin retiré** entièrement
+(`renderJardin` + SVG + `hashStr` + CSS `.voy-jardin-*`). Trois listes miroir mises à jour
+(`index.html`, `sw.js` → 13 fichiers js, `test.mjs`). **Bonus (demandé en cours de lot)** :
+catalogue de succès étendu de 25 à **98** sur 16 familles, chacun avec une courte description
+**toujours visible** et un niveau **Facile / Moyen / Difficile** (les 25 ids historiques sont
+conservés ; les récompenses ♪ n'entrent pas dans les seuils « Notes », basés sur `baseNotes()`).
 
 **Prompt à coller :**
 

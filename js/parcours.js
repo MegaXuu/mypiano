@@ -1,35 +1,104 @@
 /* ==========================================================================
-   STATISTIQUES
+   PARCOURS (V5-2) — fusion de Voyage + Statistiques en un seul écran défilant,
+   sans sous-onglets. Visible d'emblée : rang, défis, activité. Repliés (dépliants
+   sobres) : succès, répertoire & aperçus, cartes, records & rétrospective.
+   Le Jardin a été retiré (V5-2). Les fonctions de gamification (achievements,
+   défis, cartes, hourHeat, célébrations) restent dans js/gamification.js.
    ========================================================================== */
-let statSplit='composer',statsTab='activite';
-function renderStats(){
-  document.getElementById('s-stats').innerHTML=`
-    <h1>Statistiques</h1>
-    <div class="grid2 stat-hero-grid">
-      <div class="metric"><div class="v num" id="stat-hero-time">0</div><div class="l">temps total joué</div></div>
-      <div class="metric"><div class="v num" id="stat-hero-sessions">0</div><div class="l">séances au total</div></div>
-    </div>
-    <div class="seg stat-tabs">
-      <button class="${statsTab==='activite'?'on':''}" onclick="setStatsTab('activite')">Activité</button>
-      <button class="${statsTab==='rep'?'on':''}" onclick="setStatsTab('rep')">Répertoire</button>
-      <button class="${statsTab==='records'?'on':''}" onclick="setStatsTab('records')">Records</button>
-    </div>
-    <div id="stats-body"></div>`;
-  countUp(document.getElementById('stat-hero-time'),totalSeconds(),durH,500);
-  countUp(document.getElementById('stat-hero-sessions'),S.sessions.length,v=>Math.round(v).toString(),400);
-  renderStatsBody();
-}
-function setStatsTab(t){statsTab=t;renderStats();}
-function renderStatsBody(){
-  const el=document.getElementById('stats-body');
+let statSplit='composer',voyageRanksOpen=false,_parcAnim=true;
+const parcoursOpen={succes:false,rep:false,cartes:false,records:false};
+
+function renderParcours(){
+  checkChallenges();
+  const el=document.getElementById('s-parcours');
   if(!el)return;
-  el.innerHTML=statsTab==='rep'?renderStatsRep():statsTab==='records'?renderStatsRecords():renderStatsActivite();
-  if(statsTab==='activite')countUp(document.getElementById('stat-week-time'),weekSeconds(),dur,450);
+  const animate=_parcAnim;_parcAnim=true;
+  el.innerHTML=`
+    <h1>Parcours</h1>
+    <div class="grid2 stat-hero-grid">
+      <div class="metric"><div class="v num" id="parc-hero-time">0</div><div class="l">temps total joué</div></div>
+      <div class="metric"><div class="v num" id="parc-hero-sessions">0</div><div class="l">séances au total</div></div>
+    </div>
+    ${rankCardHtml()}
+    <h2>Défis en cours</h2>
+    ${defisCards()}
+    <h2>Activité</h2>
+    ${renderStatsActivite()}
+    ${parcFold('succes','Succès',succesCount())}
+    ${parcFold('rep','Répertoire & aperçus','')}
+    ${parcFold('cartes','Cartes compositeurs','')}
+    ${parcFold('records','Records & rétrospective','')}`;
+  _pnum('parc-hero-time',totalSeconds(),durH,animate);
+  _pnum('parc-hero-sessions',S.sessions.length,v=>Math.round(v).toLocaleString('fr-FR'),animate);
+  _pnum('stat-week-time',weekSeconds(),dur,animate);
 }
+function _pnum(id,val,fmt,animate){const e=document.getElementById(id);if(!e)return;if(animate)countUp(e,val,fmt,450);else e.textContent=fmt(val);}
+function toggleParc(k){parcoursOpen[k]=!parcoursOpen[k];_parcAnim=false;renderParcours();}
+function toggleVoyageRanks(){voyageRanksOpen=!voyageRanksOpen;_parcAnim=false;renderParcours();}
+function setSplit(s){statSplit=s;_parcAnim=false;renderParcours();}
+// Dépliant sobre : en-tête cliquable + corps monté seulement s'il est ouvert.
+function parcFold(key,title,meta){
+  const open=parcoursOpen[key],body=open?parcBody(key):'';
+  return `<button class="parc-fold ${open?'open':''}" onclick="toggleParc('${key}')" aria-expanded="${open}">
+    <span class="parc-fold-title">${title}</span>
+    ${meta?`<span class="parc-fold-meta">${meta}</span>`:''}
+    <span class="parc-fold-caret">${open?'−':'+'}</span>
+  </button>${open?`<div class="parc-fold-body">${body}</div>`:''}`;
+}
+function parcBody(key){
+  if(key==='succes')return succesGrid();
+  if(key==='rep')return renderStatsRep();
+  if(key==='cartes')return renderCartes();
+  if(key==='records')return renderStatsRecords();
+  return '';
+}
+
+/* ---------- Rang courant (ancien onglet Voyage) ---------- */
+function rankCardHtml(){
+  const hours=totalSeconds()/3600, cur=currentStone(), next=nextStone();
+  const hoursDisp=hours<10?hours.toFixed(1):Math.round(hours);
+  const prevH=cur?cur.h:0, span=next?(next.h-prevH):1, prog=next?Math.min(1,(hours-prevH)/span):1;
+  const focusIdx=Math.max(0,cur?STONES.indexOf(cur):0);
+  const from=voyageRanksOpen?0:Math.max(0,focusIdx-3);
+  const to=voyageRanksOpen?STONES.length-1:Math.min(STONES.length-1,focusIdx+3);
+  let rows='';
+  for(let idx=to;idx>=from;idx--){
+    const s=STONES[idx],reached=hours>=s.h,isNext=next&&s.n===next.n;
+    const rowState=reached?'reached':isNext?'current':'upcoming';
+    rows+=`<div class="voy-rank-row ${rowState}">
+      <span class="voy-rank-row-dot"></span>
+      <div class="between voy-rank-row-body">
+        <span class="voy-rank-row-name">${s.n}${isNext?' <span class="tag acc voy-rank-row-tag">en cours</span>':''}</span>
+        <span class="num muted">${s.h.toLocaleString('fr-FR')} h</span>
+      </div>
+    </div>`;
+  }
+  return `
+    <div class="card hi voy-rank-card">
+      <div class="voy-rank-medal">
+        <div class="voy-rank-medal-glow"></div>
+        <div class="voy-rank-medal-ring"></div>
+        <div class="voy-rank-medal-ring2"></div>
+        <div class="voy-rank-medal-glyph">${cur?rankGlyph(cur):'♪'}</div>
+      </div>
+      <div class="eyebrow voy-rank-eyebrow">Rang actuel</div>
+      <div class="serif voy-rank-name">${cur?cur.n:'En route'}</div>
+      <div class="num it voy-rank-hours">${hoursDisp} heures jouées</div>
+      ${next?`<div class="sub voy-rank-next"><span>Prochain · ${next.n}</span><span>${hoursDisp} / ${next.h} h</span></div>
+      <div class="bar voy-rank-bar"><i style="width:${Math.round(prog*100)}%;"></i></div>
+      <div class="muted voy-rank-next-sub">Encore ${Math.max(0,Math.round(next.h-hours))} h avant ${next.n}</div>`:'<div class="muted voy-rank-done">Voyage accompli — Maestro Assoluto atteint. ♫</div>'}
+    </div>
+    <div class="muted voy-ranks-label">${voyageRanksOpen?"18 rangs · d'Apprenti à Maestro Assoluto":'Autour de toi · rang '+(focusIdx+1)+' sur 18'}</div>
+    <div class="voy-path">${rows}</div>
+    <button class="btn ghost sm voy-ranks-toggle" onclick="toggleVoyageRanks()">${voyageRanksOpen?'Réduire':'Voir les 18 rangs'}</button>`;
+}
+
+/* ==========================================================================
+   STATISTIQUES (fusionnées dans Parcours)
+   ========================================================================== */
 function renderStatsActivite(){
   const bars=[];let max=1;for(let i=6;i>=0;i--){const d=addDays(new Date(),-i);const s=secondsOnDay(dkey(d));bars.push({d,s});max=Math.max(max,s);}
   return `
-    <h2>7 derniers jours</h2>
     <div class="card">
       <div class="between stat-card-head"><span class="stat-card-title">7 derniers jours</span><span class="muted stat-card-sub"><span id="stat-week-time">0</span> cette sem.</span></div>
       <div class="stat-bars7">${bars.map((x,i)=>{const h=x.s?Math.max(6,Math.round(x.s/max*100)):2;const lb=x.d.toLocaleDateString('fr-FR',{weekday:'short'}).slice(0,3);
@@ -54,14 +123,12 @@ function renderStatsRecords(){
   let bestDay=0;practiceDays().forEach(k=>bestDay=Math.max(bestDay,secondsOnDay(k)));
   let bestWk=0;if(S.sessions.length){const first=new Date([...practiceDays()].sort()[0]);for(let d=new Date(first);d<=new Date();d=addDays(d,7)){let t=0;for(let i=0;i<7;i++)t+=secondsOnDay(dkey(addDays(d,i)));bestWk=Math.max(bestWk,t);}}
   return `
-    <h2>Records</h2>
     <div class="grid2">
       ${rec('Plus longue séance',dur(longest))}${rec('Meilleure journée',dur(bestDay))}
       ${rec('Meilleure semaine',dur(bestWk))}${rec('Meilleure série',bestStreak()+' j')}
     </div>
     ${retroYears().length?`<h2>Rétrospective</h2><p class="muted stat-retro-intro">Une année de piano, en quelques chiffres.</p><div class="chips">${retroYears().map(y=>`<button class="chip" onclick="yearRetroSheet(${y})">${y}</button>`).join('')}</div>`:''}`;
 }
-function setSplit(s){statSplit=s;renderStatsBody();}
 function rec(l,v){return `<div class="metric stat-rec"><div class="v stat-rec-v">${v}</div><div class="l">${l}</div></div>`;}
 function heatmap(){
   const days=[];for(let i=83;i>=0;i--){const d=addDays(new Date(),-i);const s=secondsOnDay(dkey(d));days.push(s);}
@@ -190,4 +257,3 @@ function yearRetroSheet(year){
     ${topPiece?`<div class="card stat-insight-card"><div class="stat-insight-rule gold"></div><span class="muted stat-retro-piece-label">Pièce de l'année</span><div class="stat-retro-piece-title">${esc(topPiece.title)}</div><div class="muted stat-retro-piece-sub">${dur(topPieceEntry[1])} joués</div></div>`:''}
     <button class="btn primary mt16" onclick="closeSheet()">Fermer</button>`);
 }
-
