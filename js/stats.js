@@ -155,18 +155,8 @@ function stagnationInsight(){
   const list=stagnantPieces().slice(0,2);if(!list.length)return '';
   return list.map(p=>`« ${esc(p.title)} » n'a pas avancé depuis trois semaines malgré tes séances.`).join('<br>');
 }
-function fractionedInsight(){
-  const withF=S.sessions.filter(s=>s.feeling&&(s.mode==='chrono'||s.mode==='minuteur'));
-  const frac=withF.filter(s=>s.interval).map(s=>feelIdx(s.feeling)).filter(i=>i>=0);
-  const cont=withF.filter(s=>!s.interval).map(s=>feelIdx(s.feeling)).filter(i=>i>=0);
-  if(frac.length<3||cont.length<3)return '';
-  const avg=a=>a.reduce((x,y)=>x+y,0)/a.length,af=avg(frac),ac=avg(cont);
-  if(Math.abs(af-ac)<0.5)return '';
-  return af>ac?'Tes séances en pratique fractionnée (25/5) donnent en moyenne un ressenti plus satisfaisant.'
-    :'Tes séances continues donnent en moyenne un ressenti plus satisfaisant que le fractionné.';
-}
 function renderInsights(){
-  const lines=[momentInsight(),stagnationInsight(),fractionedInsight()].filter(Boolean);
+  const lines=[momentInsight(),stagnationInsight()].filter(Boolean);
   if(!lines.length)return '';
   return `<h2>Aperçus</h2>${lines.map(l=>`<div class="card stat-insight-card"><div class="stat-insight-rule"></div><p class="stat-insight-text">${l}</p></div>`).join('')}`;
 }

@@ -91,18 +91,49 @@ function renderPlanPreview(){
   _plan=generatePlan(_planDraft);
   return _plan.map(b=>`<div class="card plan-block-card"><div class="between"><span class="plan-block-title">${esc(b.focus)}${b.piece?' · '+esc(pieceName(b.piece)):''}</span><span class="num plan-block-min">${b.min} min</span></div><div class="plan-block-consigne">${esc(b.consigne)}</div></div>`).join('');
 }
-function regenPlanPreview(){const el=document.getElementById('pg-preview');if(el)el.innerHTML=renderPlanPreview();}
-function planSheet(){
+function regenPlanPreview(){const el=document.getElementById('pg-preview');if(el)el.innerHTML=renderPlanPreview();
+  const sub=document.getElementById('pg-sub');if(sub)sub.textContent=_planDraft.dur+' min · '+intentLabel(_planDraft.intent);}
+function intentLabel(k){const it=PLAN_INTENTS.find(x=>x.k===k);return it?it.label:'';}
+// Résumé du programme du jour affiché sous le CTA « Jouer » (accueil).
+function planSummaryLine(){
+  const plan=generatePlan(S.settings.planPrefs);
+  const first=plan.find(b=>b.piece);
+  const head=first?(pieceName(first.piece)+(first.sectionId?' — '+first.focus:'')):'Séance libre';
+  const pr=S.settings.planPrefs||{dur:60};
+  return esc(head)+' · '+pr.dur+' min · '+plan.length+' blocs';
+}
+/* ---------- Feuille « Jouer » (programme du jour, V5-1) ---------- */
+function playSheet(){
+  // Répertoire vide ou vacances : pas de programme creux, on va droit aux alternatives.
+  if(vacationActive()||!activePieces().length){altSheet(true);return;}
   const pr=S.settings.planPrefs||{dur:60,n:2,intent:'equilibre'};
   _planDraft={dur:pr.dur,n:pr.n,intent:pr.intent};_planTouchedN=false;
-  openSheet(`<h3>Plan guidé</h3><p class="muted sheet-sub">Compose ta séance : durée, nombre de pièces, intention.</p>
-    <div class="field"><label>Durée</label><div class="chips" id="pg-dur">${[30,45,60,75,90].map(m=>`<button class="chip ${m===_planDraft.dur?'on':''}" onclick="pgSetDur(${m},this)">${m} min</button>`).join('')}</div></div>
-    <div class="field"><label>Nombre de pièces</label>
-      <div class="stepper sess-stepper"><button onclick="pgStepN(-1)">–</button><div class="v" id="pg-n">${_planDraft.n}</div><button onclick="pgStepN(1)">+</button></div></div>
-    <div class="field"><label>Intention</label><div class="seg" id="pg-intent">${PLAN_INTENTS.map(it=>`<button class="${it.k===_planDraft.intent?'on':''}" onclick="pgSetIntent('${it.k}',this)">${it.label}</button>`).join('')}</div></div>
-    <h2 class="pg-preview-h">Aperçu</h2>
+  openSheet(`<h3>Programme du jour</h3><p class="muted sheet-sub" id="pg-sub">${_planDraft.dur} min · ${intentLabel(_planDraft.intent)}</p>
     <div id="pg-preview">${renderPlanPreview()}</div>
-    <button class="btn primary" onclick="launchPlan()">Lancer le plan</button>`);
+    <button class="btn primary" onclick="launchPlan()">Commencer</button>
+    <button class="btn ghost sm btn-full mt10" id="pg-adjust-btn" onclick="togglePlayAdjust()">Ajuster ⌄</button>
+    <div id="pg-adjust" class="collapse">
+      <div class="field"><label>Durée</label><div class="chips" id="pg-dur">${[30,45,60,75,90].map(m=>`<button class="chip ${m===_planDraft.dur?'on':''}" onclick="pgSetDur(${m},this)">${m} min</button>`).join('')}</div></div>
+      <div class="field"><label>Nombre de pièces</label>
+        <div class="stepper sess-stepper"><button onclick="pgStepN(-1)">–</button><div class="v" id="pg-n">${_planDraft.n}</div><button onclick="pgStepN(1)">+</button></div></div>
+      <div class="field"><label>Intention</label><div class="seg" id="pg-intent">${PLAN_INTENTS.map(it=>`<button class="${it.k===_planDraft.intent?'on':''}" onclick="pgSetIntent('${it.k}',this)">${it.label}</button>`).join('')}</div></div>
+    </div>
+    <button class="btn ghost sm btn-full mt10" onclick="altSheet(false)">Autrement…</button>`);
+}
+function togglePlayAdjust(){
+  const b=document.getElementById('pg-adjust'),btn=document.getElementById('pg-adjust-btn');if(!b)return;
+  const open=b.classList.toggle('open');b.style.display=open?'block':'none';
+  if(btn)btn.textContent=open?'Ajuster ⌃':'Ajuster ⌄';
+}
+// Feuille secondaire : les autres façons de jouer (une entrée = une ligne).
+function altSheet(root){
+  openSheet(`${root?'':'<button class="btn ghost sm alt-back" onclick="playSheet()">‹ Retour</button>'}<h3>Autrement</h3>
+    <p class="muted sheet-sub">Une autre façon de jouer aujourd'hui.</p>
+    <div class="alt-list">
+      <button class="btn ghost btn-full alt-row" onclick="startSheet()">Séance libre<span class="alt-arr">›</span></button>
+      <button class="btn ghost btn-full alt-row" onclick="concertSheet()">Simulation de concert<span class="alt-arr">›</span></button>
+      <button class="btn ghost btn-full alt-row" onclick="aposterioriSheet()">Séance oubliée<span class="alt-arr">›</span></button>
+    </div>`);
 }
 function pgSetDur(m,el){
   _planDraft.dur=m;
@@ -123,7 +154,7 @@ function pgSetIntent(k,el){
 function startPlanSession(plan){
   if(!plan||!plan.length)return;
   closeSheet();const f=plan[0];
-  timer={mode:'guided',target:0,total:0,running:true,last:Date.now(),blocks:[{piece:f.piece||IMPROV,sec:0}],goal:todayGoal(),plan,planIdx:0,blockPending:false,interval:null};
+  timer={mode:'guided',target:0,total:0,running:true,last:Date.now(),blocks:[{piece:f.piece||IMPROV,sec:0}],goal:todayGoal(),plan,planIdx:0,blockPending:false};
   go('session');renderSession();startTick();acquireWakeLock();
 }
 function launchPlan(){

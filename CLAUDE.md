@@ -108,10 +108,10 @@ carnet de travail, et se motiver par la gamification. Cible : iPhone (PWA instal
     entrelacée des 3 pièces les plus en retard (`startRevision`, réutilise `timer.plan/planIdx`).
   - **Fiche unifiée** `pieceDetail(id)` (feuille) = point d'entrée depuis le répertoire : stats, avancement (dérivé si sections, sinon ±10 manuel), notes, transitions de statut. Formulaire `pieceSheet` allégé (champs primaires + dépliant « Détails »). **Phase** dérivée `piecePhase(p)` (À apprendre / Déchiffrage / Consolidation / Polissage / Maîtrisé / À entretenir…). Anti-doublon `findDuplicate` (normalisé).
   - **Sections & mesures (V3 étape 2)** : `bars` (nb de mesures, facultatif) + `sections[] = {id,name,from,to,todo,status(new|wip|poli|ok),bpm:[{d,v}],diff?(1–4)}`, **entièrement facultatif** — une pièce sans section se comporte comme avant (avancement manuel ±10). Dès que `bars` et au moins une section existent, `hasDerivedProgress(p)` devient vrai et `pieceProgress(p)` **remplace** `p.progress` partout (phase, estimation, tri du plan guidé) : seules les mesures des sections `ok` comptent (`barsOk`, union par rang pour éviter les doubles comptages en cas de chevauchement — `sectionRankArr`). `hist[] = {d,m}` journalise les mesures au point (un point par jour joué ou modifié, `recordHist`) → mini-courbe (`renderHistCurve`, pas de courbe de tempo). Carte visuelle de couverture (`renderMap`/`mapSegments`, trous = `coverageGaps`). Tempo = **saisie manuelle uniquement**, stocké par section (`sec.bpm[]`), jamais de métronome. Découpage assisté = `cutSheet`/`applyCut` (raccourci en mesures régulières) ou assistant pas-à-pas `startCutWizard` (V4-1, voir « État & feuille de route »). Suggestion « à travailler aujourd'hui » = section non `ok` la moins récemment travaillée (`pickTodaySection`, dérivé de `sessions[].entries[].sections`). Rappel en séance = ligne « Pas au point : … » (`sectionsReminderLine`). Carnet de fin de séance = bloc replié « Sections travaillées » (chips + avancer d'un cran + bpm optionnel). **Difficulté ressentie (V4-1)** : `sec.diff` ∈ 1–4 (Facile/Moyen/Difficile/Très difficile, `DIFF_LABELS`/`secDiffLabel`), facultative, purement indicative en V4-1 (n'influence ni tri ni suggestions — c'est le périmètre de V4-2).
-- `sessions[]` : `{id,date,mode(chrono|minuteur|guided|concert|away),goal,feeling(pp|p|mf|f|ff),blocks[{piece|'__improv__'|'',sec}],entries[{piece,worked,next}],ts,concert?,interval?,awayKind?,section?}`
-  — `interval` (bool, facultatif) : vrai si la séance était en pratique fractionnée 25/5 ; sert à
-  `fractionedInsight()` (étape 5). Absent sur les séances antérieures et les séances a posteriori
-  (traité comme faux). `mode:'away'` (V4-4, mode vacances) : séance « loin du clavier »
+- `sessions[]` : `{id,date,mode(chrono|minuteur|guided|concert|away),goal,feeling(pp|p|mf|f|ff),blocks[{piece|'__improv__'|'',sec}],entries[{piece,worked,next}],ts,concert?,awayKind?,section?}`
+  — `interval` (bool) : champ **hérité et mort** depuis la Bêta 5.1 (retrait du fractionné 25/5,
+  V5-1). Il subsiste sur d'anciennes séances mais n'est plus écrit ni lu nulle part (aucune
+  migration). `mode:'away'` (V4-4, mode vacances) : séance « loin du clavier »
   (`awayKind` ∈ `ecoute|lecture|mental`, `section` = id de section optionnel), journalisée via
   `blocks` comme les autres pour rester compatible avec `sessionSeconds`/le Carnet, mais **comptée
   à part** — `playSessions()` (`js/state.js`) exclut ces séances de tous les agrégats de jeu
@@ -233,12 +233,13 @@ niveaux de cartes compositeurs (Bronze/Argent/Or) ont leurs propres teintes de m
      verrouillage ; blob vide → abandon propre avec toast. **Le correctif reste à revérifier sur
      l'appareil après déploiement** (le comportement iOS en arrière-plan n'est pas reproductible hors
      device réel).
-  5. ✅ **Bilans & insights** (Stats, section « Aperçus ») : trois croisements sobres, chacun affiché
+  5. ✅ **Bilans & insights** (Stats, section « Aperçus ») : croisements sobres, chacun affiché
      seulement si le seuil de confiance est atteint (sinon rien plutôt qu'une phrase creuse) —
      ressenti moyen par moment de la journée (`momentInsight`, ≥3 séances par créneau, écart ≥0.6 sur
      l'échelle pp–ff), stagnation (`stagnantPieces`/`stagnationInsight`, mesures « au point » figées
-     depuis ≥3 semaines malgré des séances récentes), fractionné vs continu (`fractionedInsight`,
-     ≥3 séances de chaque, écart ≥0.5). **Rétrospective annuelle** (`yearRetroSheet`, chips par année
+     depuis ≥3 semaines malgré des séances récentes). _(Le croisement fractionné vs continu
+     `fractionedInsight` a été retiré en Bêta 5.1 avec le fractionné 25/5.)_
+     **Rétrospective annuelle** (`yearRetroSheet`, chips par année
      sous « Rétrospective ») : temps joué, séances, plus longue série de l'année (`bestStreakInYear`),
      compositeur dominant, pièce de l'année. Notifications locales améliorées (`localNotify` : icône,
      `tag` anti-doublon, clic → focus fenêtre) — **push iOS réel toujours écarté**, nécessite un
@@ -397,13 +398,23 @@ niveaux de cartes compositeurs (Bronze/Argent/Or) ont leurs propres teintes de m
     `lastWeekReport` ne refiltrent plus toutes les séances 7× (14 balayages complets sur l'accueil
     → 2). Aucun changement de comportement (mêmes valeurs), couvert par `npm test`.
 
-- **Cycle V5 « Épure » (validé 2026-07-21) — À VENIR** : rendre l'app la plus simple et
+- **Cycle V5 « Épure » (validé 2026-07-21) — EN COURS** : rendre l'app la plus simple et
   intuitive possible, principe « l'app propose, tu valides » (= moins de décisions), et
   donnable à un ami telle quelle. 4 lots = Bêta 5.1 → 5.4, **détail + prompts dans
-  `ROADMAP-V5.md`** : V5-1 programme du jour (un seul CTA « Jouer » → feuille de confirmation
-  avec plan déjà composé via `generatePlan`/`planPrefs`, dépliant « Ajuster », lien
-  « Autrement… » vers séance libre/concert/séance oubliée ; retrait complet du fractionné
-  25/5) ; V5-2 navigation (tab bar à 4 onglets Accueil·Carnet·Répertoire·Parcours, fusion
+  `ROADMAP-V5.md`** :
+  - **V5-1 (Bêta 5.1)** ✅ : démarrage unifié. Un seul CTA **« Jouer »** sur l'accueil
+    (`playSheet`, `js/plan.js`) + sous-titre résumant le programme composé (`planSummaryLine`).
+    La feuille « Jouer » présente le plan déjà composé via `generatePlan(planPrefs)` (consigne
+    sur chaque bloc), « Commencer » → `startPlanSession`, dépliant « Ajuster » (durée/nb/
+    intention, aperçu live via `regenPlanPreview`, mémorisé dans `planPrefs`), et « Autrement… »
+    → feuille secondaire `altSheet` (séance libre / concert / séance oubliée). `startSheet`
+    allégé (« Séance libre »), sans fractionné ni bouton « séance oubliée ». Retirés de
+    l'accueil : grille Plan/Simulation, chips « Reprendre », section « À entretenir »
+    (`startRevision` conservé pour la reprise vacances). **Fractionné 25/5 retiré partout**
+    (`toggleInterval`, `timer.interval`, phases work/break, `fractionedInsight`) ; champ
+    `interval` des anciennes séances laissé mort, sans migration. Répertoire vide ou vacances →
+    `playSheet` ouvre directement `altSheet`. `planSheet` supprimé.
+  - **À venir** : V5-2 navigation (tab bar à 4 onglets Accueil·Carnet·Répertoire·Parcours, fusion
   Voyage+Stats en un écran défilant sans sous-onglets, retrait complet du Jardin, fusion
   `voyage.js`+`stats.js` → `parcours.js`) ; V5-3 réglages & partage (`settings.userName` — le
   « Bonjour Florian » de `js/home.js` est codé en dur —, feuille de bienvenue sur état vierge

@@ -9,7 +9,7 @@ function renderHome(){
   const circ=528, off=vac?circ:circ*(1-Math.min(pct,1));
   const reached=!vac&&pct>=1;
   const todos=S.pieces.filter(p=>p.todo&&p.todo.trim());
-  const wkSeconds=weekSeconds(), wkDays=weekDays(), rev=revisionList();
+  const wkSeconds=weekSeconds(), wkDays=weekDays();
   document.getElementById('s-home').innerHTML=`
     <div class="between">
       <span class="eyebrow">${frDate(new Date())} · Programme</span>
@@ -49,12 +49,9 @@ function renderHome(){
       </div>
     </div>
 
-    <button class="btn primary home-cta" onclick="startSheet()">
-      ${playSvg()} Démarrer une séance</button>
-
-    ${recentPieces(4).length?`<h2>Reprendre</h2><div class="chips">${recentPieces(4).map(id=>`<button class="chip" onclick="quickStart('${id}')">${esc(pieceName(id))}</button>`).join('')}</div>`:''}
-
-    <div class="grid2 home-grid"><button class="btn ghost" onclick="planSheet()">Plan guidé</button><button class="btn ghost" onclick="concertSheet()">Simulation</button></div>
+    <button class="btn primary home-cta" onclick="playSheet()">
+      ${playSvg()} Jouer</button>
+    ${(!vac&&activePieces().length)?`<p class="muted home-play-sub">${planSummaryLine()}</p>`:''}
 
     ${homeAlertsHtml()}
 
@@ -68,10 +65,6 @@ function renderHome(){
       <div class="metric"><div class="v num" id="home-week-time-v">0</div><div class="l">temps joué</div></div>
       <div class="metric"><div class="v num" id="home-week-days-v">0</div><div class="l">jours actifs</div></div>
     </div>
-    ${rev.length?`<div class="between home-revision-head"><h2>À entretenir</h2><button class="btn ghost sm" onclick="startRevision()">Réviser</button></div><div class="card home-revision-card">
-      <p class="muted home-revision-intro">Maîtrisés, mais pas rejoués depuis un moment :</p>
-      ${rev.slice(0,3).map(p=>`<div class="between home-revision-item"><div class="home-revision-info"><div class="home-revision-title">${esc(p.title)}</div><div class="muted home-revision-composer">${esc(p.composer||'')}</div></div><button class="btn ghost sm" onclick="quickStart('${p.id}')">Jouer</button></div>`).join('')}</div>`:''}
-
     ${vac?'':`<button class="btn ghost sm home-vacation-link" onclick="vacationSheet()">Mode vacances</button>`}
     <p class="num it home-quote">« ${q[0]} » — ${q[1]}</p>`;
 

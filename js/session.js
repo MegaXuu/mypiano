@@ -1,11 +1,10 @@
 /* ==========================================================================
    SÉANCE
    ========================================================================== */
-let timer=null,tickInt=null,_mode='chrono',_min=25,_piece=null,_interval=false;
+let timer=null,tickInt=null,_mode='chrono',_min=25,_piece=null;
 let _wakeLock=null;
 async function acquireWakeLock(){try{_wakeLock=await navigator.wakeLock.request('screen');}catch(e){}}
 function releaseWakeLock(){try{_wakeLock&&_wakeLock.release();}catch(e){}_wakeLock=null;}
-function toggleInterval(el){_interval=!_interval;el.classList.toggle('on');}
 function activePieces(){return S.pieces.filter(p=>!p.isEnsemble&&(p.status==='active'||p.status==='mastered'));}
 function chipLabel(p){return p.parentId?((pieceById(p.parentId)||{}).title?pieceById(p.parentId).title+' — '+p.title:p.title):p.title;}
 function pieceChips(sel,fn,exclude){
@@ -23,16 +22,14 @@ function filterStartPieces(q){q=(q||'').toLowerCase();const box=document.getElem
   if(!q){const rec=new Set(recentPieces(4));list=list.filter(p=>!rec.has(p.id));}
   box.innerHTML=list.map(p=>`<button class="chip ${p.id===_piece?'on':''}" onclick="pickPiece('${p.id}',this)">${esc(chipLabel(p))}</button>`).join('')
     +`<button class="chip ${_piece===IMPROV?'on':''}" onclick="pickPiece('${IMPROV}',this)">Improvisation</button>`;}
-function quickStart(id){_mode='chrono';_min=25;_piece=id;_interval=false;beginSession();}
+function quickStart(id){_mode='chrono';_min=25;_piece=id;beginSession();}
 function todoLines(list){return list.map(p=>`<div class="todo-line"><span class="todo-line-ic">♫</span><div class="todo-line-body"><div class="todo-line-title">${esc(p.title)}</div><div class="muted todo-line-note">${esc(p.todo)}</div></div></div>`).join('');}
 function showAllTodos(btn){const b=document.getElementById('home-todos');if(b)b.innerHTML=todoLines(S.pieces.filter(p=>p.todo&&p.todo.trim()));if(btn)btn.style.display='none';}
 function startSheet(){
-  _mode='chrono';_min=25;_piece=recentPieces(1)[0]||null;_interval=false;
-  openSheet(`<h3>Nouvelle séance</h3>
+  _mode='chrono';_min=25;_piece=recentPieces(1)[0]||null;
+  openSheet(`<h3>Séance libre</h3>
     <div class="field"><label>Mode</label>
       <div class="seg" id="ms"><button class="on" onclick="pickMode('chrono',this)">Chrono ↑</button><button onclick="pickMode('minuteur',this)">Minuteur ↓</button></div></div>
-    <div class="field"><div class="between"><span>Pratique fractionnée (25/5)</span><div class="toggle" id="iv-tog" onclick="toggleInterval(this)"></div></div>
-      <p class="muted sess-hint-top">Blocs de 25 min entrecoupés de pauses « repose tes mains ».</p></div>
     <div class="field" id="mf" style="display:none;"><label>Durée visée</label>
       <div class="stepper sess-stepper"><button onclick="mStep(-5)">–</button><div class="v" id="mv">25 min</div><button onclick="mStep(5)">+</button></div></div>
     <div class="field"><label>Premier morceau</label>
@@ -41,8 +38,7 @@ function startSheet(){
       <div class="chips" id="sc">${pieceChips(_piece,'pickPiece',new Set(recentPieces(4)))}</div>
       <div id="sc-hint"></div>
       ${activePieces().length?'':'<p class="muted sess-hint-lg">Ajoute des morceaux au répertoire, ou joue en improvisation.</p>'}</div>
-    <button class="btn primary" onclick="beginSession()">Commencer</button>
-    <button class="btn ghost sm btn-full mt10" onclick="aposterioriSheet()">Ajouter plutôt une séance oubliée</button>`);
+    <button class="btn primary" onclick="beginSession()">Commencer</button>`);
 }
 function pickMode(m,el){_mode=m;document.querySelectorAll('#ms button').forEach(b=>b.classList.remove('on'));el.classList.add('on');document.getElementById('mf').style.display=m==='minuteur'?'block':'none';}
 function mStep(n){_min=Math.max(5,_min+n);document.getElementById('mv').textContent=fmtMinLong(_min);}
@@ -50,22 +46,18 @@ function pickPiece(id,el){_piece=id;document.querySelectorAll('#sheet .chip').fo
   const hint=document.getElementById('sc-hint');if(hint){const p=id!==IMPROV?pieceById(id):null;hint.innerHTML=p&&p.todo?`<div class="sess-note"><span class="sess-note-label">À faire</span><div class="sess-note-text">${esc(p.todo)}</div></div>`:'';}}
 function beginSession(){
   if(!_piece){toast('Choisis un morceau',{danger:true});return;}
-  timer={mode:_mode,target:_min*60,total:0,running:true,last:Date.now(),blocks:[{piece:_piece,sec:0}],goal:todayGoal(),interval:_interval?{work:1500,brk:300,phase:'work',phaseSec:0}:null};
+  timer={mode:_mode,target:_min*60,total:0,running:true,last:Date.now(),blocks:[{piece:_piece,sec:0}],goal:todayGoal()};
   closeSheet();go('session');renderSession();startTick();acquireWakeLock();
 }
 function startTick(){clearInterval(tickInt);tickInt=setInterval(tick,300);tick();}
 function tick(){
   if(!timer)return;
   if(timer.running){
-    const now=Date.now(),dt=(now-timer.last)/1000;timer.last=now;const iv=timer.interval;
-    if(iv&&iv.phase==='break'){iv.phaseSec+=dt;if(iv.phaseSec>=iv.brk){iv.phase='work';iv.phaseSec=0;buzz();toast('Reprise');}}
-    else{
-      timer.total+=dt;timer.blocks[timer.blocks.length-1].sec+=dt;
-      if(iv){iv.phaseSec+=dt;if(iv.phaseSec>=iv.work){iv.phase='break';iv.phaseSec=0;buzz();toast('Pause · repose tes mains');}}
-      if(timer.mode==='minuteur'&&timer.total>=timer.target){timer.total=timer.target;timer.running=false;buzz();toast('Minuteur terminé ✓');}
-      if(timer.plan&&!timer.blockPending){const cb=timer.plan[timer.planIdx];
-        if(timer.blocks[timer.blocks.length-1].sec>=cb.min*60){timer.blockPending=true;buzz();}
-      }
+    const now=Date.now(),dt=(now-timer.last)/1000;timer.last=now;
+    timer.total+=dt;timer.blocks[timer.blocks.length-1].sec+=dt;
+    if(timer.mode==='minuteur'&&timer.total>=timer.target){timer.total=timer.target;timer.running=false;buzz();toast('Minuteur terminé ✓');}
+    if(timer.plan&&!timer.blockPending){const cb=timer.plan[timer.planIdx];
+      if(timer.blocks[timer.blocks.length-1].sec>=cb.min*60){timer.blockPending=true;buzz();}
     }
   }
   paintSession();
@@ -120,8 +112,7 @@ function paintSession(){
   if(timer.plan&&md)md.textContent='Plan guidé';
   const tl=document.getElementById('ss-timeline');if(tl){tl.innerHTML=renderTimeline();tl.style.display=timer.plan?'flex':'none';}
   const be=document.getElementById('ss-blockend');if(be)be.innerHTML=renderBlockEnd();
-  const iv=timer.interval;if(iv&&iv.phase==='break'){if(t)t.textContent=big(Math.max(0,iv.brk-iv.phaseSec));if(md)md.textContent='Pause · repose tes mains';}
-  const halo=document.getElementById('ss-halo');if(halo){halo.classList.toggle('paused',!timer.running);halo.classList.toggle('brk',!!(iv&&iv.phase==='break'));}
+  const halo=document.getElementById('ss-halo');if(halo){halo.classList.toggle('paused',!timer.running);}
   const pb=document.getElementById('ss-pause');if(pb){pb.textContent=timer.running?'❚❚':'▶';}
   const ph=document.getElementById('ss-pausehint');if(ph)ph.style.display=timer.running?'none':'block';
   const rb=document.getElementById('ss-rec');if(rb){rb.textContent=_rec?'■':'●';rb.classList.toggle('rec',!!_rec);}
@@ -275,7 +266,7 @@ function commitSession(total){
     if(hasDerivedProgress(p))recordHist(p);
     if(_mastery[i]==='active'&&p.status==='mastered'){p.status='active';p.masteredAt=null;p.revInterval=S.settings.revisionDays||18;}
     else if(_mastery[i]==='mastered'&&p.status==='mastered'){p.revInterval=Math.min(120,Math.round((p.revInterval||S.settings.revisionDays||18)*1.6));}});
-  S.sessions.push({id:uid(),date:dkey(),mode:timer.mode,goal:timer.goal,feeling:_feel,blocks,entries,ts:Date.now(),interval:!!timer.interval});
+  S.sessions.push({id:uid(),date:dkey(),mode:timer.mode,goal:timer.goal,feeling:_feel,blocks,entries,ts:Date.now()});
   save();checkChallenges();timer=null;releaseWakeLock();closeSheet();
   const after=currentStone();
   go('home');

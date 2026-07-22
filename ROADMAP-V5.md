@@ -41,19 +41,35 @@
 
 | Lot | Release | Contenu |
 |------|---------|---------|
-| ☐ V5-1 | Bêta 5.1 | Programme du jour : un seul « Jouer », feuille de confirmation, retrait du fractionné |
+| ☑ V5-1 | Bêta 5.1 | Programme du jour : un seul « Jouer », feuille de confirmation, retrait du fractionné |
 | ☐ V5-2 | Bêta 5.2 | Navigation : 4 onglets, écran « Parcours » (fusion Voyage+Stats), retrait du Jardin |
 | ☐ V5-3 | Bêta 5.3 | Réglages & partage : profil, premier lancement, à propos, réinitialisation, retrait NAS |
 | ☐ V5-4 | Bêta 5.4 | Élagage résiduel, polish transversal, QA, checklist iPhone |
 
 ---
 
-## Lot V5-1 — Programme du jour (Bêta 5.1)
+## Lot V5-1 — Programme du jour (Bêta 5.1) ✅
 
 **But** : le cœur du cycle. Le moment le plus important de l'app — s'asseoir au piano —
 devient le plus simple : une proposition déjà composée, un tap pour l'accepter.
 
-**Prompt à coller :**
+**Livré (Bêta 5.1)** : CTA unique **« Jouer »** sur l'accueil (sous-titre = résumé du
+programme composé, `planSummaryLine`). Feuille **« Jouer »** (`playSheet`, `js/plan.js`) :
+programme déjà composé via `generatePlan(planPrefs)`, aperçu des blocs (consigne sur
+**chaque** bloc), CTA « Commencer » → `startPlanSession`, dépliant « Ajuster » (durée /
+nb de pièces / intention, aperçu + sous-titre régénérés en direct par `regenPlanPreview`),
+lien « Autrement… » → feuille secondaire (`altSheet`) = séance libre / concert / séance
+oubliée, une ligne chacune. `startSheet` allégé (retrait du toggle fractionné et du bouton
+« séance oubliée », renommé « Séance libre »). **Retirés de l'accueil** : grille Plan/
+Simulation, chips « Reprendre », section « À entretenir » (les révisions passent par le
+programme ; `startRevision` reste pour la reprise vacances). **Fractionné 25/5 retiré**
+partout (`toggleInterval`, `timer.interval`, phases work/break de `tick`/`paintSession`,
+`fractionedInsight`) ; le champ `interval` des anciennes séances reste en base, ignoré.
+Cas limites : répertoire vide ou vacances → `playSheet` ouvre directement `altSheet`
+(pas de programme creux). `planSheet`/`launchPlan` : `planSheet` supprimé, `launchPlan`
+réutilisé par « Commencer ».
+
+**Prompt (archive) :**
 
 ```
 Lot V5-1 du cycle « Épure » (direction validée, voir ROADMAP-V5.md) — Bêta 5.1.
