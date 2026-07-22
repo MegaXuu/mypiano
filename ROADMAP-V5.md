@@ -44,7 +44,7 @@
 | ☑ V5-1 | Bêta 5.1 | Programme du jour : un seul « Jouer », feuille de confirmation, retrait du fractionné |
 | ☑ V5-2 | Bêta 5.2 | Navigation : 4 onglets, écran « Parcours » (fusion Voyage+Stats), retrait du Jardin |
 | ☑ V5-3 | Bêta 5.3 | Réglages & partage : profil, premier lancement, à propos, réinitialisation, retrait NAS |
-| ☐ V5-4 | Bêta 5.4 | Élagage résiduel, polish transversal, QA, checklist iPhone |
+| ☑ V5-4 | Bêta 5.4 | Élagage résiduel, polish transversal, QA, checklist iPhone |
 
 ---
 
@@ -297,6 +297,24 @@ Contraintes : diffs ciblés ; node --check ; npm test doit passer ; incrémente 
 en piano-b5-4 ET APP_VERSION (js/state.js) en 'Bêta 5.4' ; pas d'emoji ; français sobre.
 Termine par un commit (message français).
 ```
+
+**Réalisé (Bêta 5.4) ✅** :
+- **Code mort** : résidus fractionné/Jardin déjà quasi tous retirés aux lots précédents ; il
+  ne restait qu'une règle CSS morte `.sess-halo.brk` (modificateur de la phase pause du
+  fractionné, plus jamais appliqué) — retirée. Champ `interval` des anciennes séances : plus
+  aucune lecture ni écriture nulle part (vérifié par grep). Commentaire de `parcours.js`
+  documentant le retrait du Jardin conservé (documentation, pas du code mort).
+- **Règle « jamais deux chemins »** : trois redondances signalées et **toutes retirées** après
+  validation — (1) « Séance oubliée » n'est plus accessible que depuis le Carnet (retiré de
+  Jouer → Autrement, qui ne garde que Séance libre + Simulation de concert) ; (2) l'objectif
+  du jour ne s'édite plus que depuis Réglages (bouton « Modifier » de l'anneau d'accueil retiré,
+  `goalSheet`/`gStep`/`saveGoal` supprimés) ; (3) le mode vacances ne s'active plus que depuis
+  Réglages (lien discret d'accueil retiré). CSS orphelin nettoyé (`.home-goal-btn/-sub/-stepper/
+  -unit`, `.home-vacation-link`).
+- **Réglages** : ordre des groupes (Profil → Objectifs → Série → Vacances → Révision &
+  estimations → Notifications → Données) et libellés relus, cohérents ; rien d'autre à retirer.
+- **Textes** du cycle (Jouer, Autrement, Parcours, bienvenue, à propos) relus : sobres,
+  minuscules de phrase, cohérents. Aucune correction nécessaire.
 
 ---
 

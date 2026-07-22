@@ -44,7 +44,7 @@ function renderHome(){
         </div>
         <div class="home-goal-info">
           <span class="muted home-goal-label">${vac?'Objectif en pause':'Objectif du jour'}</span>
-          ${vac?'':`<div><button class="btn ghost sm home-goal-btn" onclick="goalSheet()">Modifier</button></div>${softenedGoalActive()?'<div class="muted home-goal-soft">Objectif adouci · reprise en douceur</div>':''}`}
+          ${vac||!softenedGoalActive()?'':'<div class="muted home-goal-soft">Objectif adouci · reprise en douceur</div>'}
         </div>
       </div>
     </div>
@@ -65,7 +65,6 @@ function renderHome(){
       <div class="metric"><div class="v num" id="home-week-time-v">0</div><div class="l">temps joué</div></div>
       <div class="metric"><div class="v num" id="home-week-days-v">0</div><div class="l">jours actifs</div></div>
     </div>
-    ${vac?'':`<button class="btn ghost sm home-vacation-link" onclick="vacationSheet()">Mode vacances</button>`}
     <p class="num it home-quote">« ${q[0]} » — ${q[1]}</p>`;
 
   countUp(document.getElementById('home-streak-v'),streak,v=>Math.round(v).toString(),400);
@@ -115,14 +114,4 @@ function cap(s){return s.charAt(0).toUpperCase()+s.slice(1);}
 function flameSvg(sz){sz=sz||24;return '<svg viewBox="0 0 24 24" width="'+sz+'" height="'+sz+'" fill="currentColor" class="flame-ic"><path d="M12 2s5 4 5 9a5 5 0 0 1-10 0c0-2 1-3 1-3s0 2 1.5 2S12 9 12 7s0-3 0-5Z"/></svg>';}
 function playSvg(){return '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';}
 
-function goalSheet(){
-  openSheet(`<h3>Objectif du jour</h3>
-    <p class="muted home-goal-sub">Une durée pour aujourd'hui — tu peux la dépasser.</p>
-    <div class="stepper home-goal-stepper">
-      <button onclick="gStep(-5)">–</button><div class="v"><span id="gv">${todayGoal()}</span> <span class="home-goal-unit">min</span></div>
-      <button onclick="gStep(5)">+</button></div>
-    <button class="btn primary" onclick="saveGoal()">Valider</button>`);
-}
-function gStep(n){const e=document.getElementById('gv');e.textContent=Math.max(5,parseInt(e.textContent)+n);}
-function saveGoal(){S.settings.dailyGoal=parseInt(document.getElementById('gv').textContent);save();closeSheet();renderHome();toast('Objectif : '+S.settings.dailyGoal+' min');}
 

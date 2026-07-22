@@ -136,7 +136,8 @@ carnet de travail, et se motiver par la gamification. Cible : iPhone (PWA instal
   de 5). Pendant la pause (`vacationActive()`) : `needsRevision`/`revisionList` vides, alertes
   d'accueil neutralisées (`homeAlertsHtml`), notifications locales coupées (`localNotify`), anneau
   d'objectif en mode « Repos ». Cycle de vie dans `js/settings.js` : `vacationSheet`/
-  `activateVacation` (activation, aussi accessible par un lien discret en bas de l'accueil),
+  `activateVacation` (activation depuis Réglages → Vacances ; le lien discret d'accueil a été retiré
+  en V5-4, règle « jamais deux chemins »),
   `stopVacation`/`resumeSheet` (reprise manuelle ou automatique au boot si `until` est dépassée,
   voir `js/boot.js`) — résumé de la pause + jusqu'à 3 pièces à réviser en priorité
   (`revisionList().slice(0,3)`, bouton vers `startRevision()`) puis `applyResumeSpread` décale
@@ -378,7 +379,7 @@ niveaux de cartes compositeurs (Bronze/Argent/Or) ont leurs propres teintes de m
     accessible depuis la bannière : 3 formes (écoute active/lecture de partition/travail mental),
     pièce et section optionnelles, journalisées `mode:'away'` — comptées à part partout
     (`playSessions()`). Activation/reprise depuis Réglages (groupe « Vacances »,
-    `js/settings.js`) ou lien discret en bas de l'accueil ; reprise manuelle ou automatique au boot
+    `js/settings.js` ; lien d'accueil retiré en V5-4) ; reprise manuelle ou automatique au boot
     si la date de retour est dépassée (`js/boot.js`) ouvre `resumeSheet` (résumé de la pause,
     jusqu'à 3 révisions prioritaires, objectif adouci 7 jours, échéances de révision décalées de la
     durée de la pause). Rétrospective annuelle : ligne « + Xh loin du clavier » séparée du temps
@@ -411,8 +412,8 @@ niveaux de cartes compositeurs (Bronze/Argent/Or) ont leurs propres teintes de m
     `lastWeekReport` ne refiltrent plus toutes les séances 7× (14 balayages complets sur l'accueil
     → 2). Aucun changement de comportement (mêmes valeurs), couvert par `npm test`.
 
-- **Cycle V5 « Épure » (validé 2026-07-21) — EN COURS** : rendre l'app la plus simple et
-  intuitive possible, principe « l'app propose, tu valides » (= moins de décisions), et
+- **Cycle V5 « Épure » (validé 2026-07-21) — ✅ TERMINÉ (Bêta 5.4)** : rendre l'app la plus
+  simple et intuitive possible, principe « l'app propose, tu valides » (= moins de décisions), et
   donnable à un ami telle quelle. 4 lots = Bêta 5.1 → 5.4, **détail + prompts dans
   `ROADMAP-V5.md`** :
   - **V5-1 (Bêta 5.1)** ✅ : démarrage unifié. Un seul CTA **« Jouer »** sur l'accueil
@@ -420,7 +421,8 @@ niveaux de cartes compositeurs (Bronze/Argent/Or) ont leurs propres teintes de m
     La feuille « Jouer » présente le plan déjà composé via `generatePlan(planPrefs)` (consigne
     sur chaque bloc), « Commencer » → `startPlanSession`, dépliant « Ajuster » (durée/nb/
     intention, aperçu live via `regenPlanPreview`, mémorisé dans `planPrefs`), et « Autrement… »
-    → feuille secondaire `altSheet` (séance libre / concert / séance oubliée). `startSheet`
+    → feuille secondaire `altSheet` (séance libre / concert ; « séance oubliée » retirée d'ici en
+    V5-4, cf. ci-dessous). `startSheet`
     allégé (« Séance libre »), sans fractionné ni bouton « séance oubliée ». Retirés de
     l'accueil : grille Plan/Simulation, chips « Reprendre », section « À entretenir »
     (`startRevision` conservé pour la reprise vacances). **Fractionné 25/5 retiré partout**
@@ -450,10 +452,16 @@ niveaux de cartes compositeurs (Bronze/Argent/Or) ont leurs propres teintes de m
   `aboutSheet` (données 100 % locales + conseil d'export + version), `resetSheet`/`doReset`
   (feuille en deux temps : export d'abord, puis danger → `S=defaults()` + `idbClearRecordings()`
   + `saveNow()` → accueil vierge → re-bienvenue).
-  - **À venir** : V5-4 élagage résiduel + polish + QA. Décisions cadrées : priorités =
-  démarrage + navigation + réglages/partage (carnet de fin et refonte accueil hors périmètre,
-  candidats V6) ; élagage au cas par cas (seuls Jardin, fractionné et UI NAS retirés,
-  défis/cartes/concert/vacances conservés) ; maquette à valider avant de coder pour V5-1 et V5-2.
+  - **V5-4 (Bêta 5.4)** ✅ : élagage résiduel + polish + QA, aucune fonctionnalité nouvelle.
+  Code mort restant du cycle : seule la règle CSS `.sess-halo.brk` (modificateur de la pause du
+  fractionné, plus jamais appliqué) subsistait — retirée ; champ `interval` des anciennes séances
+  confirmé sans lecture ni écriture nulle part. **Règle « jamais deux chemins visibles vers la même
+  action »** appliquée — trois redondances retirées après validation : (1) « Séance oubliée » n'est
+  plus accessible que depuis le Carnet (`aposterioriSheet`, retiré de `altSheet`) ; (2) l'objectif
+  du jour ne s'édite plus que depuis Réglages (bouton « Modifier » de l'anneau d'accueil supprimé,
+  avec `goalSheet`/`gStep`/`saveGoal`) ; (3) le mode vacances ne s'active plus que depuis Réglages
+  (lien d'accueil supprimé ; `vacationSheet` conservé). CSS orphelin nettoyé au passage. Réglages et
+  textes du cycle relus (ordre des groupes, libellés, minuscules de phrase) : rien à corriger.
 
 - **Reporté en V6+** : carnet de fin de séance allégé (deux temps) ; refonte complète de
   l'accueil ; thème clair « Nacre » ; **sauvegarde auto vers NAS Synology** (on reste

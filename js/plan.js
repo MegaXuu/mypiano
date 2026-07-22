@@ -132,7 +132,6 @@ function altSheet(root){
     <div class="alt-list">
       <button class="btn ghost btn-full alt-row" onclick="startSheet()">Séance libre<span class="alt-arr">›</span></button>
       <button class="btn ghost btn-full alt-row" onclick="concertSheet()">Simulation de concert<span class="alt-arr">›</span></button>
-      <button class="btn ghost btn-full alt-row" onclick="aposterioriSheet()">Séance oubliée<span class="alt-arr">›</span></button>
     </div>`);
 }
 function pgSetDur(m,el){
