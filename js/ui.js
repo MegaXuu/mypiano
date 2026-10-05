@@ -1,17 +1,17 @@
 /* ==========================================================================
    ui.js — COQUILLE. Navigation (go/FULL), toast, feuilles modales
-   (openSheet/closeSheet/confirmSheet) et geste glisser-fermer.
+   (openSheet/closeSheet/confirmSheet), geste glisser-fermer, célébration.
    ========================================================================== */
 const FULL = {session:1,settings:1};
 function go(name){
-  if(name==='voyage'||name==='stats')name='parcours'; // alias hérités (V5-2 : Voyage+Stats fusionnés)
+  if(!document.getElementById('s-'+name))name='home'; // écrans retirés (répertoire, voyage, stats…)
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   const el=document.getElementById('s-'+name);
   el.classList.add('active');
   document.getElementById('tabbar').style.display = FULL[name]?'none':'flex';
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.s===name));
   window.scrollTo(0,0);
-  ({home:renderHome,carnet:renderCarnet,rep:renderRep,parcours:renderParcours,settings:renderSettings}[name]||(()=>{}))();
+  ({home:renderHome,carnet:renderCarnet,parcours:renderParcours,settings:renderSettings}[name]||(()=>{}))();
   staggerScreen(el);
 }
 function reduceMotion(){return !!(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches);}
@@ -30,7 +30,7 @@ function countUp(el,target,fmt,dur){
   if(reduceMotion()){el.textContent=fmt(target);return;}
   const start=performance.now();
   (function frame(t){
-    const p=Math.min(1,(t-start)/dur),eased=1-Math.pow(1-p,3);
+    const p=Math.min(1,Math.max(0,(t-start)/dur)),eased=1-Math.pow(1-p,3);
     el.textContent=fmt(target*eased);
     if(p<1)raf(frame);
   })(start);
@@ -96,3 +96,30 @@ function endSheetDrag(e){
 document.getElementById('sheet-bg').addEventListener('pointerup',endSheetDrag);
 document.getElementById('sheet-bg').addEventListener('pointercancel',endSheetDrag);
 
+
+/* ---------- Célébration (nouveau rang) ---------- */
+function buzz(){try{navigator.vibrate&&navigator.vibrate([50,40,50]);}catch(e){}}
+function celebrate(title,sub){
+  buzz();const o=document.createElement('div');
+  o.className='celeb-ov';
+  o.innerHTML=`<div class="celeb-inner">
+    <div class="medal"><div class="medal-glow"></div><div class="medal-ring"></div><div class="medal-glyph">${esc(rankGlyph(currentStone()))}</div></div>
+    <div class="eyebrow">Nouveau rang</div>
+    <div class="serif celeb-title">${esc(title)}</div>
+    ${sub?`<div class="muted celeb-sub">${esc(sub)}</div>`:''}
+    <button class="btn ghost sm celeb-continue">Continuer</button>
+  </div>`;
+  o.onclick=e=>{if(e.target===o||e.target.tagName==='BUTTON')o.remove();};
+  document.body.appendChild(o);
+  raf(()=>o.firstElementChild.classList.add('show'));
+}
+function playSvg(sz){sz=sz||18;return '<svg viewBox="0 0 24 24" width="'+sz+'" height="'+sz+'" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>';}
+function flameSvg(sz){sz=sz||16;return '<svg viewBox="0 0 24 24" width="'+sz+'" height="'+sz+'" fill="currentColor" aria-hidden="true"><path d="M12 2s5 4 5 9a5 5 0 0 1-10 0c0-2 1-3 1-3s0 2 1.5 2S12 9 12 7s0-3 0-5Z"/></svg>';}
+const _dyn={};
+// Échelle de nuances pp–ff réutilisable (fin de séance, enregistrement, édition).
+function dynPicker(id,val){_dyn[id]=val||'';const idx=FEEL_ORDER.indexOf(val);
+  return `<div class="dyn" id="${id}">${FEEL_ORDER.map((f,i)=>`<button type="button" class="${val&&i<=idx?'on':''}" onclick="pickDyn('${id}','${f}')">${f}</button>`).join('')}</div>
+    <div class="muted feel-label" id="${id}-l">${val?FEEL[val]:'—'}</div>`;}
+function pickDyn(id,f){_dyn[id]=_dyn[id]===f?'':f;const v=_dyn[id],idx=FEEL_ORDER.indexOf(v);
+  document.querySelectorAll('#'+id+' button').forEach((b,i)=>b.classList.toggle('on',!!v&&i<=idx));
+  const l=document.getElementById(id+'-l');if(l)l.textContent=v?FEEL[v]:'—';}

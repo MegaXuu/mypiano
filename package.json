@@ -5,7 +5,7 @@
   "description": "App perso de pratique du piano (PWA hors-ligne, JS pur, sans build).",
   "type": "module",
   "scripts": {
-    "check": "node --check app.js && node --check opus.js && node --check sw.js",
+    "check": "for f in js/*.js sw.js; do node --check $f || exit 1; done",
     "test": "node test.mjs",
     "serve": "python3 -m http.server 8137"
   },

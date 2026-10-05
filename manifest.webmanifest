@@ -1,7 +1,7 @@
 {
   "name": "Piano — Pratique",
   "short_name": "Piano",
-  "description": "Carnet de travail, suivi et gamification de ta pratique du piano.",
+  "description": "Un chrono et un objectif pour ta pratique du piano.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

@@ -1,15 +1,15 @@
 /* ==========================================================================
    Test fumée — charge l'app sous jsdom et exerce les fonctions clés.
-   Objectif : attraper les erreurs runtime (pas de vérif métier fine).
+   Objectif : attraper les erreurs runtime + vérifier la migration V5 → V6
+   (pas de vérif métier fine).
    Lancer :  npm test           (après « npm install » une première fois)
 
-   Note : dans app.js, l'état `let S` n'est PAS une propriété de window.
-   On seed donc via localStorage AVANT l'exécution (c'est loadState() qui migre
-   depuis là au premier boot), et on lit l'état via un petit accesseur
-   window.__S injecté après app.js. Le boot est désormais asynchrone
-   (IndexedDB) : window.__ready renvoie la promesse de boot, window.__flush
-   force l'écriture disque avant qu'on aille inspecter IndexedDB directement.
-   jsdom n'implémente pas IndexedDB → on injecte fake-indexeddb.
+   L'état `let S` n'est PAS une propriété de window : on seed via localStorage
+   AVANT l'exécution (loadState() migre depuis là au premier boot), et on lit
+   l'état via l'accesseur window.__S injecté après les modules. Le boot est
+   asynchrone (IndexedDB) : window.__ready renvoie la promesse de boot,
+   window.__flush force l'écriture disque. jsdom n'implémente pas IndexedDB →
+   on injecte fake-indexeddb.
    ========================================================================== */
 import { readFileSync } from 'node:fs';
 import { JSDOM } from 'jsdom';
@@ -18,38 +18,33 @@ import { indexedDB, IDBKeyRange } from 'fake-indexeddb';
 const root = new URL('.', import.meta.url).pathname;
 const read = f => readFileSync(root + f, 'utf8');
 
-// L'app est découpée en modules <script> classiques (js/*.js). En prod ils
-// partagent la portée globale ; sous jsdom c'est pareil, mais on les inline en
-// UN seul <script> (concaténation dans l'ordre de chargement = l'ancien app.js)
-// pour rester robuste, puis on ajoute les accesseurs (même scope lexical).
+// Modules <script> classiques, concaténés dans l'ordre de chargement (miroir d'index.html et sw.js).
 const FILES = [
-  'js/opus.js', 'js/state.js', 'js/ui.js', 'js/home.js', 'js/session.js', 'js/carnet.js',
-  'js/repertoire.js', 'js/piece-detail.js', 'js/parcours.js', 'js/settings.js',
-  'js/gamification.js', 'js/plan.js', 'js/boot.js',
+  'js/state.js', 'js/ui.js', 'js/methods.js', 'js/home.js', 'js/session.js',
+  'js/carnet.js', 'js/parcours.js', 'js/settings.js', 'js/boot.js',
 ];
 const bundle = FILES.map(read).join('\n');
 const html = read('index.html')
-  .replace(/<script src="js\/[^"]+"><\/script>\s*/g, '') // retire les 14 balises externes
-  .replace('</body>', `<script>${bundle}</script>\n<script>window.__S=function(){return S;};window.__ready=function(){return READY;};window.__flush=function(){return saveNow();};</script>\n</body>`);
+  .replace(/<script src="js\/[^"]+"><\/script>\s*/g, '')
+  .replace('</body>', `<script>${bundle}</script>\n<script>window.__S=function(){return S;};window.__T=function(){return timer;};window.__ready=function(){return READY;};window.__flush=function(){return saveNow();};</script>\n</body>`);
 
+// Seed au format V5 (données réelles typiques) pour vérifier la migration.
 const now = Date.now();
+const day = n => { const d = new Date(now - n * 864e5); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
 const seed = {
   pieces: [
-    { id: 'a1', title: 'Nocturne op. 9 no 2', composer: 'Chopin', epoch: 'Romantique', diff: 6, status: 'active', progress: 20, tags: ['concert'], notes: [{ id: 'n1', date: '2026-07-10', section: 'mes. 1-8', text: 'Legato' }], createdAt: now - 40 * 864e5 },
-    { id: 'a2', title: 'Clair de lune', composer: 'Debussy', diff: 7, status: 'active', progress: 55, notes: [], createdAt: now - 20 * 864e5 },
-    { id: 'a3', title: 'Gymnopédie no 1', composer: 'Satie', diff: 3, status: 'mastered', progress: 100, masteredAt: now - 60 * 864e5, notes: [], createdAt: now - 120 * 864e5 },
-    { id: 'a4', title: 'Fantaisie-Impromptu', composer: 'Chopin', diff: 8, status: 'active', progress: 0, bars: 50, notes: [], createdAt: now - 30 * 864e5,
-      sections: [
-        { id: 'sec1', name: 'Ouverture', from: 1, to: 20, todo: '', status: 'wip', bpm: [{ d: '2026-07-01', v: 70 }, { d: '2026-07-08', v: 80 }] },
-        { id: 'sec2', name: 'Coda', from: 21, to: 50, todo: 'Ralentir', status: 'ok', bpm: [] },
-      ],
-      hist: [{ d: '2026-06-20', m: 0 }, { d: '2026-06-27', m: 10 }, { d: '2026-07-04', m: 20 }, { d: '2026-07-11', m: 30 }] },
-    { id: 'a5', title: 'Étude sans section', composer: 'Czerny', diff: 4, status: 'active', progress: 30, notes: [], createdAt: now - 10 * 864e5 },
+    { id: 'a1', title: 'Nocturne op. 9 no 2', composer: 'Chopin', status: 'active', notes: [], createdAt: now - 40 * 864e5,
+      recordings: [{ id: 'r1', date: day(3), dur: 42, feel: 'mf', size: 12000, mime: 'audio/mp4' }] },
+    { id: 'a2', title: 'Clair de lune', composer: 'Debussy', status: 'mastered', sections: [{ id: 's1', name: 'A', from: 1, to: 8, status: 'ok' }] },
   ],
-  sessions: [{ id: 's1', date: '2026-07-14', mode: 'chrono', blocks: [{ piece: 'a1', sec: 1200 }], entries: [], ts: now }],
-  wishlist: [{ id: 'w1', title: 'La Campanella', composer: 'Liszt' }],
-  journal: {}, opusCache: {}, challenges: { week: null, month: null, log: [] },
-  settings: {},
+  sessions: [
+    { id: 's1', date: day(2), mode: 'chrono', blocks: [{ piece: 'a1', sec: 1200 }, { piece: 'a2', sec: 600 }], entries: [{ piece: 'a1', worked: 'Legato', next: 'Pédale' }], feeling: 'f', ts: now - 2 * 864e5 },
+    { id: 's2', date: day(1), mode: 'guided', blocks: [{ piece: '__improv__', sec: 900 }], entries: [], ts: now - 864e5 },
+    { id: 's3', date: day(1), mode: 'away', awayKind: 'ecoute', blocks: [{ piece: '', sec: 1800 }], entries: [], ts: now - 864e5 },
+  ],
+  wishlist: [], journal: {}, challenges: { week: null, month: null, log: [] },
+  vacation: { on: true, from: day(20), until: null, resumedAt: null },
+  settings: { userName: 'Test', dailyGoal: 30, tolerance: 1, planPrefs: { dur: 60, n: 2, intent: 'equilibre' } },
 };
 
 const fails = [];
@@ -59,23 +54,10 @@ const dom = new JSDOM(html, {
   runScripts: 'dangerously',
   url: 'http://localhost/',
   beforeParse(win) {
-    // Réseau coupé + hors-ligne : pas d'appel Open Opus pendant le test.
     win.fetch = () => Promise.reject(new Error('offline (test)'));
-    Object.defineProperty(win.navigator, 'onLine', { get: () => false });
-    // jsdom n'implémente pas IndexedDB : on injecte fake-indexeddb (même instance
-    // que celle importée ci-dessus dans ce script, pour pouvoir l'inspecter après boot).
     win.indexedDB = indexedDB;
     win.IDBKeyRange = IDBKeyRange;
-    // jsdom n'implémente pas scrollTo : no-op pour éviter le bruit console.
     win.scrollTo = () => {};
-    // idem pour confirm() (dialogues non implémentés en jsdom) : on approuve toujours.
-    win.confirm = () => true;
-    // app.js déclare une fonction globale history() (liste des séances) ;
-    // en vrai navigateur elle masque sans souci window.history (vérifié),
-    // mais l'objet History de jsdom est non-configurable et bloque le
-    // shadowing — on le libère avant l'exécution du script.
-    try { delete win.history; } catch (e) {}
-    // Seed AVANT que app.js exécute load() au boot.
     win.localStorage.setItem('pianoV2', JSON.stringify(seed));
     win.addEventListener('error', e => onError('window.onerror', e.error || e.message));
   },
@@ -84,151 +66,139 @@ const dom = new JSDOM(html, {
 const win = dom.window;
 if (typeof win.__ready === 'function') await win.__ready();
 const S = typeof win.__S === 'function' ? win.__S() : undefined;
+const call = (label, fn) => { try { fn(); } catch (e) { onError(label, e); } };
 
-// 1) Le boot a-t-il produit un état exploitable ?
-if (!S) fails.push('boot → état S inaccessible (app.js n’a pas exécuté / accesseur absent)');
-
-// 2) Migration de la wishlist.
-if (S) {
-  if (S.wishlist.length !== 0) fails.push('migration → wishlist non vidée');
-  if (!S.pieces.some(p => p.status === 'wishlist')) fails.push('migration → aucune pièce « à apprendre »');
+// 1) Boot + migration V5 → V6.
+if (!S) fails.push('boot → état S inaccessible');
+else {
+  if (S.pieces.length !== 2) fails.push('migration → les anciens morceaux doivent rester stockés');
+  if (!S.recordings.some(r => r.id === 'r1' && r.label === 'Nocturne op. 9 no 2')) fails.push('migration → enregistrement non repris dans S.recordings');
+  if (S.vacation.on) fails.push('migration → une pause en cours doit être terminée');
+  if (!S.onboarded) fails.push('migration → onboarded doit être vrai avec des données');
+  if (win.totalSeconds() !== 2700) fails.push('totalSeconds → ' + win.totalSeconds() + ' (attendu 2700, séance away exclue)');
+  if (win.legacyPieces(S.sessions[0]).join('|') !== 'Nocturne op. 9 no 2|Clair de lune') fails.push('legacyPieces → noms des anciens morceaux incorrects');
 }
 
-// 2bis) Migration localStorage → IndexedDB (étape 3 V3).
+// 1bis) Migration localStorage → IndexedDB.
 function idbGetDirect(key) {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open('pianoV2', 1);
     req.onsuccess = () => {
-      const db = req.result;
-      const rq = db.transaction('state', 'readonly').objectStore('state').get(key);
-      rq.onsuccess = () => resolve(rq.result);
-      rq.onerror = () => reject(rq.error);
+      const rq = req.result.transaction('state', 'readonly').objectStore('state').get(key);
+      rq.onsuccess = () => resolve(rq.result); rq.onerror = () => reject(rq.error);
     };
     req.onerror = () => reject(req.error);
   });
 }
 try {
-  const idbRaw = await idbGetDirect('S');
-  if (!idbRaw) fails.push('IndexedDB → clé "S" absente après boot');
-  else {
-    const idbState = JSON.parse(idbRaw);
-    if (!Array.isArray(idbState.pieces) || idbState.pieces.length !== S.pieces.length)
-      fails.push('IndexedDB → nombre de pièces divergent de l’état en mémoire');
-  }
-  const idbMeta = await idbGetDirect('meta');
-  if (!idbMeta || idbMeta.from !== 'localStorage')
-    fails.push('IndexedDB → meta.from attendu "localStorage" (migration depuis le seed localStorage)');
-} catch (e) {
-  fails.push('IndexedDB → lecture directe en échec : ' + (e && e.message ? e.message : e));
-}
+  const raw = await idbGetDirect('S');
+  if (!raw) fails.push('IndexedDB → clé "S" absente après boot');
+  else if (JSON.parse(raw).sessions.length !== 3) fails.push('IndexedDB → séances divergentes');
+  const meta = await idbGetDirect('meta');
+  if (!meta || meta.from !== 'localStorage') fails.push('IndexedDB → meta.from attendu "localStorage"');
+} catch (e) { fails.push('IndexedDB → lecture directe en échec : ' + (e && e.message ? e.message : e)); }
 
-// 3) Batterie d'appels : chaque fonction ne doit pas throw.
-const call = (label, fn) => { try { fn(); } catch (e) { onError(label, e); } };
+// 2) Navigation.
+['home', 'carnet', 'parcours', 'settings', 'home'].forEach(scr => call(`go('${scr}')`, () => win.go(scr)));
+call("go('rep') → accueil", () => { win.go('rep'); if (!win.document.getElementById('s-home').classList.contains('active')) throw new Error('écran retiré non redirigé'); });
 
-['home', 'carnet', 'rep', 'parcours', 'settings'].forEach(scr =>
-  call(`go('${scr}')`, () => win.go(scr))
-);
-// Alias hérités Voyage/Stats → Parcours (V5-2).
-call("go('voyage'/'stats') alias", () => { win.go('voyage'); win.go('stats'); });
-call("renderRep('active')", () => win.setRep('active'));
-call("renderRep('mastered')", () => win.setRep('mastered'));
-call("renderRep('wishlist')", () => win.setRep('wishlist'));
-call('pieceDetail(active)', () => win.pieceDetail('a1'));
-call('pieceDetail(mastered)', () => win.pieceDetail('a3'));
-call('piecePhase(tous)', () => S && S.pieces.forEach(p => win.piecePhase(p)));
-call('findDuplicate', () => { if (!win.findDuplicate('nocturne op.9 no2', 'CHOPIN')) throw new Error('doublon non détecté'); });
-call('addPieceSheet', () => win.addPieceSheet());
-call('startSheet', () => win.startSheet());
-call('parcours dépliants', () => { win.go('parcours'); ['succes', 'rep', 'cartes', 'records'].forEach(k => { win.toggleParc(k); win.toggleParc(k); }); win.toggleVoyageRanks(); win.toggleVoyageRanks(); });
-call('succesGrid/succesCount', () => { if (!win.succesGrid()) throw new Error('succesGrid vide'); win.succesCount(); });
-call('lastMonthReport', () => win.lastMonthReport());
-
-// 3bis) Sections & mesures (V3 étape 2).
-call('pieceDetail(sections)', () => win.pieceDetail('a4'));
-call('addSection+deleteSection', () => {
-  win.addSection('a4');
-  const p = S.pieces.find(x => x.id === 'a4');
-  const last = p.sections[p.sections.length - 1];
-  win.deleteSection('a4', last.id); // ouvre confirmSheet() (feuille, plus de confirm() natif)
-  win._runConfirm(); // simule le tap sur le bouton de confirmation
-  if (p.sections.some(s => s.id === last.id)) throw new Error('deleteSection n’a pas supprimé la section');
+// 3) Séance complète : démarrage, situation, méthodes, pause, fin, enregistrement.
+call('séance : démarrage + situation + méthodes', () => {
+  win.beginSession();
+  if (!win.__T()) throw new Error('timer absent');
+  if (!win.localStorage.getItem('pianoV2.timer')) throw new Error('chrono non persisté');
+  win.setFocus('difficile');
+  if (win.__T().focus !== 'difficile' || S.settings.focus !== 'difficile') throw new Error('situation non retenue');
+  win.nextMethod(); win.nextMethod();
+  if (!win.document.querySelector('.method-card')) throw new Error('carte méthode absente');
+  win.methodsSheet('difficile'); win.closeSheet();
+  win.togglePause(); if (win.__T().since) throw new Error('pause sans effet');
+  win.togglePause(); if (!win.__T().since) throw new Error('reprise sans effet');
 });
-call('toggleSec+secBpmStep+noteSecBpm', () => {
-  win.pieceDetail('a4');
-  const p = S.pieces.find(x => x.id === 'a4');
-  const sid = p.sections[0].id;
-  win.toggleSec('a4', sid);
-  win.secBpmStep(sid, 2);
-  win.noteSecBpm('a4', sid);
+call('séance : chrono à horodatages', () => {
+  const t = win.__T(); t.acc = 600; t.since = Date.now() - 60000; // 10 min déjà comptées + 1 min en cours
+  if (Math.round(win.elapsed()) !== 660) throw new Error('elapsed() = ' + win.elapsed());
+  win.paintSession();
 });
-call('setSecStatus', () => {
-  const p = S.pieces.find(x => x.id === 'a4');
-  win.setSecStatus('a4', p.sections[0].id, 'poli');
+call('séance : fin + enregistrement', () => {
+  const before = S.sessions.length;
+  win.stopSession();
+  win.pickDyn('end-f', 'ff');
+  win.document.getElementById('end-n').value = 'Main gauche plus libre';
+  win.commitSession(660);
+  if (S.sessions.length !== before + 1) throw new Error('séance non créée');
+  const s = S.sessions[S.sessions.length - 1];
+  if (s.feeling !== 'ff' || s.note !== 'Main gauche plus libre' || s.focus !== 'difficile') throw new Error('champs de fin de séance perdus');
+  if (win.sessionSeconds(s) !== 660) throw new Error('durée = ' + win.sessionSeconds(s));
+  if (win.__T()) throw new Error('timer non libéré');
+  if (win.localStorage.getItem('pianoV2.timer')) throw new Error('chrono persistant non effacé');
 });
-call('cutSheet+applyCut(pièce sans sections)', () => {
-  win.cutSheet('a5');
-  const barsInput = win.document.getElementById('cut-bars');
-  barsInput.value = '40';
-  win.paintCutPreview();
-  const btns = [...win.document.querySelectorAll('#cut-seg button')];
-  if (btns[1]) btns[1].click(); // « 16 mes. »
-  win.applyCut('a5');
-  const p = S.pieces.find(x => x.id === 'a5');
-  if (!p.bars || !p.sections.length) throw new Error('découpage assisté n’a rien créé');
+call('séance : durée corrigée à la main', () => {
+  win.beginSession(); win.stopSession();
+  win.document.getElementById('end-min').value = '45';
+  win.commitSession(3);
+  if (win.sessionSeconds(S.sessions[S.sessions.length - 1]) !== 2700) throw new Error('correction de durée ignorée');
 });
-call('carnetSheet+commitSession(sections)', () => {
-  // Démarre une vraie séance (fixe le `timer` interne, pas accessible depuis window autrement).
-  win.quickStart('a4');
-  win.stopSession(); // total < 5s → ouvre confirmSheet()
-  win._runConfirm(); // simule « Enregistrer quand même » → carnetSheet() s'ouvre
-  const chip = win.document.querySelector('#csec-chips-0 .chip');
-  if (!chip) throw new Error('chip section introuvable dans le carnet');
-  chip.click();
-  const sid = chip.dataset.sid;
-  const adv = win.document.getElementById('csec-adv-0-' + sid);
-  if (adv) adv.click();
-  const bpmInput = win.document.getElementById('cbpm-0-' + sid);
-  if (bpmInput) bpmInput.value = '96';
-  win.commitSession(0);
+call('séance : abandon', () => {
+  const before = S.sessions.length;
+  win.beginSession(); win.stopSession(); win.discardSession(); win._runConfirm();
+  if (S.sessions.length !== before || win.__T()) throw new Error('abandon incorrect');
+});
+call('séance : reprise après rechargement', () => {
+  win.localStorage.setItem('pianoV2.timer', JSON.stringify({ start: Date.now() - 300000, acc: 0, since: Date.now() - 300000, focus: null, recIds: [] }));
+  if (!win.resumeStoredSession()) throw new Error('reprise refusée');
+  if (Math.round(win.elapsed()) < 299) throw new Error('temps perdu à la reprise');
+  win.stopSession(); win.discardSession(); win._runConfirm();
 });
 
-// 3quater) Mode vacances (V4-4) : activation/bannière, séance loin du clavier, gel de série, reprise.
-call('vacation : activation + bannière accueil', () => {
-  win.vacationSheet();
-  win.document.getElementById('vac-from').value = win.dkey(win.addDays(new Date(), -30));
-  win.document.getElementById('vac-until').value = win.dkey(win.addDays(new Date(), 30));
-  win.activateVacation();
-  if (!S.vacation.on) throw new Error('vacation non activée');
-  win.go('home'); // doit peindre la bannière sans throw
-  win.renderSettings(); // doit peindre le groupe « Vacances » en état actif
+// 4) Carnet.
+call('carnet : détail, édition, séance oubliée, suppression', () => {
+  win.go('carnet');
+  win.sessionDetail('s1'); win.sessionDetail('s3');
+  win.sessionEditSheet('s1');
+  win.document.getElementById('a-min').value = '60';
+  win.saveSessionEdit('s1');
+  const s1 = S.sessions.find(s => s.id === 's1');
+  if (win.sessionSeconds(s1) !== 3600 || s1.blocks.length !== 2) throw new Error('édition au prorata incorrecte');
+  const before = S.sessions.length;
+  win.sessionEditSheet(); win.document.getElementById('a-min').value = '20'; win.saveSessionEdit('');
+  if (S.sessions.length !== before + 1) throw new Error('séance oubliée non ajoutée');
+  win.deleteSession('s2'); win._runConfirm();
+  if (S.sessions.some(s => s.id === 's2')) throw new Error('suppression sans effet');
+  win.recordingsSheet(); win.closeSheet();
 });
-call('vacation : séance loin du clavier comptée à part', () => {
-  const before = win.totalSeconds(), beforeCount = S.sessions.length;
-  win.awaySheet();
-  const chip = win.document.querySelector('#aw-pieces .chip');
-  if (chip) chip.click();
-  win.saveAway();
-  if (S.sessions.length !== beforeCount + 1) throw new Error('séance away non créée');
-  const away = S.sessions[S.sessions.length - 1];
-  if (away.mode !== 'away') throw new Error('mode away non appliqué');
-  if (win.totalSeconds() !== before) throw new Error('la séance away a été comptée dans le temps joué');
-  win.go('carnet'); // doit peindre le badge « loin du clavier » sans throw
+
+// 5) Parcours, succès, réglages.
+call('parcours + dépliants + succès', () => {
+  win.go('parcours'); win.toggleParc('rangs'); win.toggleParc('succes');
+  const ach = win.achievements();
+  if (ach.length < 25) throw new Error('catalogue de succès trop court');
+  if (!ach.find(a => a.id === 'foc1').on) throw new Error('succès « situation » non débloqué');
+  if (!ach.find(a => a.id === 'rec1').on) throw new Error('succès « enregistrement » non débloqué');
 });
-call('vacation : reprise (feuille + objectif adouci)', () => {
-  win.stopVacation();
-  if (S.vacation.on) throw new Error('vacation toujours active après stopVacation');
-  if (!S.vacation.resumedAt) throw new Error('resumedAt non renseigné après la reprise');
-  if (!win.softenedGoalActive()) throw new Error('objectif adouci non actif juste après la reprise');
-  win.closeSheet();
+call('réglages : objectif + tolérance + prénom', () => {
+  win.go('settings');
+  win.goalSheet(); win.goalStep(5); win.saveGoal();
+  if (S.settings.dailyGoal !== 35) throw new Error('objectif non enregistré');
+  win.setTol(2); if (S.settings.tolerance !== 2) throw new Error('tolérance non enregistrée');
+  win.editName(); win.document.getElementById('un').value = ''; win.saveName();
+  if (S.settings.userName !== null) throw new Error('prénom vide non accepté');
+  win.aboutSheet(); win.closeSheet();
   win.go('home');
 });
 
-// 3ter) Écriture immédiate (utilisée par l'import JSON et la mise en arrière-plan).
-if (typeof win.__flush === 'function') {
-  try { await win.__flush(); } catch (e) { onError('saveNow (flush)', e); }
-}
+// 6) Écriture immédiate puis réinitialisation (→ bienvenue).
+try { await win.__flush(); } catch (e) { onError('saveNow (flush)', e); }
+try {
+  await win.doReset();
+  const S2 = win.__S();
+  if (S2.sessions.length || S2.onboarded) fails.push('réinitialisation incomplète');
+  if (!win.document.getElementById('sheet-bg').classList.contains('show')) fails.push('bienvenue non affichée après réinitialisation');
+  win.welcomeStep(2); win.wGoalStep(10); win.finishWelcome();
+  if (!win.__S().onboarded || win.__S().settings.dailyGoal !== 30) fails.push('bienvenue : objectif/onboarded incorrects');
+} catch (e) { onError('doReset/bienvenue', e); }
 
-// 4) Bilan.
+// 7) Bilan.
 if (fails.length) {
   console.error(`\n✗ ${fails.length} échec(s) :`);
   fails.forEach(f => console.error('  - ' + f));
